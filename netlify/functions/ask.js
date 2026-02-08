@@ -24,17 +24,19 @@ exports.handler = async (event, context) => {
     }
 
     // 1. Generate Embedding for the Question
-    // MUST use the exact same model as ingest.py to match dimensions (3072 or 768)
+    // We use the exact same model as ingest.py to match dimensions
     const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
+    
+    // SDK Update: use embedContent and access values correctly
     const embeddingResult = await embeddingModel.embedContent(question);
     const vector = embeddingResult.embedding.values;
 
     // 2. Hybrid Search in Supabase
-    // We call the 'hybrid_search' RPC function you created in SQL
+    // We call the 'hybrid_search' RPC function created in SQL
     const { data: chunks, error: searchError } = await supabase.rpc('hybrid_search', {
       query_text: question,
       query_embedding: vector,
-      match_count: 5,       // Top 5 relevant chunks
+      match_count: 15,       // UPDATED: Increased to 15 chunks for broader context
       full_text_weight: 1.0, 
       semantic_weight: 2.0, // Prioritize meaning over keywords
       rrf_k: 50
@@ -42,26 +44,29 @@ exports.handler = async (event, context) => {
 
     if (searchError) {
       console.error("Supabase Error:", searchError);
-      throw new Error("Failed to search database.");
+      throw new Error(`Database Error: ${searchError.message}`);
     }
 
     // 3. Construct the Context String
     const contextText = chunks
-      .map(chunk => `SOURCE (${chunk.id}):\n${chunk.content}`)
+      .map(chunk => `SOURCE (ID: ${chunk.id}):\n${chunk.content}`)
       .join("\n\n---\n\n");
 
     // 4. Generate Answer with Gemini 2.0 Flash
     const chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     
+    // UPDATED PROMPT: Stricter "Docs Only" rules and cleaner formatting
     const prompt = `
-    You are a legal assistant for South African labor law. 
-    Use the following context to answer the user's question.
-    
-    Rules:
-    - Base your answer ONLY on the provided context.
-    - If the answer is not in the context, say "I cannot find this in the database."
-    - Cite the case names or acts if mentioned in the text.
-    
+    You are a professional legal assistant for South African labor law. 
+    Your knowledge base is STRICTLY LIMITED to the provided context below.
+
+    Directives:
+    1. **Strict Grounding:** Answer the user's question using ONLY the information found in the 'Context' section below. Do not use your own outside knowledge.
+    2. **Transparency:** If the answer is not explicitly found in the context, state: "I cannot find specific details regarding this in the uploaded documents." Do not try to make up an answer.
+    3. **Professional Tone:** Provide clear, concise, and professional answers. Use bullet points for lists.
+    4. **Citations:** Refer to specific Acts or Sections if available in the text (e.g., "According to the Basic Conditions of Employment Act..."). 
+    5. **Clean Output:** Do NOT mention internal "Source IDs", "Chunks", or "Database Records" in your final response.
+
     Context:
     ${contextText}
     
@@ -70,7 +75,8 @@ exports.handler = async (event, context) => {
     `;
 
     const result = await chatModel.generateContent(prompt);
-    const answer = result.response.text();
+    const response = await result.response;
+    const answer = response.text();
 
     return {
       statusCode: 200,
@@ -80,9 +86,10 @@ exports.handler = async (event, context) => {
 
   } catch (error) {
     console.error("Server Error:", error);
+    // Send the actual error message to the frontend
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Internal Server Error", details: error.message })
+      body: JSON.stringify({ error: error.message || "Unknown Error" })
     };
   }
 };
