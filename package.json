@@ -1,0 +1,10 @@
+{
+  "name": "legal-chat-bot",
+  "version": "1.0.0",
+  "description": "Serverless function for RAG chat",
+  "dependencies": {
+    "@google/generative-ai": "^0.2.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1"
+  }
+}
