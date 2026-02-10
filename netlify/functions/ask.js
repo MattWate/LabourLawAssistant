@@ -14,43 +14,35 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { question } = JSON.parse(event.body);
+    const { question, history } = JSON.parse(event.body); // Accepted history if you want to add it later
     if (!question) return { statusCode: 400, body: JSON.stringify({ error: 'Question required' }) };
 
-    // Initialize Models
-    // We use the same model for both "Thinking" and "Answering"
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.0-flash", 
+        generationConfig: { responseMimeType: "application/json" } // Force JSON output
+    });
     const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
 
-    // --- STEP 1: QUERY EXPANSION (The "Translation" Layer) ---
-    // We ask Gemini to convert the user's "Story" into "Legal Keywords"
+    // --- STEP 1: QUERY EXPANSION ---
     const expansionPrompt = `
       You are a legal research assistant. 
-      Convert the following user query (which may be a story or scenario) into 5 specific legal search terms or concepts relevant to South African Labour Law.
-      Do not answer the question. Just output the keywords.
-      
+      Convert the user query into 3 specific legal search terms for South African Labour Law.
+      Output specific Act names or legal concepts (e.g. "BCEA Section 10", "Automatic Unfair Dismissal").
       User Query: "${question}"
-      
-      Keywords:
+      Output just the terms.
     `;
-    
     const expansionResult = await model.generateContent(expansionPrompt);
     const legalKeywords = expansionResult.response.text();
-    
-    console.log(`User Story: "${question}"`);
-    console.log(`Generated Search Terms: "${legalKeywords}"`);
-
-    // Combine original question + legal keywords for a powerful "Hybrid" search query
     const combinedSearchQuery = `${question} ${legalKeywords}`;
 
-    // --- STEP 2: EMBEDDING & SEARCH ---
+    // --- STEP 2: SEARCH ---
     const embeddingResult = await embeddingModel.embedContent(combinedSearchQuery);
     const vector = embeddingResult.embedding.values;
 
     const { data: chunks, error: searchError } = await supabase.rpc('hybrid_search', {
-      query_text: combinedSearchQuery, // Use the expanded query for keyword match
-      query_embedding: vector,         // Use the expanded vector for semantic match
-      match_count: 15,                 
+      query_text: combinedSearchQuery,
+      query_embedding: vector,
+      match_count: 10,
       full_text_weight: 1.0, 
       semantic_weight: 2.0, 
       rrf_k: 50
@@ -62,10 +54,12 @@ exports.handler = async (event, context) => {
       .map(chunk => `SOURCE (ID: ${chunk.id}):\n${chunk.content}`)
       .join("\n\n---\n\n");
 
-    // --- STEP 3: ANSWER GENERATION (The "Advisor") ---
+    // --- STEP 3: DUAL-MODE ANSWER GENERATION ---
     const finalPrompt = `
-    You are a professional legal assistant for South African labor law.
-    
+    You are a Labour Law Assistant. You have two goals: 
+    1. Have a natural, human conversation with the client.
+    2. Provide a technical legal breakdown for their records.
+
     CONTEXT:
     ${contextText}
 
@@ -73,22 +67,30 @@ exports.handler = async (event, context) => {
     ${question}
 
     INSTRUCTIONS:
-    1. **Analyze the Scenario:** Look for legal concepts in the context that apply to the user's story (e.g., if they mention "swearing", look for "misconduct" or "insubordination" in the context).
-    2. **Strict Grounding:** Base your advice ONLY on the provided context acts and codes.
-    3. **Handle Gaps:** - If the exact answer is in the text, give it.
-       - If the *exact* answer is missing, but the context contains the *general procedure* (like Schedule 8 Code of Good Practice), explain that general procedure.
-       - **CRITICAL:** If you need more details to give a specific answer (e.g., "Is there a contract?", "Was there a hearing?"), **ASK THE USER** these questions at the end of your response to clarify the situation.
-    4. **Tone:** Professional, empathetic, but legally cautious. Do not give binding legal advice, give "guidance based on the Act".
-    5. **Output:** Clean text, use bullet points. Do NOT mention "Source IDs".
+    Return a JSON object with exactly these two fields:
+    
+    1. "conversation": 
+       - A friendly, short response (2-3 sentences max). 
+       - Do NOT give a massive lecture. 
+       - If you need more info (e.g. "Is there a contract?"), ask the user specifically.
+       - Use simple, layperson English.
+
+    2. "legal_reasoning":
+       - A structured, technical note.
+       - Cite specific Acts, Sections, or Schedules found in the CONTEXT.
+       - Quote the relevant line from the act if possible.
+       - Explain *why* the law applies here.
+       - Format this as a markdown string (use bullet points).
     `;
 
     const result = await model.generateContent(finalPrompt);
-    const answer = result.response.text();
+    const responseText = result.response.text();
+    const jsonResponse = JSON.parse(responseText);
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answer, sources: chunks })
+      body: JSON.stringify(jsonResponse)
     };
 
   } catch (error) {
