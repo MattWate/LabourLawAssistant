@@ -30,7 +30,6 @@
             margin: 0 auto;
             background: white;
             box-shadow: 0 0 20px rgba(0,0,0,0.05);
-            /* NEW: Constrain height to viewport to enable internal scrolling */
             height: 100%; 
             overflow: hidden;
         }
@@ -41,7 +40,6 @@
             flex-direction: column;
             border-right: 1px solid var(--border);
             height: 100%;
-            /* NEW: Ensure this container doesn't overflow */
             overflow: hidden; 
             min-height: 0;
         }
@@ -53,7 +51,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            flex-shrink: 0; /* Prevent header from shrinking */
+            flex-shrink: 0; 
         }
         .chat-header h1 { margin: 0; font-size: 1.1rem; color: #1e293b; }
         .badge { background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
@@ -99,7 +97,7 @@
             background: white;
             display: flex;
             gap: 10px;
-            flex-shrink: 0; /* Prevent input area from shrinking */
+            flex-shrink: 0; 
         }
         input {
             flex: 1;
@@ -129,7 +127,6 @@
             display: flex;
             flex-direction: column;
             height: 100%;
-            /* NEW: Ensure this container doesn't overflow */
             overflow: hidden; 
             min-height: 0;
         }
@@ -175,7 +172,7 @@
         /* Mobile Responsive */
         @media (max-width: 800px) {
             .app-container { grid-template-columns: 1fr; }
-            .notes-panel { display: none; } /* Hide notes on mobile for now, or use tabs */
+            .notes-panel { display: none; } 
         }
     </style>
 </head>
@@ -221,15 +218,17 @@
     const notesContent = document.getElementById('notes-content');
     const btn = document.getElementById('send-btn');
 
+    // NEW: Conversational Memory Array
+    let chatHistory = [];
+
     function appendMessage(text, sender) {
         const div = document.createElement('div');
         div.classList.add('message', sender);
-        div.innerHTML = text.replace(/\n/g, '<br>'); // Simple line break handling
+        div.innerHTML = text.replace(/\n/g, '<br>');
         history.appendChild(div);
         history.scrollTop = history.scrollHeight;
     }
 
-    // Simple markdown parser for the notes panel
     function parseMarkdown(text) {
         if (!text) return '';
         let html = text
@@ -238,9 +237,7 @@
             .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
             .replace(/^\s*-\s(.*)/gim, '<li>$1</li>');
         
-        // Wrap lists
         if (html.includes('<li>')) {
-            // Very basic list wrapping, robust enough for bullet points
             html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>'); 
         }
         return html.replace(/\n/g, '<br>');
@@ -264,16 +261,20 @@
         history.appendChild(loadingDiv);
 
         try {
+            // NEW: Send history with the request
             const response = await fetch('/.netlify/functions/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: query })
+                body: JSON.stringify({ 
+                    question: query,
+                    history: chatHistory // Sending the memory
+                })
             });
 
             const data = await response.json();
             
             // Remove loading
-            history.removeChild(loadingDiv);
+            if (loadingDiv.parentNode) history.removeChild(loadingDiv);
 
             if (data.error) {
                 appendMessage("Error: " + data.error, 'bot');
@@ -281,9 +282,16 @@
                 // 3. Bot Chat Response
                 appendMessage(data.conversation, 'bot');
 
-                // 4. Update Legal Notes Panel
+                // 4. Update Memory
+                // We save what you said and what the bot said
+                chatHistory.push({ role: 'user', content: query });
+                chatHistory.push({ role: 'model', content: data.conversation });
+                
+                // Keep only last 20 messages to avoid hitting limits
+                if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+                // 5. Update Legal Notes Panel
                 if (data.legal_reasoning) {
-                    // Fade out old notes
                     notesContent.style.opacity = '0.5';
                     setTimeout(() => {
                         notesContent.innerHTML = parseMarkdown(data.legal_reasoning);
@@ -292,7 +300,7 @@
                 }
             }
         } catch (err) {
-            history.removeChild(loadingDiv);
+            if (loadingDiv.parentNode) history.removeChild(loadingDiv);
             appendMessage("Network error. Please try again.", 'bot');
             console.error(err);
         }
