@@ -17,62 +17,47 @@ exports.handler = async (event, context) => {
     const { question, history } = JSON.parse(event.body);
     if (!question) return { statusCode: 400, body: JSON.stringify({ error: 'Question required' }) };
 
-    // Use Gemini 2.0 Flash for logic/chat
+    // 1. Setup Models
+    // Gemini 2.0 Flash for logic (it's faster and smarter at reasoning)
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const jsonModel = genAI.getGenerativeModel({ 
         model: "gemini-2.0-flash", 
         generationConfig: { responseMimeType: "application/json" } 
     });
-    // Use Embedding 001 for vector search
     const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
 
     let standaloneQuestion = question;
 
-    // --- STEP 1: CONTEXTUALIZATION (The "Memory" Fix) ---
-    // If there is history, we must rewrite the user's question to be self-contained.
+    // --- STEP 1: CONTEXTUALIZATION (Memory) ---
+    // Rewrite the user's question based on history to ensure we search for the right thing.
     if (history && history.length > 0) {
         const historyText = history.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join("\n");
-        
         const rewritePrompt = `
-        Given the following conversation history and a new user question, rewrite the new question to be a standalone sentence that includes all necessary context from the history.
+        Rewrite the "New User Question" to be a standalone sentence that incorporates context from the "Chat History".
+        Resolve references like "he", "it", "the letter".
         
         Chat History:
         ${historyText}
         
         New User Question: "${question}"
         
-        Directives:
-        1. Resolve references like "he", "it", "that" to the specific nouns mentioned earlier.
-        2. Keep the core intent of the question.
-        3. If the question is already standalone, return it as is.
-        
         Rewritten Question:
         `;
-        
         const rewriteResult = await model.generateContent(rewritePrompt);
         standaloneQuestion = rewriteResult.response.text().trim();
-        console.log("Original:", question);
-        console.log("Rewritten:", standaloneQuestion);
     }
 
-    // --- STEP 2: QUERY EXPANSION ---
-    // Use the REWRITTEN question to generate search terms
+    // --- STEP 2: SEARCH INTENT & EXPANSION ---
     const expansionPrompt = `
-      You are a legal research assistant. 
-      Convert the following specific query into 3 specific legal search terms for South African Labour Law.
-      Output specific Act names or legal concepts (e.g. "BCEA Section 10", "Automatic Unfair Dismissal").
-      
-      Query: "${standaloneQuestion}"
-      
-      Output just the terms.
+      You are a legal expert. Convert the query "${standaloneQuestion}" into 3 specific South African Labour Law search terms.
+      Examples: "BCEA Section 10", "Schedule 8 Code of Good Practice", "LRA Unfair Dismissal".
+      Output ONLY the terms.
     `;
     const expansionResult = await model.generateContent(expansionPrompt);
     const legalKeywords = expansionResult.response.text();
-    
-    // Combine for a rich search query
     const combinedSearchQuery = `${standaloneQuestion} ${legalKeywords}`;
 
-    // --- STEP 3: SEARCH ---
+    // --- STEP 3: HYBRID SEARCH ---
     const embeddingResult = await embeddingModel.embedContent(combinedSearchQuery);
     const vector = embeddingResult.embedding.values;
 
@@ -91,11 +76,13 @@ exports.handler = async (event, context) => {
       .map(chunk => `SOURCE (ID: ${chunk.id}):\n${chunk.content}`)
       .join("\n\n---\n\n");
 
-    // --- STEP 4: ANSWER GENERATION ---
+    // --- STEP 4: INVESTIGATIVE ANSWER GENERATION ---
     const finalPrompt = `
-    You are a Labour Law Assistant. You have two goals: 
-    1. Have a natural, human conversation with the client.
-    2. Provide a technical legal breakdown for their records.
+    You are a Senior Labour Law Consultant conducting an intake interview.
+    
+    GOAL:
+    Guide the user to a solution. To do this, you usually need to gather specific facts first.
+    Do not be passive. Be proactive and investigative.
 
     CONTEXT (Legal Documents):
     ${contextText}
@@ -104,21 +91,23 @@ exports.handler = async (event, context) => {
     ${JSON.stringify(history || [])}
 
     CURRENT USER QUERY:
-    ${question} (Contextualized as: ${standaloneQuestion})
+    ${question} (Contextualized: ${standaloneQuestion})
 
     INSTRUCTIONS:
     Return a JSON object with exactly these two fields:
-    
-    1. "conversation": 
-       - A friendly, short response (2-3 sentences max). 
-       - Acknowledge facts mentioned earlier in the history (e.g., "Since you mentioned you work on Saturdays...").
-       - Use simple, layperson English.
+
+    1. "conversation":
+       - **ACT AS AN INVESTIGATOR.**
+       - If the user's query lacks specific details (e.g., "I was fired"), DO NOT just give a generic definition of dismissal.
+       - **IMMEDIATELY ASK** 1 or 2 relevant clarifying questions based on the law (e.g., "Were you given a notice to attend a hearing?", "Do you have a written contract?", "How many employees are at the company?").
+       - Only provide the final legal conclusion if you have enough facts.
+       - Keep the tone professional but direct. Max 3 sentences.
 
     2. "legal_reasoning":
-       - A structured, technical note.
-       - Cite specific Acts, Sections, or Schedules found in the CONTEXT.
-       - Explain *why* the law applies to the user's specific story facts.
-       - Format this as a markdown string (use bullet points).
+       - **SHOW YOUR WORK.**
+       - If you asked questions in the conversation, explain *why* those facts are legally important here. (e.g., "I am asking about the contract because BCEA Section 37 determines notice periods based on length of service.")
+       - Cite specific Acts/Sections from the CONTEXT that triggered your questions.
+       - Use markdown bullet points.
     `;
 
     const result = await jsonModel.generateContent(finalPrompt);
