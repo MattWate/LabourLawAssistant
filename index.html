@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Labour Law Assistant</title>
+    <title>Justine - Labour Law Assistant</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -24,7 +24,7 @@
         /* LAYOUT GRID */
         .app-container {
             display: grid;
-            grid-template-columns: 1fr 400px; /* Chat gets remaining space, Notes get 400px */
+            grid-template-columns: 1fr 400px;
             width: 100%;
             max-width: 1400px;
             margin: 0 auto;
@@ -50,11 +50,20 @@
             background: white;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
             flex-shrink: 0; 
         }
-        .chat-header h1 { margin: 0; font-size: 1.1rem; color: #1e293b; }
-        .badge { background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        /* Header Avatar */
+        .header-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border);
+        }
+        .chat-header-info h1 { margin: 0; font-size: 1.1rem; color: #1e293b; }
+        .chat-header-info span { font-size: 0.8rem; color: #64748b; }
+        .badge { background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 8px;}
 
         #chat-history {
             flex: 1;
@@ -62,8 +71,34 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px; /* Increased gap for better grouping */
             background: #fafafa;
+        }
+
+        /* NEW CHAT ROW LAYOUT */
+        .chat-row {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            align-items: flex-start;
+        }
+        .chat-row.user-row {
+            justify-content: flex-end;
+        }
+        .chat-row.bot-row {
+            justify-content: flex-start;
+        }
+
+        /* Chat Avatars (In message stream) */
+        .chat-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+            background-color: #e2e8f0;
+            border: 1px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .message {
@@ -72,23 +107,23 @@
             border-radius: 12px;
             line-height: 1.5;
             font-size: 0.95rem;
-            animation: fadeIn 0.3s ease;
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .user {
-            align-self: flex-end;
-            background-color: var(--primary);
-            color: white;
-            border-bottom-right-radius: 2px;
-        }
-        .bot {
-            align-self: flex-start;
+        /* Bot Message Styles */
+        .bot-row .message {
             background-color: white;
             border: 1px solid var(--border);
             color: #1e293b;
-            border-bottom-left-radius: 2px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            border-top-left-radius: 2px; /* Point bubble towards avatar */
+        }
+
+        /* User Message Styles */
+        .user-row .message {
+            background-color: var(--primary);
+            color: white;
+            border-bottom-right-radius: 2px;
         }
 
         .input-area {
@@ -149,7 +184,6 @@
             font-size: 0.9rem;
             line-height: 1.6;
         }
-        /* Markdown Styling in Notes */
         #notes-content h3 { font-size: 1rem; color: #0f172a; margin-top: 0; }
         #notes-content ul { padding-left: 20px; margin-bottom: 20px; }
         #notes-content li { margin-bottom: 8px; }
@@ -169,7 +203,6 @@
         }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 100% { content: ''; } }
         
-        /* Mobile Responsive */
         @media (max-width: 800px) {
             .app-container { grid-template-columns: 1fr; }
             .notes-panel { display: none; } 
@@ -182,13 +215,21 @@
     <!-- Chat Section -->
     <div class="chat-panel">
         <div class="chat-header">
-            <h1>⚖️ Labour Law Assistant</h1>
-            <span class="badge">BETA</span>
+            <!-- Header Avatar -->
+            <img src="justine-avatar.png" class="header-avatar" alt="Justine" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
+            <div class="chat-header-info">
+                <h1>Justine <span class="badge">BETA</span></h1>
+                <span>Labour Law Assistant</span>
+            </div>
         </div>
         
         <div id="chat-history">
-            <div class="message bot">
-                Hi there! I'm here to help you navigate labour law. What situation are you dealing with today?
+            <!-- Initial Bot Message -->
+            <div class="chat-row bot-row">
+                <img src="justine-avatar.png" class="chat-avatar" alt="Justine" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
+                <div class="message">
+                    Hi there! I'm Justine, your labour law assistant. I'm here to help you navigate your workplace rights. What situation are you dealing with today?
+                </div>
             </div>
         </div>
 
@@ -205,7 +246,7 @@
         </div>
         <div id="notes-content">
             <div class="empty-state">
-                Bot notes and legal references will appear here as you chat.
+                Justine's legal notes and act references will appear here as you chat.
             </div>
         </div>
     </div>
@@ -218,14 +259,30 @@
     const notesContent = document.getElementById('notes-content');
     const btn = document.getElementById('send-btn');
 
-    // NEW: Conversational Memory Array
     let chatHistory = [];
 
+    // Updated append function to handle the new "Chat Row" structure
     function appendMessage(text, sender) {
-        const div = document.createElement('div');
-        div.classList.add('message', sender);
-        div.innerHTML = text.replace(/\n/g, '<br>');
-        history.appendChild(div);
+        const rowDiv = document.createElement('div');
+        rowDiv.classList.add('chat-row', sender === 'user' ? 'user-row' : 'bot-row');
+
+        if (sender === 'bot') {
+            // Add Avatar for Bot
+            const img = document.createElement('img');
+            img.src = 'justine-avatar.png';
+            img.classList.add('chat-avatar');
+            img.alt = 'Justine';
+            // Fallback if image not found
+            img.onerror = function() { this.src = 'https://ui-avatars.com/api/?name=Justine&background=random'; };
+            rowDiv.appendChild(img);
+        }
+
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message');
+        msgDiv.innerHTML = text.replace(/\n/g, '<br>');
+        
+        rowDiv.appendChild(msgDiv);
+        history.appendChild(rowDiv);
         history.scrollTop = history.scrollHeight;
     }
 
@@ -255,42 +312,47 @@
         btn.disabled = true;
 
         // 2. Loading State
-        const loadingDiv = document.createElement('div');
-        loadingDiv.classList.add('message', 'bot');
-        loadingDiv.innerHTML = 'Thinking<span class="loading-dots"></span>';
-        history.appendChild(loadingDiv);
+        const loadingRow = document.createElement('div');
+        loadingRow.classList.add('chat-row', 'bot-row');
+        
+        const loadingAvatar = document.createElement('img');
+        loadingAvatar.src = 'justine-avatar.png';
+        loadingAvatar.classList.add('chat-avatar');
+        loadingAvatar.onerror = function() { this.src = 'https://ui-avatars.com/api/?name=Justine&background=random'; };
+        
+        const loadingMsg = document.createElement('div');
+        loadingMsg.classList.add('message');
+        loadingMsg.innerHTML = 'Thinking<span class="loading-dots"></span>';
+        
+        loadingRow.appendChild(loadingAvatar);
+        loadingRow.appendChild(loadingMsg);
+        history.appendChild(loadingRow);
+        history.scrollTop = history.scrollHeight;
 
         try {
-            // NEW: Send history with the request
             const response = await fetch('/.netlify/functions/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     question: query,
-                    history: chatHistory // Sending the memory
+                    history: chatHistory
                 })
             });
 
             const data = await response.json();
             
             // Remove loading
-            if (loadingDiv.parentNode) history.removeChild(loadingDiv);
+            if (loadingRow.parentNode) history.removeChild(loadingRow);
 
             if (data.error) {
                 appendMessage("Error: " + data.error, 'bot');
             } else {
-                // 3. Bot Chat Response
                 appendMessage(data.conversation, 'bot');
 
-                // 4. Update Memory
-                // We save what you said and what the bot said
                 chatHistory.push({ role: 'user', content: query });
                 chatHistory.push({ role: 'model', content: data.conversation });
-                
-                // Keep only last 20 messages to avoid hitting limits
                 if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
-                // 5. Update Legal Notes Panel
                 if (data.legal_reasoning) {
                     notesContent.style.opacity = '0.5';
                     setTimeout(() => {
@@ -300,7 +362,7 @@
                 }
             }
         } catch (err) {
-            if (loadingDiv.parentNode) history.removeChild(loadingDiv);
+            if (loadingRow.parentNode) history.removeChild(loadingRow);
             appendMessage("Network error. Please try again.", 'bot');
             console.error(err);
         }
