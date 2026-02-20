@@ -53,7 +53,6 @@
             gap: 15px;
             flex-shrink: 0; 
         }
-        /* Header Avatar */
         .header-avatar {
             width: 40px;
             height: 40px;
@@ -71,25 +70,19 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 20px; /* Increased gap for better grouping */
+            gap: 20px;
             background: #fafafa;
         }
 
-        /* NEW CHAT ROW LAYOUT */
         .chat-row {
             display: flex;
             gap: 12px;
             width: 100%;
             align-items: flex-start;
         }
-        .chat-row.user-row {
-            justify-content: flex-end;
-        }
-        .chat-row.bot-row {
-            justify-content: flex-start;
-        }
+        .chat-row.user-row { justify-content: flex-end; }
+        .chat-row.bot-row { justify-content: flex-start; }
 
-        /* Chat Avatars (In message stream) */
         .chat-avatar {
             width: 32px;
             height: 32px;
@@ -111,15 +104,13 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
-        /* Bot Message Styles */
         .bot-row .message {
             background-color: white;
             border: 1px solid var(--border);
             color: #1e293b;
-            border-top-left-radius: 2px; /* Point bubble towards avatar */
+            border-top-left-radius: 2px;
         }
 
-        /* User Message Styles */
         .user-row .message {
             background-color: var(--primary);
             color: white;
@@ -215,7 +206,6 @@
     <!-- Chat Section -->
     <div class="chat-panel">
         <div class="chat-header">
-            <!-- Header Avatar -->
             <img src="justine-avatar.png" class="header-avatar" alt="Justine" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
             <div class="chat-header-info">
                 <h1>Justine <span class="badge">BETA</span></h1>
@@ -224,7 +214,6 @@
         </div>
         
         <div id="chat-history">
-            <!-- Initial Bot Message -->
             <div class="chat-row bot-row">
                 <img src="justine-avatar.png" class="chat-avatar" alt="Justine" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
                 <div class="message">
@@ -260,19 +249,17 @@
     const btn = document.getElementById('send-btn');
 
     let chatHistory = [];
+    let currentCaseId = null; // Store the active Case ID
 
-    // Updated append function to handle the new "Chat Row" structure
     function appendMessage(text, sender) {
         const rowDiv = document.createElement('div');
         rowDiv.classList.add('chat-row', sender === 'user' ? 'user-row' : 'bot-row');
 
         if (sender === 'bot') {
-            // Add Avatar for Bot
             const img = document.createElement('img');
             img.src = 'justine-avatar.png';
             img.classList.add('chat-avatar');
             img.alt = 'Justine';
-            // Fallback if image not found
             img.onerror = function() { this.src = 'https://ui-avatars.com/api/?name=Justine&background=random'; };
             rowDiv.appendChild(img);
         }
@@ -305,13 +292,11 @@
         const query = input.value.trim();
         if (!query) return;
 
-        // 1. User Message
         appendMessage(query, 'user');
         input.value = '';
         input.disabled = true;
         btn.disabled = true;
 
-        // 2. Loading State
         const loadingRow = document.createElement('div');
         loadingRow.classList.add('chat-row', 'bot-row');
         
@@ -335,19 +320,24 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     question: query,
-                    history: chatHistory
+                    history: chatHistory,
+                    caseId: currentCaseId // Send the current Case ID if we have one
                 })
             });
 
             const data = await response.json();
             
-            // Remove loading
             if (loadingRow.parentNode) history.removeChild(loadingRow);
 
             if (data.error) {
                 appendMessage("Error: " + data.error, 'bot');
             } else {
                 appendMessage(data.conversation, 'bot');
+
+                // Save the returned Case ID for future turns
+                if (data.caseId) {
+                    currentCaseId = data.caseId;
+                }
 
                 chatHistory.push({ role: 'user', content: query });
                 chatHistory.push({ role: 'model', content: data.conversation });
