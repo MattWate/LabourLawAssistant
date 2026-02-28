@@ -14,11 +14,10 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { question, history } = JSON.parse(event.body);
+    const { question, history, caseId } = JSON.parse(event.body);
     if (!question) return { statusCode: 400, body: JSON.stringify({ error: 'Question required' }) };
 
-    // 1. Setup Models
-    // Gemini 2.0 Flash for logic (it's faster and smarter at reasoning)
+    // Initialize Models
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const jsonModel = genAI.getGenerativeModel({ 
         model: "gemini-2.0-flash", 
@@ -26,43 +25,26 @@ exports.handler = async (event, context) => {
     });
     const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
 
+    // ---------------------------------------------------------
+    // PHASE 1: SEARCH & RETRIEVAL (The Legal Brain)
+    // ---------------------------------------------------------
+    
     let standaloneQuestion = question;
-
-    // --- STEP 1: CONTEXTUALIZATION (Memory) ---
-    // Rewrite the user's question based on history to ensure we search for the right thing.
     if (history && history.length > 0) {
         const historyText = history.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join("\n");
-        const rewritePrompt = `
-        Rewrite the "New User Question" to be a standalone sentence that incorporates context from the "Chat History".
-        Resolve references like "he", "it", "the letter".
-        
-        Chat History:
-        ${historyText}
-        
-        New User Question: "${question}"
-        
-        Rewritten Question:
-        `;
-        const rewriteResult = await model.generateContent(rewritePrompt);
+        const rewriteResult = await model.generateContent(`
+            Rewrite this "New User Question" into a standalone sentence using the "Chat History" for context.
+            New User Question: "${question}"
+            Chat History: ${historyText}
+        `);
         standaloneQuestion = rewriteResult.response.text().trim();
     }
 
-    // --- STEP 2: SEARCH INTENT & EXPANSION ---
-    const expansionPrompt = `
-      You are a legal expert. Convert the query "${standaloneQuestion}" into 3 specific South African Labour Law search terms.
-      Examples: "BCEA Section 10", "Schedule 8 Code of Good Practice", "LRA Unfair Dismissal".
-      Output ONLY the terms.
-    `;
-    const expansionResult = await model.generateContent(expansionPrompt);
-    const legalKeywords = expansionResult.response.text();
-    const combinedSearchQuery = `${standaloneQuestion} ${legalKeywords}`;
-
-    // --- STEP 3: HYBRID SEARCH ---
-    const embeddingResult = await embeddingModel.embedContent(combinedSearchQuery);
+    const embeddingResult = await embeddingModel.embedContent(standaloneQuestion);
     const vector = embeddingResult.embedding.values;
-
+    
     const { data: chunks, error: searchError } = await supabase.rpc('hybrid_search', {
-      query_text: combinedSearchQuery,
+      query_text: standaloneQuestion,
       query_embedding: vector,
       match_count: 10,
       full_text_weight: 1.0, 
@@ -71,53 +53,109 @@ exports.handler = async (event, context) => {
     });
 
     if (searchError) throw new Error(`Database Error: ${searchError.message}`);
+    const contextText = chunks.map(c => `SOURCE (ID: ${c.id}):\n${c.content}`).join("\n\n---\n\n");
 
-    const contextText = chunks
-      .map(chunk => `SOURCE (ID: ${chunk.id}):\n${chunk.content}`)
-      .join("\n\n---\n\n");
+    // ---------------------------------------------------------
+    // PHASE 2: CASE ANALYST (Structured Data Extraction)
+    // ---------------------------------------------------------
 
-    // --- STEP 4: INVESTIGATIVE ANSWER GENERATION ---
-    const finalPrompt = `
-    You are a Senior Labour Law Consultant conducting an intake interview.
+    const historyForExtraction = [...(history || []), { role: 'user', content: question }];
     
-    GOAL:
-    Guide the user to a solution. To do this, you usually need to gather specific facts first.
-    Do not be passive. Be proactive and investigative.
+    // We force the AI to fill out this specific checklist.
+    const extractionPrompt = `
+    Analyze this chat history. Extract the following MANDATORY screening fields for a Labour Law case.
+    If the user has not provided the information yet, set the value strictly to null.
+    
+    Chat History:
+    ${JSON.stringify(historyForExtraction)}
 
-    CONTEXT (Legal Documents):
+    Return ONLY a JSON object with exactly this structure:
+    {
+      "client_name": null,
+      "contact_info": null,
+      "employer_name": null,
+      "incident_date": null,
+      "incident_description": null,
+      "hearing_held": null,
+      "case_merit_assessed": false
+    }
+    `;
+
+    const extractionResult = await jsonModel.generateContent(extractionPrompt);
+    const caseFacts = JSON.parse(extractionResult.response.text());
+
+    // 4. Upsert Case to Supabase
+    let activeCaseId = caseId;
+    
+    const dbPayload = {
+        updated_at: new Date().toISOString(),
+        issue_summary: caseFacts.incident_description || 'Gathering facts...',
+        case_facts: caseFacts,
+        ...(caseFacts.client_name && { client_name: caseFacts.client_name }),
+        ...(caseFacts.contact_info && { contact_info: caseFacts.contact_info }),
+    };
+
+    if (activeCaseId) {
+        await supabase.table('cases').update(dbPayload).eq('id', activeCaseId);
+    } else {
+        const { data: newCase } = await supabase.table('cases').insert(dbPayload).select().single();
+        activeCaseId = newCase.id;
+    }
+
+    // ---------------------------------------------------------
+    // PHASE 3: THE INTAKE AGENT (Generation)
+    // ---------------------------------------------------------
+
+    // We figure out which questions are still missing
+    const missingFields = Object.keys(caseFacts).filter(key => caseFacts[key] === null && key !== 'case_merit_assessed');
+
+    const finalPrompt = `
+    You are Justine, a Senior Labour Law Conversion Agent.
+    
+    YOUR CURRENT STAGE IN THE PROCESS:
+    ${missingFields.length > 0 ? "STAGE 1: INTAKE CHECKLIST" : "STAGE 2: MERIT ASSESSMENT & PITCH"}
+
+    CURRENT CASE FACTS:
+    ${JSON.stringify(caseFacts, null, 2)}
+
+    MISSING FIELDS TO COLLECT:
+    ${JSON.stringify(missingFields)}
+
+    LEGAL CONTEXT (For reference):
     ${contextText}
 
-    CONVERSATION HISTORY:
-    ${JSON.stringify(history || [])}
+    USER QUERY:
+    ${question}
 
-    CURRENT USER QUERY:
-    ${question} (Contextualized: ${standaloneQuestion})
+    INSTRUCTIONS FOR STAGE 1 (If you are in STAGE 1):
+    1. You MUST gather the missing fields one by one. DO NOT give final legal advice yet.
+    2. Politely and naturally ask the user for the FIRST missing field on the list.
+    3. Example: If "employer_name" is missing, say "To help me look into this, could you tell me the name of the company you work for?"
+    4. Keep the conversation flowing naturally, acknowledge what they just said, but steer them to the next question.
 
-    INSTRUCTIONS:
-    Return a JSON object with exactly these two fields:
+    INSTRUCTIONS FOR STAGE 2 (If you are in STAGE 2 - All facts collected):
+    1. Evaluate their situation using the LEGAL CONTEXT. Does their case have merit? (e.g., was it an unfair dismissal?).
+    2. Explain your findings briefly and simply.
+    3. **THE PITCH:** Tell them that based on the merits, you highly recommend sending a formal "Without Prejudice" letter to the employer to demand a settlement or rectify the issue.
+    4. Inform them that you can draft this letter for them right now. Once drafted, one of our human attorneys will review, sign, and send it for a fixed fee. Ask if they would like you to generate the draft.
 
-    1. "conversation":
-       - **ACT AS AN INVESTIGATOR.**
-       - If the user's query lacks specific details (e.g., "I was fired"), DO NOT just give a generic definition of dismissal.
-       - **IMMEDIATELY ASK** 1 or 2 relevant clarifying questions based on the law (e.g., "Were you given a notice to attend a hearing?", "Do you have a written contract?", "How many employees are at the company?").
-       - Only provide the final legal conclusion if you have enough facts.
-       - Keep the tone professional but direct. Max 3 sentences.
-
-    2. "legal_reasoning":
-       - **SHOW YOUR WORK.**
-       - If you asked questions in the conversation, explain *why* those facts are legally important here. (e.g., "I am asking about the contract because BCEA Section 37 determines notice periods based on length of service.")
-       - Cite specific Acts/Sections from the CONTEXT that triggered your questions.
-       - Use markdown bullet points.
+    OUTPUT FORMAT (Return JSON):
+    {
+      "conversation": "Your conversational response (asking a question OR giving the pitch).",
+      "legal_reasoning": "Markdown note. In Stage 1: Document what you are asking and why. In Stage 2: Document the legal merits of the case based on the Acts."
+    }
     `;
 
     const result = await jsonModel.generateContent(finalPrompt);
-    const responseText = result.response.text();
-    const jsonResponse = JSON.parse(responseText);
+    const responseJson = JSON.parse(result.response.text());
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(jsonResponse)
+      body: JSON.stringify({ 
+          ...responseJson,
+          caseId: activeCaseId 
+      })
     };
 
   } catch (error) {
