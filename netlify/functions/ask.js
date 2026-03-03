@@ -97,14 +97,14 @@ exports.handler = async (event, context) => {
     };
 
     if (activeCaseId) {
-        await supabase.table('cases').update(dbPayload).eq('id', activeCaseId);
+        await supabase.from('cases').update(dbPayload).eq('id', activeCaseId);
     } else {
-        const { data: newCase } = await supabase.table('cases').insert(dbPayload).select().single();
+        const { data: newCase } = await supabase.from('cases').insert(dbPayload).select().single();
         activeCaseId = newCase.id;
     }
 
     // ---------------------------------------------------------
-    // PHASE 3: THE INTAKE AGENT (Generation & Drafting)
+    // PHASE 3: THE INTAKE AGENT (Generation)
     // ---------------------------------------------------------
 
     // We figure out which questions are still missing
@@ -164,7 +164,7 @@ exports.handler = async (event, context) => {
 
     // 5. IF Stage 3 triggered and a letter was drafted, save it to the database!
     if (responseJson.draft_letter) {
-        await supabase.table('cases').update({
+        await supabase.from('cases').update({
             draft_letter: responseJson.draft_letter,
             letter_status: 'pending_review',
             status: 'requires_attorney' // Flag for the admin dashboard
