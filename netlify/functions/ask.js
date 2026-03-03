@@ -56,45 +56,84 @@ exports.handler = async (event, context) => {
     const contextText = chunks.map(c => `SOURCE (ID: ${c.id}):\n${c.content}`).join("\n\n---\n\n");
 
     // ---------------------------------------------------------
-    // PHASE 2: CASE ANALYST (Structured Data Extraction)
+    // PHASE 2 & 3: COMBINED EXTRACTION & GENERATION
     // ---------------------------------------------------------
-
-    const historyForExtraction = [...(history || []), { role: 'user', content: question }];
     
-    // We force the AI to fill out this specific checklist, INCLUDING "wants_letter"
-    const extractionPrompt = `
-    Analyze this chat history. Extract the following MANDATORY screening fields for a Labour Law case.
-    If the user has not provided the information yet, set the value strictly to null.
-    If the user has agreed to have a letter drafted, set "wants_letter" to true.
-    
-    Chat History:
-    ${JSON.stringify(historyForExtraction)}
+    let activeCaseId = caseId;
+    let currentCaseFacts = {
+      client_name: null, contact_info: null, employer_name: null,
+      incident_date: null, incident_description: null, hearing_held: null, wants_letter: false
+    };
 
-    Return ONLY a JSON object with exactly this structure:
+    // If we have an active case, fetch the existing facts first so Gemini knows where we left off
+    if (activeCaseId) {
+        const { data: existingCase } = await supabase.from('cases').select('case_facts').eq('id', activeCaseId).single();
+        if (existingCase && existingCase.case_facts) {
+            currentCaseFacts = { ...currentCaseFacts, ...existingCase.case_facts };
+        }
+    }
+
+    const combinedPrompt = `
+    You are Justine, a Senior Labour Law Conversion Agent.
+    
+    CURRENT CASE FACTS:
+    ${JSON.stringify(currentCaseFacts, null, 2)}
+
+    CHAT HISTORY:
+    ${JSON.stringify(history)}
+
+    NEW USER QUERY:
+    ${question}
+
+    LEGAL CONTEXT (For reference):
+    ${contextText}
+
+    YOUR TASKS:
+    1. EXTRACT: Update the CURRENT CASE FACTS based on the NEW USER QUERY. If they provided a missing detail, update the null value. If they agreed to a letter, set "wants_letter" to true.
+    2. DETERMINE STAGE & RESPOND:
+       - STAGE 1 (Intake): If any fact (except wants_letter) is null, ask the user for the FIRST missing fact naturally and politely.
+       - STAGE 2 (Pitch): If all facts are gathered but wants_letter is false, evaluate their case using the LEGAL CONTEXT. Briefly explain the merits and pitch our "Without Prejudice" letter service. Ask if they want you to draft it.
+       - STAGE 3 (Draft): If wants_letter is true, tell the user the letter is drafted and with the legal team. Draft the actual formal letter in the JSON response.
+
+    Return ONLY a JSON object with this exact structure:
     {
-      "client_name": null,
-      "contact_info": null,
-      "employer_name": null,
-      "incident_date": null,
-      "incident_description": null,
-      "hearing_held": null,
-      "wants_letter": false
+      "updated_facts": {
+        "client_name": "...",
+        "contact_info": "...",
+        "employer_name": "...",
+        "incident_date": "...",
+        "incident_description": "...",
+        "hearing_held": "...",
+        "wants_letter": true/false
+      },
+      "conversation": "Your conversational response for Stage 1, 2, or 3.",
+      "legal_reasoning": "Markdown notes detailing merits or reasoning.",
+      "draft_letter": null // ONLY populate this string with the formal letter text if you are in STAGE 3.
     }
     `;
 
-    const extractionResult = await jsonModel.generateContent(extractionPrompt);
-    const caseFacts = JSON.parse(extractionResult.response.text());
+    const result = await jsonModel.generateContent(combinedPrompt);
+    const responseJson = JSON.parse(result.response.text());
+    const newFacts = responseJson.updated_facts;
 
-    // 4. Upsert Case to Supabase
-    let activeCaseId = caseId;
+    // ---------------------------------------------------------
+    // PHASE 4: SAVE TO SUPABASE
+    // ---------------------------------------------------------
     
     const dbPayload = {
         updated_at: new Date().toISOString(),
-        issue_summary: caseFacts.incident_description || 'Gathering facts...',
-        case_facts: caseFacts,
-        ...(caseFacts.client_name && { client_name: caseFacts.client_name }),
-        ...(caseFacts.contact_info && { contact_info: caseFacts.contact_info }),
+        issue_summary: newFacts.incident_description || 'Gathering facts...',
+        case_facts: newFacts,
+        ...(newFacts.client_name && { client_name: newFacts.client_name }),
+        ...(newFacts.contact_info && { contact_info: newFacts.contact_info }),
     };
+
+    // Determine letter status
+    if (responseJson.draft_letter) {
+        dbPayload.draft_letter = responseJson.draft_letter;
+        dbPayload.letter_status = 'pending_review';
+        dbPayload.status = 'requires_attorney';
+    }
 
     if (activeCaseId) {
         await supabase.from('cases').update(dbPayload).eq('id', activeCaseId);
@@ -103,79 +142,12 @@ exports.handler = async (event, context) => {
         activeCaseId = newCase.id;
     }
 
-    // ---------------------------------------------------------
-    // PHASE 3: THE INTAKE AGENT (Generation)
-    // ---------------------------------------------------------
-
-    // We figure out which questions are still missing
-    const missingFields = Object.keys(caseFacts).filter(key => caseFacts[key] === null && key !== 'wants_letter');
-
-    let currentStage = "STAGE 1: INTAKE CHECKLIST";
-    if (missingFields.length === 0) {
-        // If no facts are missing, check if they want a letter. If yes -> Stage 3. If no -> Pitch them (Stage 2).
-        currentStage = caseFacts.wants_letter ? "STAGE 3: DRAFTING & HANDOFF" : "STAGE 2: MERIT ASSESSMENT & PITCH";
-    }
-
-    const finalPrompt = `
-    You are Justine, a Senior Labour Law Conversion Agent.
-    
-    YOUR CURRENT STAGE IN THE PROCESS:
-    ${currentStage}
-
-    CURRENT CASE FACTS:
-    ${JSON.stringify(caseFacts, null, 2)}
-
-    MISSING FIELDS TO COLLECT:
-    ${JSON.stringify(missingFields)}
-
-    LEGAL CONTEXT (For reference):
-    ${contextText}
-
-    USER QUERY:
-    ${question}
-
-    INSTRUCTIONS FOR STAGE 1 (If you are in STAGE 1):
-    1. You MUST gather the missing fields one by one. DO NOT give final legal advice yet.
-    2. Politely and naturally ask the user for the FIRST missing field on the list.
-    3. Example: If "employer_name" is missing, say "To help me look into this, could you tell me the name of the company you work for?"
-    4. Keep the conversation flowing naturally, acknowledge what they just said, but steer them to the next question.
-
-    INSTRUCTIONS FOR STAGE 2 (If you are in STAGE 2 - All facts collected, pitch not accepted yet):
-    1. Evaluate their situation using the LEGAL CONTEXT. Does their case have merit? (e.g., was it an unfair dismissal?).
-    2. Explain your findings briefly and simply.
-    3. **THE PITCH:** Tell them that based on the merits, you highly recommend sending a formal "Without Prejudice" letter to the employer to demand a settlement or rectify the issue.
-    4. Inform them that you can draft this letter for them right now. Once drafted, one of our human attorneys will review, sign, and send it for a fixed fee. Ask if they would like you to generate the draft.
-
-    INSTRUCTIONS FOR STAGE 3 (If you are in STAGE 3 - User wants the letter):
-    1. Tell the user you have drafted the letter and it is now with the legal team for review. 
-    2. Provide instructions on next steps (we will email you once approved for payment).
-    3. Generate the actual formal legal letter in the "draft_letter" JSON field. Use standard legal formatting and be professional.
-
-    OUTPUT FORMAT (Return JSON):
-    {
-      "conversation": "Your conversational response (asking a question, giving the pitch, or confirming the letter draft).",
-      "legal_reasoning": "Markdown note. In Stage 1: Document what you are asking and why. In Stage 2: Document the legal merits. In Stage 3: Note that drafting is complete.",
-      "draft_letter": null // ONLY populate this string in STAGE 3 with the formal letter text.
-    }
-    `;
-
-    const result = await jsonModel.generateContent(finalPrompt);
-    const responseJson = JSON.parse(result.response.text());
-
-    // 5. IF Stage 3 triggered and a letter was drafted, save it to the database!
-    if (responseJson.draft_letter) {
-        await supabase.from('cases').update({
-            draft_letter: responseJson.draft_letter,
-            letter_status: 'pending_review',
-            status: 'requires_attorney' // Flag for the admin dashboard
-        }).eq('id', activeCaseId);
-    }
-
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
-          ...responseJson,
+          conversation: responseJson.conversation,
+          legal_reasoning: responseJson.legal_reasoning,
           caseId: activeCaseId 
       })
     };
