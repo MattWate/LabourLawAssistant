@@ -15,7 +15,7 @@ exports.handler = async (event, context) => {
     try {
         // Fetch all cases, ordered by the most recently updated
         const { data, error } = await supabase
-            .table('cases')
+            .from('cases')
             .select('*')
             .order('updated_at', { ascending: false });
 
