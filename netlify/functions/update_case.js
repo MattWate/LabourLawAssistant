@@ -19,7 +19,7 @@ exports.handler = async (event, context) => {
 
         // Update the case in Supabase
         const { data, error } = await supabase
-            .table('cases')
+            .from('cases')
             .update({ 
                 draft_letter: draft_letter, 
                 letter_status: letter_status,
