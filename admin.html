@@ -6,179 +6,64 @@
     <title>Case Review Dashboard</title>
     <style>
         :root {
-            --primary: #0f172a;
-            --accent: #2563eb;
-            --bg: #f8fafc;
-            --panel-bg: #ffffff;
-            --border: #e2e8f0;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
+            --primary: #0f172a; --accent: #2563eb; --bg: #f8fafc;
+            --panel-bg: #ffffff; --border: #e2e8f0; --text-main: #1e293b; --text-muted: #64748b;
         }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg);
-            margin: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-            color: var(--text-main);
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); margin: 0; display: flex; height: 100vh; overflow: hidden; color: var(--text-main); }
+        
+        .admin-container { display: grid; grid-template-columns: 350px 1fr; width: 100%; height: 100%; }
 
-        /* Layout */
-        .admin-container {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            width: 100%;
-            height: 100%;
-        }
-
-        /* LEFT PANEL: Case List */
-        .case-list-panel {
-            background-color: var(--panel-bg);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            overflow: hidden;
-        }
-        .header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-            background-color: var(--primary);
-            color: white;
-        }
+        /* LEFT PANEL */
+        .case-list-panel { background-color: var(--panel-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .header { padding: 20px; border-bottom: 1px solid var(--border); background-color: var(--primary); color: white; }
         .header h1 { margin: 0; font-size: 1.2rem; }
         .header p { margin: 5px 0 0 0; font-size: 0.85rem; color: #94a3b8; }
         
-        #case-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-        }
-        .case-card {
-            padding: 15px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: white;
-        }
-        .case-card:hover {
-            border-color: var(--accent);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .case-card.active {
-            border-color: var(--accent);
-            background-color: #eff6ff;
-        }
+        #case-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .case-card { padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; background: white; position: relative;}
+        .case-card:hover { border-color: var(--accent); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .case-card.active { border-color: var(--accent); background-color: #eff6ff; }
         .case-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 5px; }
-        .case-meta { font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; }
-        .status-badge { 
-            display: inline-block; 
-            padding: 3px 8px; 
-            border-radius: 12px; 
-            font-size: 0.7rem; 
-            font-weight: 600;
-            text-transform: uppercase;
-            background: #e2e8f0;
-            color: #475569;
-        }
-        .status-badge.new { background: #dbeafe; color: #1e40af; }
+        
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; background: #e2e8f0; color: #475569; }
+        .status-badge.pending_review { background: #fef08a; color: #854d0e; }
+        .status-badge.approved { background: #bbf7d0; color: #166534; }
 
-        /* RIGHT PANEL: Case Details */
-        .case-details-panel {
-            background-color: var(--bg);
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            overflow: hidden;
-        }
-        .details-header {
-            padding: 20px 30px;
-            background: white;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        #details-content {
-            flex: 1;
-            padding: 30px;
-            overflow-y: auto;
-        }
-        .empty-state {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: var(--text-muted);
-            font-style: italic;
-        }
+        /* RIGHT PANEL */
+        .case-details-panel { background-color: var(--bg); display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        #details-content { flex: 1; padding: 30px; overflow-y: auto; }
+        .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-style: italic; }
 
-        /* Detail Cards */
-        .info-card {
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-        }
-        .info-card h3 { 
-            margin-top: 0; 
-            font-size: 0.9rem; 
-            text-transform: uppercase; 
-            color: var(--text-muted); 
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-        .fact-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        .fact-item .label { font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
-        .fact-item .value { font-size: 0.95rem; font-weight: 500; }
+        /* Editor Styles */
+        .info-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .info-card h3 { margin-top: 0; font-size: 0.9rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
+        
+        .json-viewer { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; }
+        
+        .letter-editor { width: 100%; height: 350px; padding: 15px; border: 1px solid var(--border); border-radius: 6px; font-family: "Times New Roman", Times, serif; font-size: 1.1rem; line-height: 1.6; resize: vertical; box-sizing: border-box; }
+        .letter-editor:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
 
-        .json-viewer {
-            background: #1e293b;
-            color: #e2e8f0;
-            padding: 15px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            white-space: pre-wrap;
-        }
-
-        .loader {
-            text-align: center;
-            padding: 20px;
-            color: var(--text-muted);
-        }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-success { background: #16a34a; color: white; margin-left: 10px;}
+        .btn-success:hover { background: #15803d; }
     </style>
 </head>
 <body>
 
 <div class="admin-container">
-    <!-- LEFT: List of Cases -->
     <div class="case-list-panel">
         <div class="header">
-            <h1>Case Book Review</h1>
-            <p>Matter Management Dashboard</p>
+            <h1>Legal Review Board</h1>
+            <p>Matter & Letter Management</p>
         </div>
-        <div id="case-list">
-            <div class="loader">Loading cases...</div>
-        </div>
+        <div id="case-list"><div style="padding:20px;text-align:center;">Loading cases...</div></div>
     </div>
 
-    <!-- RIGHT: Detailed View -->
     <div class="case-details-panel">
         <div id="details-content">
-            <div class="empty-state">
-                Select a case from the left panel to view details.
-            </div>
+            <div class="empty-state">Select a case from the left panel to review.</div>
         </div>
     </div>
 </div>
@@ -186,104 +71,135 @@
 <script>
     let casesData = [];
 
-    // Format date nicely
-    function formatDate(isoString) {
-        if (!isoString) return 'Unknown';
-        const date = new Date(isoString);
-        return date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    }
-
-    // Load cases from the backend
     async function fetchCases() {
-        const listEl = document.getElementById('case-list');
-        try {
-            const response = await fetch('/.netlify/functions/get_cases');
-            const data = await response.json();
-            
-            if (data.error) throw new Error(data.error);
-            
-            casesData = data;
-            renderCaseList();
-        } catch (error) {
-            console.error("Error fetching cases:", error);
-            listEl.innerHTML = `<div class="loader" style="color: red;">Error loading cases. Check console.</div>`;
-        }
+        const response = await fetch('/.netlify/functions/get_cases');
+        casesData = await response.json();
+        renderCaseList();
     }
 
-    // Render the left sidebar list
     function renderCaseList() {
         const listEl = document.getElementById('case-list');
         listEl.innerHTML = '';
-
-        if (casesData.length === 0) {
-            listEl.innerHTML = '<div class="loader">No cases found.</div>';
-            return;
-        }
-
+        
         casesData.forEach(c => {
             const card = document.createElement('div');
             card.className = 'case-card';
             card.onclick = () => showCaseDetails(c.id, card);
 
-            const title = c.client_name || 'Anonymous Client';
-            const issue = c.issue_summary || 'No issue summary yet';
+            const statusClass = c.letter_status || 'none';
             
             card.innerHTML = `
-                <div class="case-title">${title}</div>
-                <div style="font-size: 0.85rem; margin-bottom: 10px; color: #334155;">${issue}</div>
-                <div class="case-meta">
-                    <span class="status-badge ${c.status}">${c.status}</span>
-                    <span>${formatDate(c.updated_at)}</span>
-                </div>
+                <div class="case-title">${c.client_name || 'Anonymous Client'}</div>
+                <div style="font-size: 0.85rem; margin-bottom: 10px; color: #334155;">${c.issue_summary || 'No issue summary yet'}</div>
+                <div><span class="status-badge ${statusClass}">${c.letter_status === 'pending_review' ? 'Needs Review' : (c.letter_status || 'No Letter')}</span></div>
             `;
             listEl.appendChild(card);
         });
     }
 
-    // Render the right panel details
     function showCaseDetails(caseId, cardElement) {
-        // Highlight active card
         document.querySelectorAll('.case-card').forEach(el => el.classList.remove('active'));
         if (cardElement) cardElement.classList.add('active');
 
-        const caseData = casesData.find(c => c.id === caseId);
-        const detailsEl = document.getElementById('details-content');
+        const c = casesData.find(caseItem => caseItem.id === caseId);
+        if (!c) return;
 
-        if (!caseData) return;
-
-        detailsEl.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
-                <div>
-                    <h2 style="margin: 0 0 5px 0;">${caseData.client_name || 'Anonymous Client'}</h2>
-                    <div style="color: var(--text-muted); font-size: 0.9rem;">Case ID: ${caseData.id}</div>
+        let letterHtml = '';
+        if (c.draft_letter) {
+            letterHtml = `
+                <div class="info-card" style="border-left: 4px solid var(--accent);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0; border:none; padding:0;">Drafted Letter</h3>
+                        <span class="status-badge ${c.letter_status}">${c.letter_status}</span>
+                    </div>
+                    <textarea id="letter-text-${c.id}" class="letter-editor">${c.draft_letter}</textarea>
+                    
+                    <div style="margin-top: 15px; text-align: right;">
+                        <button class="btn btn-primary" onclick="saveLetter('${c.id}', 'pending_review')">💾 Save Draft</button>
+                        <button class="btn btn-success" onclick="saveLetter('${c.id}', 'approved')">✅ Approve & Ready for Payment</button>
+                    </div>
                 </div>
-                <span class="status-badge ${caseData.status}" style="font-size: 0.85rem; padding: 5px 12px;">STATUS: ${caseData.status}</span>
+            `;
+        }
+
+        // Format facts into a clean grid instead of raw JSON
+        const facts = c.case_facts || {};
+        const labels = {
+            client_name: "Client Name",
+            contact_info: "Contact Info",
+            employer_name: "Employer Name",
+            incident_date: "Incident Date",
+            incident_description: "Incident Description",
+            hearing_held: "Hearing Held?",
+            wants_letter: "Wants Letter?",
+            case_merit_assessed: "Merit Assessed"
+        };
+
+        let factsHtml = '<div class="fact-grid">';
+        for (const [key, val] of Object.entries(facts)) {
+            // Use our custom label, or fallback to auto-formatting the key
+            const label = labels[key] || key.replace(/_/g, ' ').toUpperCase();
+            
+            let displayVal = val;
+            if (val === null) {
+                displayVal = '<span style="color: #94a3b8; font-style: italic;">Pending...</span>';
+            } else if (typeof val === 'boolean') {
+                displayVal = val ? 'Yes' : 'No';
+            }
+
+            // Make description fields take up the full row so they don't get squished
+            const gridStyle = key.includes('description') ? 'grid-column: 1 / -1;' : '';
+
+            factsHtml += `
+                <div class="fact-item" style="${gridStyle}">
+                    <span class="label">${label}</span>
+                    <span class="value" style="white-space: pre-wrap;">${displayVal}</span>
+                </div>
+            `;
+        }
+        factsHtml += '</div>';
+
+        document.getElementById('details-content').innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <h2 style="margin: 0 0 5px 0;">${c.client_name || 'Anonymous Client'}</h2>
+                <div style="color: var(--text-muted); font-size: 0.9rem;">Employer: ${c.case_facts?.employer_name || 'Unknown'} | Contact: ${c.contact_info || 'None'}</div>
             </div>
+
+            ${letterHtml}
 
             <div class="info-card">
                 <h3>Matter Overview</h3>
-                <p style="margin: 0; font-size: 1.05rem;">${caseData.issue_summary || '<em>Bot is still gathering details...</em>'}</p>
-                <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
-                    <strong>Last Updated:</strong> ${formatDate(caseData.updated_at)} <br>
-                    <strong>Created:</strong> ${formatDate(caseData.created_at)}
-                </div>
+                <p>${c.issue_summary}</p>
             </div>
 
             <div class="info-card">
                 <h3>Gathered Facts</h3>
-                <div class="json-viewer">${JSON.stringify(caseData.case_facts, null, 2)}</div>
-            </div>
-            
-            <div class="info-card">
-                <h3>Contact Info</h3>
-                <div class="fact-item">
-                    <span class="value">${caseData.contact_info || '<em>Not provided yet</em>'}</span>
-                </div>
+                ${factsHtml}
             </div>
         `;
     }
 
-    // Initialize
+    async function saveLetter(caseId, newStatus) {
+        const textValue = document.getElementById(`letter-text-${caseId}`).value;
+        
+        try {
+            const res = await fetch('/.netlify/functions/update_case', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: caseId, draft_letter: textValue, letter_status: newStatus })
+            });
+            
+            if(res.ok) {
+                alert(`Letter updated to: ${newStatus}`);
+                fetchCases(); // Refresh data to update UI
+            } else {
+                alert("Failed to save letter.");
+            }
+        } catch (e) {
+            alert("Error saving: " + e.message);
+        }
+    }
+
     fetchCases();
 </script>
 
