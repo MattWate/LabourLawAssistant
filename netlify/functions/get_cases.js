@@ -12,6 +12,22 @@ exports.handler = async (event, context) => {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
+    // --- SECURITY CHECK (Verify the Admin Token) ---
+    const authHeader = event.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Missing Authentication Token' }) };
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Ask Supabase if this token is a real, logged-in admin user
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    
+    if (authErr || !user) {
+        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Invalid or Expired Token' }) };
+    }
+    // ------------------------------------------------
+
     try {
         // Fetch all cases, ordered by the most recently updated
         const { data, error } = await supabase
