@@ -1,0 +1,83 @@
+const { createClient } = require('@supabase/supabase-js');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
+
+exports.handler = async (event, context) => {
+    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+
+    try {
+        const { caseId } = JSON.parse(event.body);
+        if (!caseId) return { statusCode: 400, body: JSON.stringify({ error: 'Case ID required' }) };
+
+        // 1. Fetch Case Facts
+        const { data: caseData, error: caseErr } = await supabase.from('cases').select('case_facts').eq('id', caseId).single();
+        if (caseErr || !caseData) throw new Error("Case not found");
+        
+        const facts = caseData.case_facts;
+
+        // 2. Fetch AI Settings
+        const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
+        const activeLLM = settingData ? settingData.setting_value : 'gemini';
+
+        // 3. The Drafter Prompt
+        const prompt = `
+        You are a Senior South African Labour Lawyer. 
+        Write a formal, highly professional "Without Prejudice" demand letter based on the following case facts.
+        
+        CLIENT NAME: ${facts.client_name || 'N/A'}
+        EMPLOYER NAME: ${facts.employer_name || 'N/A'}
+        EMPLOYER CONTACT: ${facts.employer_contact_details || 'N/A'}
+        DATE OF INCIDENT: ${facts.incident_date || 'N/A'}
+        HEARING HELD: ${facts.hearing_held ? 'Yes' : 'No'}
+        INCIDENT SUMMARY: ${facts.incident_description || 'N/A'}
+
+        REQUIREMENTS:
+        1. Start with "WITHOUT PREJUDICE" centered at the top.
+        2. Format as a formal letter to the Employer.
+        3. Clearly state the dispute (e.g., Unfair Dismissal, Unfair Labour Practice) based on the summary.
+        4. Make a firm demand (e.g., reinstatement, compensation, or rectification).
+        5. Conclude by stating that failure to respond favorably within 7 days will result in the matter being referred to the CCMA (Commission for Conciliation, Mediation and Arbitration) or Labour Court.
+        6. Return ONLY the letter text. Do not include markdown blocks, intro, or outro text.
+        `;
+
+        let letterText = "";
+
+        // 4. Generate Letter
+        if (activeLLM === 'openai' && openai) {
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o", // Using the more powerful gpt-4o for drafting
+                messages: [{ role: "user", content: prompt }]
+            });
+            letterText = completion.choices[0].message.content.trim();
+        } else {
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const result = await model.generateContent(prompt);
+            letterText = result.response.text().trim();
+        }
+
+        // 5. Save the generated letter to Supabase
+        await supabase.from('cases').update({
+            draft_letter: letterText,
+            letter_status: 'pending_review'
+        }).eq('id', caseId);
+
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ success: true, letter: letterText })
+        };
+
+    } catch (error) {
+        console.error("Drafting Error:", error);
+        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    }
+};
