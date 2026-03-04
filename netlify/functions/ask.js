@@ -1,12 +1,17 @@
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 
+// Load environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// Initialize Clients
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
@@ -17,8 +22,8 @@ exports.handler = async (event, context) => {
     const { question, history, caseId } = JSON.parse(event.body);
     if (!question) return { statusCode: 400, body: JSON.stringify({ error: 'Question required' }) };
 
-    // Initialize Models
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // Initialize Gemini Models (used for DB search)
+    const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const jsonModel = genAI.getGenerativeModel({ 
         model: "gemini-2.0-flash", 
         generationConfig: { responseMimeType: "application/json" } 
@@ -29,10 +34,11 @@ exports.handler = async (event, context) => {
     // PHASE 1: SEARCH & RETRIEVAL (The Legal Brain)
     // ---------------------------------------------------------
     
+    // 1. Contextualize the question using chat history
     let standaloneQuestion = question;
     if (history && history.length > 0) {
         const historyText = history.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join("\n");
-        const rewriteResult = await model.generateContent(`
+        const rewriteResult = await geminiModel.generateContent(`
             Rewrite this "New User Question" into a standalone sentence using the "Chat History" for context.
             New User Question: "${question}"
             Chat History: ${historyText}
@@ -40,6 +46,7 @@ exports.handler = async (event, context) => {
         standaloneQuestion = rewriteResult.response.text().trim();
     }
 
+    // 2. Embed the question and search Supabase
     const embeddingResult = await embeddingModel.embedContent(standaloneQuestion);
     const vector = embeddingResult.embedding.values;
     
@@ -56,7 +63,7 @@ exports.handler = async (event, context) => {
     const contextText = chunks.map(c => `SOURCE (ID: ${c.id}):\n${c.content}`).join("\n\n---\n\n");
 
     // ---------------------------------------------------------
-    // PHASE 2 & 3: COMBINED EXTRACTION & GENERATION
+    // PHASE 2 & 3: COMBINED EXTRACTION, PERSONA & GENERATION
     // ---------------------------------------------------------
     
     let activeCaseId = caseId;
@@ -65,7 +72,7 @@ exports.handler = async (event, context) => {
       incident_date: null, incident_description: null, hearing_held: null, wants_letter: false
     };
 
-    // If we have an active case, fetch the existing facts first so Gemini knows where we left off
+    // If we have an active case, fetch the existing facts so the AI knows where we left off
     if (activeCaseId) {
         const { data: existingCase } = await supabase.from('cases').select('case_facts').eq('id', activeCaseId).single();
         if (existingCase && existingCase.case_facts) {
@@ -73,9 +80,17 @@ exports.handler = async (event, context) => {
         }
     }
 
+    // Check which LLM the Admin wants to use for the conversation
+    const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
+    const activeLLM = settingData ? settingData.setting_value : 'gemini';
+
     const combinedPrompt = `
-    You are Justine, a Senior Labour Law Conversion Agent.
-    
+    You are Justine, a friendly, empathetic, and highly knowledgeable Labour Law Assistant.
+    Your main clients are everyday South African workers (e.g., factory workers, retail staff, drivers, miners). 
+    You MUST speak in plain, simple, everyday English. Do not use heavy legal jargon in the conversation. 
+    Be warm, supportive, and talk to them like a helpful friend who knows the law. 
+    Keep your sentences relatively short and easy to understand.
+
     CURRENT CASE FACTS:
     ${JSON.stringify(currentCaseFacts, null, 2)}
 
@@ -90,10 +105,10 @@ exports.handler = async (event, context) => {
 
     YOUR TASKS:
     1. EXTRACT: Update the CURRENT CASE FACTS based on the NEW USER QUERY. If they provided a missing detail, update the null value. If they agreed to a letter, set "wants_letter" to true.
-    2. DETERMINE STAGE & RESPOND:
-       - STAGE 1 (Intake): If any fact (except wants_letter) is null, ask the user for the FIRST missing fact naturally and politely.
-       - STAGE 2 (Pitch): If all facts are gathered but wants_letter is false, evaluate their case using the LEGAL CONTEXT. Briefly explain the merits and pitch our "Without Prejudice" letter service. Ask if they want you to draft it.
-       - STAGE 3 (Draft): If wants_letter is true, tell the user the letter is drafted and with the legal team. Draft the actual formal letter in the JSON response.
+    2. DETERMINE STAGE & RESPOND (Write the "conversation" field):
+       - STAGE 1 (Intake): If any fact (except wants_letter) is null, ask the user for the FIRST missing fact. Do this naturally and warmly. Acknowledge what they said and show sympathy (e.g., "I'm so sorry you're dealing with that..."). Don't sound like a robot reading a list.
+       - STAGE 2 (Pitch): If all facts are gathered but wants_letter is false, look at the LEGAL CONTEXT. Tell them simply if the law is on their side. Then, offer to help: tell them you can draft a formal, strong demand letter to the employer to fix the issue or ask for a settlement. Explain that our legal team will check and send it for a small fixed fee, and ask if they want you to write it for them now.
+       - STAGE 3 (Draft): If wants_letter is true, reassure the user. Tell them the letter is drafted and is now with the legal team for a final check. Provide simple next steps. Draft the actual formal letter in the "draft_letter" JSON field (NOTE: The letter itself MUST be highly formal, professional, and use proper legal English, even though your chat to the user is casual).
 
     Return ONLY a JSON object with this exact structure:
     {
@@ -106,14 +121,33 @@ exports.handler = async (event, context) => {
         "hearing_held": "...",
         "wants_letter": true/false
       },
-      "conversation": "Your conversational response for Stage 1, 2, or 3.",
+      "conversation": "Your warm, simple, conversational response.",
       "legal_reasoning": "Markdown notes detailing merits or reasoning.",
-      "draft_letter": null // ONLY populate this string with the formal letter text if you are in STAGE 3.
+      "draft_letter": null
     }
     `;
 
-    const result = await jsonModel.generateContent(combinedPrompt);
-    const responseJson = JSON.parse(result.response.text());
+    let responseJson = null;
+
+    // AI ROUTER: Route to the requested AI Model
+    if (activeLLM === 'openai' && openai) {
+        // Use ChatGPT
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: "You are a legal JSON processor. Always return strictly formatted JSON." },
+                { role: "user", content: combinedPrompt }
+            ],
+            response_format: { type: "json_object" }
+        });
+        responseJson = JSON.parse(completion.choices[0].message.content);
+    } else {
+        // Use Gemini
+        const result = await jsonModel.generateContent(combinedPrompt);
+        let rawText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        responseJson = JSON.parse(rawText);
+    }
+
     const newFacts = responseJson.updated_facts;
 
     // ---------------------------------------------------------
@@ -135,6 +169,7 @@ exports.handler = async (event, context) => {
         dbPayload.status = 'requires_attorney';
     }
 
+    // Save
     if (activeCaseId) {
         await supabase.from('cases').update(dbPayload).eq('id', activeCaseId);
     } else {
