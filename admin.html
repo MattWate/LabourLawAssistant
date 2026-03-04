@@ -46,11 +46,14 @@
             border-bottom: 1px solid var(--border);
             background-color: var(--primary);
             color: white;
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
         }
         .header h1 { margin: 0; font-size: 1.2rem; }
         .header p { margin: 5px 0 0 0; font-size: 0.85rem; color: #94a3b8; }
         
-        /* New CSS for the Settings Bar */
+        /* Settings Bar */
         .settings-bar {
             padding: 10px 20px;
             background: #f1f5f9;
@@ -117,14 +120,6 @@
             height: 100%;
             overflow: hidden;
         }
-        .details-header {
-            padding: 20px 30px;
-            background: white;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
         #details-content {
             flex: 1;
             padding: 30px;
@@ -163,12 +158,18 @@
             gap: 15px;
         }
         .fact-item .label { font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600; }
-        .fact-item .value { font-size: 0.95rem; color: #1e293b; }
+        
+        /* Editable Fact Inputs */
+        .fact-input {
+            width: 100%; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; font-family: inherit; box-sizing: border-box; background: #f8fafc;
+        }
+        .fact-input:focus { border-color: var(--accent); outline: none; background: white; box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
+        select.fact-input { appearance: auto; }
 
         .letter-editor { width: 100%; height: 350px; padding: 15px; border: 1px solid var(--border); border-radius: 6px; font-family: "Times New Roman", Times, serif; font-size: 1.1rem; line-height: 1.6; resize: vertical; box-sizing: border-box; }
         .letter-editor:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
 
-        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 0.9rem; }
         .btn-primary { background: var(--accent); color: white; }
         .btn-primary:hover { background: #1d4ed8; }
         .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
@@ -180,6 +181,23 @@
             padding: 20px;
             color: var(--text-muted);
         }
+
+        /* NEW CSS: Settings Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 30px; border-radius: 12px; width: 500px; max-width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .modal-content h2 { margin-top: 0; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 20px;}
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+        .form-group input[type="text"], .form-group textarea {
+            width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-family: inherit;
+        }
+        .logo-preview { max-height: 60px; margin-top: 10px; display: none; border-radius: 4px; border: 1px solid var(--border); padding: 5px; }
     </style>
 </head>
 <body>
@@ -188,11 +206,14 @@
     <!-- LEFT: List of Cases -->
     <div class="case-list-panel">
         <div class="header">
-            <h1>Case Book Review</h1>
-            <p>Matter Management Dashboard</p>
+            <div>
+                <h1>Case Book Review</h1>
+                <p>Matter Management</p>
+            </div>
+            <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: #334155;" onclick="openSettingsModal()">⚙️ Settings</button>
         </div>
         
-        <!-- NEW SETTINGS BAR -->
+        <!-- SETTINGS BAR -->
         <div class="settings-bar">
             <strong>🧠 Active AI Engine:</strong>
             <select id="llm-toggle" onchange="updateLLMSetting(this.value)">
@@ -216,23 +237,110 @@
     </div>
 </div>
 
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal">
+    <div class="modal-content">
+        <h2>Firm Settings & Letterhead</h2>
+        <div class="form-group">
+            <label>Firm Name</label>
+            <input type="text" id="set-firm-name" placeholder="e.g., Smith & Co. Attorneys">
+        </div>
+        <div class="form-group">
+            <label>Firm Address</label>
+            <textarea id="set-firm-address" rows="3" placeholder="123 Legal Ave, Pretoria, 0001"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Firm Contact Info (Email & Phone)</label>
+            <input type="text" id="set-firm-contact" placeholder="info@smithco.co.za | 011 555 1234">
+        </div>
+        <div class="form-group">
+            <label>Firm Logo (For Future PDF Exports)</label>
+            <input type="file" id="set-firm-logo" accept="image/*" onchange="handleLogoUpload(event)">
+            <img id="logo-preview" class="logo-preview" alt="Logo Preview">
+            <input type="hidden" id="set-firm-logo-base64">
+        </div>
+        <div style="text-align: right; margin-top: 25px;">
+            <button class="btn" onclick="closeSettingsModal()" style="background: #e2e8f0; color: #1e293b; margin-right: 10px;">Cancel</button>
+            <button class="btn btn-primary" onclick="saveFirmSettings()">💾 Save Settings</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let casesData = [];
 
-    // NEW FUNCTION: Fetch current AI setting on load
+    // --- MODAL & FIRM SETTINGS LOGIC ---
+    function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
+    function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
+    
+    function handleLogoUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const base64 = e.target.result;
+            document.getElementById('set-firm-logo-base64').value = base64;
+            const preview = document.getElementById('logo-preview');
+            preview.src = base64;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function saveFirmSettings() {
+        const payload = {
+            firm_name: document.getElementById('set-firm-name').value,
+            firm_address: document.getElementById('set-firm-address').value,
+            firm_contact: document.getElementById('set-firm-contact').value,
+            firm_logo: document.getElementById('set-firm-logo-base64').value
+        };
+
+        const btn = document.querySelector('#settings-modal .btn-primary');
+        const originalText = btn.innerText;
+        btn.innerText = "Saving...";
+
+        try {
+            const res = await fetch('/.netlify/functions/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                alert("Firm settings saved successfully!");
+                closeSettingsModal();
+            } else {
+                alert("Failed to save firm settings.");
+            }
+        } catch (e) {
+            alert("Error saving settings.");
+        } finally {
+            btn.innerText = originalText;
+        }
+    }
+
     async function loadSettings() {
         try {
             const res = await fetch('/.netlify/functions/settings');
             const data = await res.json();
-            if (data.active_llm) {
-                document.getElementById('llm-toggle').value = data.active_llm;
+            
+            // Populate LLM toggle
+            if (data.active_llm) document.getElementById('llm-toggle').value = data.active_llm;
+            
+            // Populate Firm Settings Modal
+            if (data.firm_name) document.getElementById('set-firm-name').value = data.firm_name;
+            if (data.firm_address) document.getElementById('set-firm-address').value = data.firm_address;
+            if (data.firm_contact) document.getElementById('set-firm-contact').value = data.firm_contact;
+            if (data.firm_logo) {
+                document.getElementById('set-firm-logo-base64').value = data.firm_logo;
+                const preview = document.getElementById('logo-preview');
+                preview.src = data.firm_logo;
+                preview.style.display = 'block';
             }
         } catch (e) {
             console.error("Could not load AI settings");
         }
     }
 
-    // NEW FUNCTION: Save setting when dropdown is changed
     async function updateLLMSetting(selectedLLM) {
         try {
             const res = await fetch('/.netlify/functions/settings', {
@@ -240,41 +348,32 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ active_llm: selectedLLM })
             });
-            if (res.ok) {
-                console.log(`Successfully switched AI engine to ${selectedLLM.toUpperCase()}`);
-            } else {
-                alert("Failed to update AI settings.");
-            }
+            if (res.ok) console.log(`Switched AI to ${selectedLLM}`);
         } catch (e) {
             alert("Error updating AI engine.");
         }
     }
 
-    // Format date nicely
+    // --- CASE MANAGEMENT LOGIC ---
     function formatDate(isoString) {
         if (!isoString) return 'Unknown';
         const date = new Date(isoString);
         return date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
-    // Load cases from the backend
     async function fetchCases() {
         const listEl = document.getElementById('case-list');
         try {
             const response = await fetch('/.netlify/functions/get_cases');
             const data = await response.json();
-            
             if (data.error) throw new Error(data.error);
-            
             casesData = data;
             renderCaseList();
         } catch (error) {
-            console.error("Error fetching cases:", error);
-            listEl.innerHTML = `<div class="loader" style="color: red;">Error loading cases. Check console.</div>`;
+            listEl.innerHTML = `<div class="loader" style="color: red;">Error loading cases.</div>`;
         }
     }
 
-    // Render the left sidebar list
     function renderCaseList() {
         const listEl = document.getElementById('case-list');
         listEl.innerHTML = '';
@@ -292,7 +391,6 @@
             const title = c.client_name || 'Anonymous Client';
             const issue = c.issue_summary || 'No issue summary yet';
             
-            // Determine display status based on what has happened
             let displayStatus = 'Gathering Facts';
             let statusClass = 'new';
             
@@ -306,7 +404,6 @@
                 displayStatus = 'Approved';
                 statusClass = 'approved';
             } else if (c.case_facts && c.case_facts.wants_letter) {
-                 // Fallback if the status flag wasn't set but they requested it
                  displayStatus = 'Needs Drafting';
                  statusClass = 'needs_drafting';
             }
@@ -323,9 +420,7 @@
         });
     }
 
-    // Render the right panel details
     function showCaseDetails(caseId, cardElement) {
-        // Highlight active card
         document.querySelectorAll('.case-card').forEach(el => el.classList.remove('active'));
         if (cardElement) cardElement.classList.add('active');
 
@@ -349,7 +444,6 @@
                 </div>
             `;
         } else if (c.case_facts && c.case_facts.wants_letter) {
-            // NEW: Show a generation button if they requested a letter but it's not drafted yet
             letterHtml = `
                 <div class="info-card" style="border-left: 4px solid #f59e0b;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
@@ -357,7 +451,7 @@
                         <span class="status-badge needs_drafting">Needs Drafting</span>
                     </div>
                     <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
-                        The client has accepted the pitch. Review the gathered facts below. Once you are happy they are correct, trigger the AI drafter.
+                        The client has accepted the pitch. <strong>Review and correct the gathered facts below.</strong> Once you are happy they are correct, click "Save Case Details", then trigger the AI drafter.
                     </p>
                     <div style="text-align: right;">
                         <button id="btn-generate-${c.id}" class="btn btn-primary" style="background: #f59e0b;" onclick="generateDraft('${c.id}')">🤖 Generate Draft Letter (AI)</button>
@@ -366,7 +460,7 @@
             `;
         }
 
-        // Format facts into a clean grid instead of raw JSON
+        // --- RENDER EDITABLE FACTS GRID ---
         const facts = c.case_facts || {};
         const labels = {
             client_name: "Client Name",
@@ -376,33 +470,50 @@
             incident_date: "Incident Date",
             incident_description: "Incident Description",
             hearing_held: "Hearing Held?",
-            wants_letter: "Wants Letter?",
-            case_merit_assessed: "Merit Assessed"
+            wants_letter: "Wants Letter?"
         };
 
         let factsHtml = '<div class="fact-grid">';
         for (const [key, val] of Object.entries(facts)) {
-            // Use our custom label, or fallback to auto-formatting the key
+            // Hide internal tracking fields from the UI
+            if (key === 'case_merit_assessed') continue;
+
             const label = labels[key] || key.replace(/_/g, ' ').toUpperCase();
+            let inputHtml = '';
             
-            let displayVal = val;
-            if (val === null) {
-                displayVal = '<span style="color: #94a3b8; font-style: italic;">Pending...</span>';
-            } else if (typeof val === 'boolean') {
-                displayVal = val ? 'Yes' : 'No';
+            // Build the appropriate input type
+            if (typeof val === 'boolean' || key === 'wants_letter' || key === 'hearing_held') {
+                const isTrue = val === true;
+                inputHtml = `
+                    <select id="fact-${key}" class="fact-input">
+                        <option value="true" ${isTrue ? 'selected' : ''}>Yes</option>
+                        <option value="false" ${val === false ? 'selected' : ''}>No</option>
+                        <option value="null" ${val === null ? 'selected' : ''}>Pending...</option>
+                    </select>
+                `;
+            } else if (key.includes('description')) {
+                inputHtml = `<textarea id="fact-${key}" class="fact-input" rows="3" placeholder="Pending...">${val || ''}</textarea>`;
+            } else if (key.includes('date')) {
+                inputHtml = `<input type="date" id="fact-${key}" class="fact-input" value="${val || ''}">`;
+            } else {
+                inputHtml = `<input type="text" id="fact-${key}" class="fact-input" value="${val || ''}" placeholder="Pending...">`;
             }
 
-            // Make description fields take up the full row so they don't get squished
             const gridStyle = key.includes('description') ? 'grid-column: 1 / -1;' : '';
-
             factsHtml += `
                 <div class="fact-item" style="${gridStyle}">
                     <span class="label">${label}</span>
-                    <span class="value" style="white-space: pre-wrap;">${displayVal}</span>
+                    ${inputHtml}
                 </div>
             `;
         }
-        factsHtml += '</div>';
+        
+        // Add a save button for the facts
+        factsHtml += `
+            <div style="grid-column: 1 / -1; text-align: right; margin-top: 10px; padding-top: 15px; border-top: 1px solid var(--border);">
+                <button class="btn btn-primary" style="background: var(--primary);" onclick="saveCaseFacts('${c.id}')">💾 Save Case Details</button>
+            </div>
+        </div>`;
 
         const detailsEl = document.getElementById('details-content');
         detailsEl.innerHTML = `
@@ -423,25 +534,64 @@
             </div>
 
             <div class="info-card">
-                <h3>Gathered Facts</h3>
+                <h3>Gathered Facts (Editable)</h3>
                 ${factsHtml}
             </div>
         `;
     }
 
+    async function saveCaseFacts(caseId) {
+        const c = casesData.find(caseItem => caseItem.id === caseId);
+        if (!c) return;
+
+        const updatedFacts = { ...c.case_facts };
+        
+        // Read all inputs from the DOM
+        for (const key of Object.keys(updatedFacts)) {
+            if (key === 'case_merit_assessed') continue;
+            const el = document.getElementById(`fact-${key}`);
+            if (el) {
+                let val = el.value;
+                if (el.tagName === 'SELECT') {
+                    if (val === 'true') val = true;
+                    else if (val === 'false') val = false;
+                    else val = null;
+                } else {
+                    if (val.trim() === '') val = null;
+                }
+                updatedFacts[key] = val;
+            }
+        }
+
+        try {
+            const res = await fetch('/.netlify/functions/update_case', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: caseId, case_facts: updatedFacts })
+            });
+            
+            if(res.ok) {
+                alert("Case details saved successfully!");
+                fetchCases(); 
+            } else {
+                alert("Failed to update case details.");
+            }
+        } catch (e) {
+            alert("Error saving details: " + e.message);
+        }
+    }
+
     async function saveLetter(caseId, newStatus) {
         const textValue = document.getElementById(`letter-text-${caseId}`).value;
-        
         try {
             const res = await fetch('/.netlify/functions/update_case', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: caseId, draft_letter: textValue, letter_status: newStatus })
             });
-            
             if(res.ok) {
                 alert(`Letter updated to: ${newStatus === 'approved' ? 'Approved' : 'Pending Review'}`);
-                fetchCases(); // Refresh data to update UI
+                fetchCases(); 
             } else {
                 alert("Failed to save letter.");
             }
@@ -450,7 +600,6 @@
         }
     }
 
-    // NEW FUNCTION: Trigger the backend drafter
     async function generateDraft(caseId) {
         const btn = document.getElementById(`btn-generate-${caseId}`);
         const originalText = btn.innerText;
@@ -465,7 +614,6 @@
             });
             
             if(res.ok) {
-                // Reload the cases to show the new text editor!
                 fetchCases(); 
             } else {
                 const err = await res.json();
@@ -481,7 +629,7 @@
         }
     }
 
-    // Initialize
+    // Initialize Page
     loadSettings();
     fetchCases();
 </script>
