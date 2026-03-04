@@ -50,6 +50,25 @@
         .header h1 { margin: 0; font-size: 1.2rem; }
         .header p { margin: 5px 0 0 0; font-size: 0.85rem; color: #94a3b8; }
         
+        /* New CSS for the Settings Bar */
+        .settings-bar {
+            padding: 10px 20px;
+            background: #f1f5f9;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+        .settings-bar select {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.8rem;
+            cursor: pointer;
+            outline: none;
+        }
+
         #case-list {
             flex: 1;
             overflow-y: auto;
@@ -170,6 +189,16 @@
             <h1>Case Book Review</h1>
             <p>Matter Management Dashboard</p>
         </div>
+        
+        <!-- NEW SETTINGS BAR -->
+        <div class="settings-bar">
+            <strong>🧠 Active AI Engine:</strong>
+            <select id="llm-toggle" onchange="updateLLMSetting(this.value)">
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI ChatGPT</option>
+            </select>
+        </div>
+
         <div id="case-list">
             <div class="loader">Loading cases...</div>
         </div>
@@ -187,6 +216,37 @@
 
 <script>
     let casesData = [];
+
+    // NEW FUNCTION: Fetch current AI setting on load
+    async function loadSettings() {
+        try {
+            const res = await fetch('/.netlify/functions/settings');
+            const data = await res.json();
+            if (data.active_llm) {
+                document.getElementById('llm-toggle').value = data.active_llm;
+            }
+        } catch (e) {
+            console.error("Could not load AI settings");
+        }
+    }
+
+    // NEW FUNCTION: Save setting when dropdown is changed
+    async function updateLLMSetting(selectedLLM) {
+        try {
+            const res = await fetch('/.netlify/functions/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active_llm: selectedLLM })
+            });
+            if (res.ok) {
+                console.log(`Successfully switched AI engine to ${selectedLLM.toUpperCase()}`);
+            } else {
+                alert("Failed to update AI settings.");
+            }
+        } catch (e) {
+            alert("Error updating AI engine.");
+        }
+    }
 
     // Format date nicely
     function formatDate(isoString) {
@@ -355,6 +415,7 @@
     }
 
     // Initialize
+    loadSettings();
     fetchCases();
 </script>
 
