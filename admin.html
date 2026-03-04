@@ -105,6 +105,7 @@
             color: #475569;
         }
         .status-badge.new { background: #dbeafe; color: #1e40af; }
+        .status-badge.needs_drafting { background: #fef08a; color: #b45309; }
         .status-badge.pending_review { background: #fef08a; color: #854d0e; }
         .status-badge.approved { background: #bbf7d0; color: #166534; }
 
@@ -170,6 +171,7 @@
         .btn { padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .btn-primary { background: var(--accent); color: white; }
         .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
         .btn-success { background: #16a34a; color: white; margin-left: 10px;}
         .btn-success:hover { background: #15803d; }
 
@@ -289,13 +291,31 @@
 
             const title = c.client_name || 'Anonymous Client';
             const issue = c.issue_summary || 'No issue summary yet';
-            const statusClass = c.letter_status || 'none';
             
+            // Determine display status based on what has happened
+            let displayStatus = 'Gathering Facts';
+            let statusClass = 'new';
+            
+            if (c.letter_status === 'needs_drafting') {
+                displayStatus = 'Needs Drafting';
+                statusClass = 'needs_drafting';
+            } else if (c.letter_status === 'pending_review') {
+                displayStatus = 'Needs Review';
+                statusClass = 'pending_review';
+            } else if (c.letter_status === 'approved') {
+                displayStatus = 'Approved';
+                statusClass = 'approved';
+            } else if (c.case_facts && c.case_facts.wants_letter) {
+                 // Fallback if the status flag wasn't set but they requested it
+                 displayStatus = 'Needs Drafting';
+                 statusClass = 'needs_drafting';
+            }
+
             card.innerHTML = `
                 <div class="case-title">${title}</div>
                 <div style="font-size: 0.85rem; margin-bottom: 10px; color: #334155;">${issue}</div>
                 <div class="case-meta">
-                    <span class="status-badge ${statusClass}">${c.letter_status === 'pending_review' ? 'Needs Review' : (c.letter_status || 'Gathering Facts')}</span>
+                    <span class="status-badge ${statusClass}">${displayStatus}</span>
                     <span>${formatDate(c.updated_at)}</span>
                 </div>
             `;
@@ -318,13 +338,29 @@
                 <div class="info-card" style="border-left: 4px solid var(--accent);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                         <h3 style="margin:0; border:none; padding:0;">Drafted Letter</h3>
-                        <span class="status-badge ${c.letter_status}">${c.letter_status}</span>
+                        <span class="status-badge ${c.letter_status}">${c.letter_status === 'pending_review' ? 'Needs Review' : 'Approved'}</span>
                     </div>
                     <textarea id="letter-text-${c.id}" class="letter-editor">${c.draft_letter}</textarea>
                     
                     <div style="margin-top: 15px; text-align: right;">
                         <button class="btn btn-primary" onclick="saveLetter('${c.id}', 'pending_review')">💾 Save Draft</button>
                         <button class="btn btn-success" onclick="saveLetter('${c.id}', 'approved')">✅ Approve & Ready for Payment</button>
+                    </div>
+                </div>
+            `;
+        } else if (c.case_facts && c.case_facts.wants_letter) {
+            // NEW: Show a generation button if they requested a letter but it's not drafted yet
+            letterHtml = `
+                <div class="info-card" style="border-left: 4px solid #f59e0b;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0; border:none; padding:0;">Letter Action Required</h3>
+                        <span class="status-badge needs_drafting">Needs Drafting</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+                        The client has accepted the pitch. Review the gathered facts below. Once you are happy they are correct, trigger the AI drafter.
+                    </p>
+                    <div style="text-align: right;">
+                        <button id="btn-generate-${c.id}" class="btn btn-primary" style="background: #f59e0b;" onclick="generateDraft('${c.id}')">🤖 Generate Draft Letter (AI)</button>
                     </div>
                 </div>
             `;
@@ -404,13 +440,44 @@
             });
             
             if(res.ok) {
-                alert(`Letter updated to: ${newStatus}`);
+                alert(`Letter updated to: ${newStatus === 'approved' ? 'Approved' : 'Pending Review'}`);
                 fetchCases(); // Refresh data to update UI
             } else {
                 alert("Failed to save letter.");
             }
         } catch (e) {
             alert("Error saving: " + e.message);
+        }
+    }
+
+    // NEW FUNCTION: Trigger the backend drafter
+    async function generateDraft(caseId) {
+        const btn = document.getElementById(`btn-generate-${caseId}`);
+        const originalText = btn.innerText;
+        btn.innerText = "⏳ Drafting Letter... Please Wait";
+        btn.disabled = true;
+        
+        try {
+            const res = await fetch('/.netlify/functions/generate_letter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ caseId: caseId })
+            });
+            
+            if(res.ok) {
+                // Reload the cases to show the new text editor!
+                fetchCases(); 
+            } else {
+                const err = await res.json();
+                alert("Failed to generate draft: " + (err.error || 'Unknown error'));
+            }
+        } catch (e) {
+            alert("Network Error: " + e.message);
+        } finally {
+            if (btn) {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         }
     }
 
