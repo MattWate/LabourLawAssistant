@@ -181,8 +181,8 @@
 
 <script>
     // --- 🚨 IMPORTANT: PASTE YOUR URL AND ANON KEY HERE 🚨 ---
-    const SUPABASE_URL = 'https://pdjhgszpndwykeqlusho.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_PUBLIC_KEY_HERE';
     
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
@@ -302,13 +302,21 @@
             if (key === 'case_merit_assessed') continue;
             const label = labels[key] || key.replace(/_/g, ' ').toUpperCase();
             let inputHtml = '';
+            
+            // FIX 1: Make boolean dropdowns smart enough to handle string "yes"/"no" from the AI
             if (typeof val === 'boolean' || key === 'wants_letter' || key === 'hearing_held') {
-                const isTrue = val === true;
-                inputHtml = `<select id="fact-${key}" class="fact-input"><option value="true" ${isTrue ? 'selected' : ''}>Yes</option><option value="false" ${val === false ? 'selected' : ''}>No</option><option value="null" ${val === null ? 'selected' : ''}>Pending...</option></select>`;
+                let boolVal = val;
+                if (typeof val === 'string') {
+                    if (val.toLowerCase() === 'yes' || val.toLowerCase() === 'true') boolVal = true;
+                    if (val.toLowerCase() === 'no' || val.toLowerCase() === 'false') boolVal = false;
+                }
+                
+                inputHtml = `<select id="fact-${key}" class="fact-input"><option value="true" ${boolVal === true ? 'selected' : ''}>Yes</option><option value="false" ${boolVal === false ? 'selected' : ''}>No</option><option value="null" ${(boolVal !== true && boolVal !== false) ? 'selected' : ''}>Pending...</option></select>`;
             } else if (key.includes('description')) {
                 inputHtml = `<textarea id="fact-${key}" class="fact-input" rows="3" placeholder="Pending...">${val || ''}</textarea>`;
             } else if (key.includes('date')) {
-                inputHtml = `<input type="date" id="fact-${key}" class="fact-input" value="${val || ''}">`;
+                // FIX 2: Change input type="date" to type="text" so the browser doesn't hide non-standard date formats
+                inputHtml = `<input type="text" id="fact-${key}" class="fact-input" value="${val || ''}" placeholder="YYYY-MM-DD or text">`;
             } else {
                 inputHtml = `<input type="text" id="fact-${key}" class="fact-input" value="${val || ''}" placeholder="Pending...">`;
             }
