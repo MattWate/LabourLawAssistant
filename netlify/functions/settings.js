@@ -5,6 +5,13 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 exports.handler = async (event, context) => {
+
+    // --- SECURITY CHECK (Verify the Admin Token) ---
+    const authHeader = event.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Missing Authentication Token' }) };
+    }
+    
     try {
         // Handle fetching the current settings
         if (event.httpMethod === 'GET') {
