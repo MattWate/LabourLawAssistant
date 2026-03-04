@@ -6,43 +6,51 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 exports.handler = async (event, context) => {
     try {
-        // Handle fetching the current setting
+        // Handle fetching the current settings
         if (event.httpMethod === 'GET') {
             const { data, error } = await supabase
                 .from('system_settings')
-                .select('*')
-                .eq('setting_name', 'active_llm')
-                .single();
+                .select('*');
 
-            // If no setting exists yet, default to gemini
-            const active_llm = data ? data.setting_value : 'gemini';
+            if (error) throw error;
+
+            // Convert array of database rows to a single clean object
+            const settings = {};
+            if (data) {
+                data.forEach(row => settings[row.setting_name] = row.setting_value);
+            }
+            
+            // Set default if missing
+            if (!settings.active_llm) settings.active_llm = 'gemini';
 
             return {
                 statusCode: 200,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ active_llm })
+                body: JSON.stringify(settings)
             };
         }
 
-        // Handle updating the setting
+        // Handle updating multiple settings at once
         if (event.httpMethod === 'POST') {
-            const { active_llm } = JSON.parse(event.body);
+            const payload = JSON.parse(event.body);
 
-            // Upsert will update the existing row, or insert it if it doesn't exist
+            // Create array of objects for bulk database upsert
+            const upsertData = Object.keys(payload).map(key => ({
+                setting_name: key, 
+                setting_value: payload[key], 
+                updated_at: new Date().toISOString() 
+            }));
+
             const { error } = await supabase
                 .from('system_settings')
-                .upsert({ 
-                    setting_name: 'active_llm', 
-                    setting_value: active_llm, 
-                    updated_at: new Date().toISOString() 
-                });
+                .upsert(upsertData);
 
             if (error) throw error;
 
             return {
                 statusCode: 200,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ success: true, active_llm })
+                body: JSON.stringify({ success: true })
             };
         }
 
