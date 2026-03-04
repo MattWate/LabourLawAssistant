@@ -14,6 +14,12 @@ const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
+    // --- SECURITY CHECK (Verify the Admin Token) ---
+    const authHeader = event.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Missing Authentication Token' }) };
+    }
+
     try {
         const { caseId } = JSON.parse(event.body);
         if (!caseId) return { statusCode: 400, body: JSON.stringify({ error: 'Case ID required' }) };
