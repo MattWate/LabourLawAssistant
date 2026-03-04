@@ -11,20 +11,22 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { id, draft_letter, letter_status } = JSON.parse(event.body);
+        const { id, draft_letter, letter_status, case_facts } = JSON.parse(event.body);
 
         if (!id) {
             return { statusCode: 400, body: JSON.stringify({ error: 'Case ID required' }) };
         }
 
+        // Build the update payload dynamically
+        const updatePayload = { updated_at: new Date().toISOString() };
+        if (draft_letter !== undefined) updatePayload.draft_letter = draft_letter;
+        if (letter_status !== undefined) updatePayload.letter_status = letter_status;
+        if (case_facts !== undefined) updatePayload.case_facts = case_facts;
+
         // Update the case in Supabase
         const { data, error } = await supabase
             .from('cases')
-            .update({ 
-                draft_letter: draft_letter, 
-                letter_status: letter_status,
-                updated_at: new Date().toISOString()
-            })
+            .update(updatePayload)
             .eq('id', id)
             .select();
 
