@@ -68,7 +68,7 @@ exports.handler = async (event, context) => {
     
     let activeCaseId = caseId;
     let currentCaseFacts = {
-      client_name: null, contact_info: null, employer_name: null,
+      client_name: null, contact_info: null, employer_name: null, employer_contact_details: null,
       incident_date: null, incident_description: null, hearing_held: null, wants_letter: false
     };
 
@@ -105,10 +105,11 @@ exports.handler = async (event, context) => {
 
     YOUR TASKS:
     1. EXTRACT: Update the CURRENT CASE FACTS based on the NEW USER QUERY. If they provided a missing detail, update the null value. If they agreed to a letter, set "wants_letter" to true.
-    2. DETERMINE STAGE & RESPOND (Write the "conversation" field):
-       - STAGE 1 (Intake): If any fact (except wants_letter) is null, ask the user for the FIRST missing fact. Do this naturally and warmly. Acknowledge what they said and show sympathy (e.g., "I'm so sorry you're dealing with that..."). Don't sound like a robot reading a list.
-       - STAGE 2 (Pitch): If all facts are gathered but wants_letter is false, look at the LEGAL CONTEXT. Tell them simply if the law is on their side. Then, offer to help: tell them you can draft a formal, strong demand letter to the employer to fix the issue or ask for a settlement. Explain that our legal team will check and send it for a small fixed fee, and ask if they want you to write it for them now.
-       - STAGE 3 (Draft): If wants_letter is true, reassure the user. Tell them the letter is drafted and is now with the legal team for a final check. Provide simple next steps. Draft the actual formal letter in the "draft_letter" JSON field (NOTE: The letter itself MUST be highly formal, professional, and use proper legal English, even though your chat to the user is casual).
+    2. STRICT STAGE DETERMINATION & RESPOND (Write the "conversation" field):
+       - STEP A: Look at your newly updated facts. Are there ANY fields (except wants_letter) that are still null?
+       - STAGE 1 (Intake - if ANY fact is still null): You MUST ask the user for the FIRST missing fact. Do this naturally and warmly. Acknowledge what they said and show sympathy. You are STRICTLY FORBIDDEN from pitching the letter or drafting the letter until every single fact (name, contact info, employer name, employer contact, date, description, hearing) is provided.
+       - STAGE 2 (Pitch - if ALL facts are provided BUT wants_letter is false): Look at the LEGAL CONTEXT. Tell them simply if the law is on their side. Then, offer to help: tell them you can draft a formal, strong demand letter to the employer to fix the issue or ask for a settlement. Explain that our legal team will check and send it for a small fixed fee, and ask if they want you to write it for them now.
+       - STAGE 3 (Draft - if ALL facts are provided AND wants_letter is true): Reassure the user. Tell them the letter is drafted and is now with the legal team for a final check. Provide simple next steps. Draft the actual formal letter in the "draft_letter" JSON field (NOTE: The letter itself MUST be highly formal, professional, and use proper legal English, even though your chat to the user is casual).
 
     Return ONLY a JSON object with this exact structure:
     {
@@ -116,6 +117,7 @@ exports.handler = async (event, context) => {
         "client_name": "...",
         "contact_info": "...",
         "employer_name": "...",
+        "employer_contact_details": "...",
         "incident_date": "...",
         "incident_description": "...",
         "hearing_held": "...",
