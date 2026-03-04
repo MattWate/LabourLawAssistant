@@ -24,15 +24,30 @@ exports.handler = async (event, context) => {
         
         const facts = caseData.case_facts;
 
-        // 2. Fetch AI Settings
-        const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
-        const activeLLM = settingData ? settingData.setting_value : 'gemini';
+        // 2. Fetch ALL AI and Firm Settings
+        const { data: settingData } = await supabase.from('system_settings').select('*');
+        const settings = {};
+        if (settingData) {
+            settingData.forEach(row => settings[row.setting_name] = row.setting_value);
+        }
+        const activeLLM = settings.active_llm || 'gemini';
+        
+        // Extract Firm details
+        const firmName = settings.firm_name || 'Legal Consultants';
+        const firmAddress = settings.firm_address || '123 Legal Way, South Africa';
+        const firmContact = settings.firm_contact || 'info@legalconsultants.co.za';
 
         // 3. The Drafter Prompt
         const prompt = `
-        You are a Senior South African Labour Lawyer. 
+        You are a Senior South African Labour Lawyer working for a firm named "${firmName}". 
         Write a formal, highly professional "Without Prejudice" demand letter based on the following case facts.
         
+        --- FIRM LETTERHEAD INFO ---
+        Firm Name: ${firmName}
+        Firm Address: ${firmAddress}
+        Firm Contact: ${firmContact}
+        ----------------------------
+
         CLIENT NAME: ${facts.client_name || 'N/A'}
         EMPLOYER NAME: ${facts.employer_name || 'N/A'}
         EMPLOYER CONTACT: ${facts.employer_contact_details || 'N/A'}
@@ -41,12 +56,14 @@ exports.handler = async (event, context) => {
         INCIDENT SUMMARY: ${facts.incident_description || 'N/A'}
 
         REQUIREMENTS:
-        1. Start with "WITHOUT PREJUDICE" centered at the top.
-        2. Format as a formal letter to the Employer.
-        3. Clearly state the dispute (e.g., Unfair Dismissal, Unfair Labour Practice) based on the summary.
-        4. Make a firm demand (e.g., reinstatement, compensation, or rectification).
-        5. Conclude by stating that failure to respond favorably within 7 days will result in the matter being referred to the CCMA (Commission for Conciliation, Mediation and Arbitration) or Labour Court.
-        6. Return ONLY the letter text. Do not include markdown blocks, intro, or outro text.
+        1. Start by placing the FIRM LETTERHEAD INFO at the very top of the document, formatted professionally like a real letterhead.
+        2. Below the letterhead and date, include "WITHOUT PREJUDICE" centered.
+        3. Format as a formal letter addressed to the Employer.
+        4. Clearly state the dispute (e.g., Unfair Dismissal, Unfair Labour Practice) based on the summary.
+        5. Make a firm demand (e.g., reinstatement, compensation, or rectification).
+        6. Conclude by stating that failure to respond favorably within 7 days will result in the matter being referred to the CCMA (Commission for Conciliation, Mediation and Arbitration) or Labour Court.
+        7. Sign off as "${firmName}".
+        8. Return ONLY the letter text. Do not include markdown blocks, intro, or outro text.
         `;
 
         let letterText = "";
@@ -54,7 +71,7 @@ exports.handler = async (event, context) => {
         // 4. Generate Letter
         if (activeLLM === 'openai' && openai) {
             const completion = await openai.chat.completions.create({
-                model: "gpt-4o", // Using the more powerful gpt-4o for drafting
+                model: "gpt-4o", 
                 messages: [{ role: "user", content: prompt }]
             });
             letterText = completion.choices[0].message.content.trim();
