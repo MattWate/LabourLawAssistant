@@ -109,7 +109,7 @@ exports.handler = async (event, context) => {
        - STEP A: Look at your newly updated facts. Are there ANY fields (except wants_letter) that are still null?
        - STAGE 1 (Intake - if ANY fact is still null): You MUST ask the user for the FIRST missing fact. Do this naturally and warmly. Acknowledge what they said and show sympathy. You are STRICTLY FORBIDDEN from pitching the letter or drafting the letter until every single fact (name, contact info, employer name, employer contact, date, description, hearing) is provided.
        - STAGE 2 (Pitch - if ALL facts are provided BUT wants_letter is false): Look at the LEGAL CONTEXT. Tell them simply if the law is on their side. Then, offer to help: tell them you can draft a formal, strong demand letter to the employer to fix the issue or ask for a settlement. Explain that our legal team will check and send it for a small fixed fee, and ask if they want you to write it for them now.
-       - STAGE 3 (Draft - if ALL facts are provided AND wants_letter is true): Reassure the user. Tell them the letter is drafted and is now with the legal team for a final check. Provide simple next steps. Draft the actual formal letter in the "draft_letter" JSON field (NOTE: The letter itself MUST be highly formal, professional, and use proper legal English, even though your chat to the user is casual).
+       - STAGE 3 (Closing - if ALL facts are provided AND wants_letter is true): Reassure the user. Tell them you have successfully sent their file to our legal team. The team will review everything, draft the formal letter, and send them an email with a payment link when it's ready. Do NOT draft the letter yourself.
 
     Return ONLY a JSON object with this exact structure:
     {
@@ -124,8 +124,7 @@ exports.handler = async (event, context) => {
         "wants_letter": true/false
       },
       "conversation": "Your warm, simple, conversational response.",
-      "legal_reasoning": "Markdown notes detailing merits or reasoning.",
-      "draft_letter": null
+      "legal_reasoning": "Markdown notes detailing merits or reasoning."
     }
     `;
 
@@ -164,10 +163,9 @@ exports.handler = async (event, context) => {
         ...(newFacts.contact_info && { contact_info: newFacts.contact_info }),
     };
 
-    // Determine letter status
-    if (responseJson.draft_letter) {
-        dbPayload.draft_letter = responseJson.draft_letter;
-        dbPayload.letter_status = 'pending_review';
+    // Determine letter status: Tag it so the Admin knows it needs to be drafted
+    if (newFacts.wants_letter) {
+        dbPayload.letter_status = 'needs_drafting';
         dbPayload.status = 'requires_attorney';
     }
 
