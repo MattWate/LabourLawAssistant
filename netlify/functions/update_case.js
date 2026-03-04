@@ -10,6 +10,12 @@ exports.handler = async (event, context) => {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
+    // --- SECURITY CHECK (Verify the Admin Token) ---
+    const authHeader = event.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Missing Authentication Token' }) };
+    }
+
     try {
         const { id, draft_letter, letter_status, case_facts } = JSON.parse(event.body);
 
