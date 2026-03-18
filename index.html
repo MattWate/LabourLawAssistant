@@ -129,7 +129,7 @@
 
         // MERGE: Universal Context
         PROBATION: { msg: "Roughly how long have you worked for this employer?", type: "buttons", options: [{label:"Less than 3 months", next:"SECTOR", val:"< 3 months"}, {label:"3 to 6 months", next:"SECTOR", val:"3 - 6 months"}, {label:"More than 6 months", next:"SECTOR", val:"> 6 months"}], saveAs: "tenure" },
-        SECTOR: { msg: "What industry or sector do you work in?", type: "buttons", options: [{label:"Retail", next:"COMPANY_NAME", val:"Retail"}, {label:"Mining", next:"COMPANY_NAME", val:"Mining"}, {label:"Security", next:"COMPANY_NAME", val:"Security"}, {label:"Metal & Engineering", next:"COMPANY_NAME", val:"Metal & Engineering"}, {label:"Other", next:"COMPANY_NAME", val:"Other"}], saveAs: "sector" },
+        SECTOR: { msg: "What industry or sector do you work in?", type: "buttons", options: [{label:"Retail", next:"COMPANY_NAME", val:"Retail"}, {label:"Mining", next:"COMPANY_NAME", val:"Mining"}, {label:"Security", next:"COMPANY_NAME", val:"Security"}, {label:"Metal & Engineering", next:"COMPANY_NAME", val:"Metal & Engineering"}, {label:"Domestic", next:"COMPANY_NAME", val:"Domestic"}, {label:"Other", next:"COMPANY_NAME", val:"Other"}], saveAs: "sector" },
 
         // LOGISTICS
         COMPANY_NAME: { msg: "What is the exact name of the company you work(ed) for?", type: "text", next: "COMPANY_CONTACT", saveAs: "employer_name" },
@@ -223,25 +223,40 @@
             const data = await res.json();
             hideLoading();
             
+            if (data.error) {
+                appendMessage("An error occurred: " + data.error, "bot");
+                return;
+            }
+
             activeCaseId = data.caseId;
             appendMessage(data.pitch, "bot");
             
-            // Show Final Decision Buttons
+            // Show Final Decision Buttons based on Merit
             buttonContainer.innerHTML = '';
-            const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => closeCase(true);
-            const btnNo = document.createElement('button'); btnNo.className = 'action-btn'; btnNo.innerText = "No thank you."; btnNo.onclick = () => closeCase(false);
-            buttonContainer.appendChild(btnYes); buttonContainer.appendChild(btnNo);
+            if (data.hasMerit) {
+                const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => closeCase(true, false);
+                const btnNo = document.createElement('button'); btnNo.className = 'action-btn'; btnNo.innerText = "No thank you."; btnNo.onclick = () => closeCase(false, false);
+                buttonContainer.appendChild(btnYes); buttonContainer.appendChild(btnNo);
+            } else {
+                const btnOk = document.createElement('button'); btnOk.className = 'action-btn'; btnOk.innerText = "Okay, thank you."; btnOk.onclick = () => closeCase(false, true);
+                buttonContainer.appendChild(btnOk);
+            }
             buttonContainer.style.display = 'flex';
 
         } catch (e) {
             hideLoading();
             appendMessage("Sorry, I had trouble connecting to the legal database. Please refresh and try again.", "bot");
+            console.error(e);
         }
     }
 
-    async function closeCase(wantsLetter) {
+    async function closeCase(wantsLetter, isLowMerit) {
         buttonContainer.style.display = 'none';
-        appendMessage(wantsLetter ? "Yes, please draft the letter." : "No thank you.", "user");
+        
+        let userMsg = wantsLetter ? "Yes, please draft the letter." : "No thank you.";
+        if (isLowMerit) userMsg = "Okay, thank you.";
+        
+        appendMessage(userMsg, "user");
         showLoading();
         
         try {
@@ -252,8 +267,17 @@
             });
             const data = await res.json();
             hideLoading();
-            appendMessage(data.closing_message, "bot");
-        } catch(e) { hideLoading(); }
+            
+            if (data.error) {
+                appendMessage("An error occurred: " + data.error, "bot");
+            } else {
+                appendMessage(data.closing_message, "bot");
+            }
+        } catch(e) { 
+            hideLoading(); 
+            appendMessage("An error occurred trying to close the case.", "bot");
+            console.error(e);
+        }
     }
 
     // Helpers
