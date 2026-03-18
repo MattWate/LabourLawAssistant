@@ -9,7 +9,6 @@
             --primary: #2563eb;
             --bg: #f1f5f9;
             --chat-bg: #ffffff;
-            --note-bg: #f8fafc;
             --border: #e2e8f0;
         }
         body {
@@ -21,266 +20,252 @@
             overflow: hidden;
         }
 
-        /* LAYOUT GRID */
         .app-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-            max-width: 800px; /* Narrowed to look like a standard chat interface */
-            margin: 0 auto;
-            background: white;
-            box-shadow: 0 0 20px rgba(0,0,0,0.05);
-            height: 100%; 
-            overflow: hidden;
+            display: flex; flex-direction: column; width: 100%; max-width: 800px;
+            margin: 0 auto; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            height: 100%; overflow: hidden;
         }
 
-        /* LEFT: CHAT PANEL */
-        .chat-panel {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            height: 100%;
-            overflow: hidden; 
-            min-height: 0;
-        }
-        
         .chat-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-            background: white;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-shrink: 0; 
+            padding: 20px; border-bottom: 1px solid var(--border); background: white;
+            display: flex; align-items: center; gap: 15px; flex-shrink: 0; 
         }
-        .header-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid var(--border);
-        }
+        .header-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
         .chat-header-info h1 { margin: 0; font-size: 1.1rem; color: #1e293b; }
         .chat-header-info span { font-size: 0.8rem; color: #64748b; }
         .badge { background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 8px;}
 
         #chat-history {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            background: #fafafa;
+            flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; background: #fafafa;
         }
 
-        .chat-row {
-            display: flex;
-            gap: 12px;
-            width: 100%;
-            align-items: flex-start;
-        }
+        .chat-row { display: flex; gap: 12px; width: 100%; align-items: flex-end; }
         .chat-row.user-row { justify-content: flex-end; }
         .chat-row.bot-row { justify-content: flex-start; }
 
-        .chat-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            object-fit: cover;
-            flex-shrink: 0;
-            background-color: #e2e8f0;
-            border: 1px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+        .chat-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background-color: #e2e8f0; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
-        .message {
-            max-width: 80%;
-            padding: 12px 16px;
-            border-radius: 12px;
-            line-height: 1.5;
-            font-size: 0.95rem;
-            position: relative;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 12px; line-height: 1.5; font-size: 0.95rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .bot-row .message { background-color: white; border: 1px solid var(--border); color: #1e293b; border-bottom-left-radius: 2px; }
+        .user-row .message { background-color: var(--primary); color: white; border-bottom-right-radius: 2px; }
 
-        .bot-row .message {
-            background-color: white;
-            border: 1px solid var(--border);
-            color: #1e293b;
-            border-top-left-radius: 2px;
-        }
+        .input-area { padding: 20px; border-top: 1px solid var(--border); background: white; flex-shrink: 0; }
+        
+        /* Dynamic Input Controls */
+        #text-input-container { display: none; gap: 10px; width: 100%; }
+        #text-input-container input { flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; outline: none; }
+        #text-input-container input:focus { border-color: var(--primary); }
+        #text-input-container button { background-color: var(--primary); color: white; border: none; padding: 0 24px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        
+        #button-input-container { display: none; flex-direction: column; gap: 10px; width: 100%; }
+        .action-btn { background: #f8fafc; border: 1px solid var(--primary); color: var(--primary); padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .action-btn:hover { background: var(--primary); color: white; }
 
-        .user-row .message {
-            background-color: var(--primary);
-            color: white;
-            border-bottom-right-radius: 2px;
-        }
-
-        .input-area {
-            padding: 20px;
-            border-top: 1px solid var(--border);
-            background: white;
-            display: flex;
-            gap: 10px;
-            flex-shrink: 0; 
-        }
-        input {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            font-size: 1rem;
-            outline: none;
-            transition: border 0.2s;
-        }
-        input:focus { border-color: var(--primary); }
-        button {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 0 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        button:hover { background-color: #1d4ed8; }
-        button:disabled { opacity: 0.7; cursor: not-allowed; }
-
-        .loading-dots { display: inline-block; }
-        .loading-dots:after {
-            content: '.';
-            animation: dots 1.5s steps(5, end) infinite;
-        }
+        .loading-dots:after { content: '.'; animation: dots 1.5s steps(5, end) infinite; }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 100% { content: ''; } }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <!-- Chat Section -->
     <div class="chat-panel">
         <div class="chat-header">
-            <img src="justine-avatar.png" class="header-avatar" alt="Justine" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
+            <img src="justine-avatar.png" class="header-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
             <div class="chat-header-info">
                 <h1>Justine <span class="badge">BETA</span></h1>
                 <span>Labour Law Assistant</span>
             </div>
         </div>
         
-        <div id="chat-history">
-            <div class="chat-row bot-row">
-                <img src="justine-avatar.png" class="chat-avatar" alt="Justine" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
-                <div class="message">
-                    Hi there! I'm Justine. I help workers understand their rights and fight unfair treatment at work. Tell me your story so we can figure this out together.
-                </div>
-            </div>
-        </div>
+        <div id="chat-history"></div>
 
-        <form class="input-area" id="chat-form">
-            <input type="text" id="question" placeholder="Type your message..." required autocomplete="off">
-            <button type="submit" id="send-btn">Send</button>
-        </form>
+        <div class="input-area">
+            <!-- Text/Date Input Form -->
+            <form id="text-input-container">
+                <input type="text" id="user-input" autocomplete="off" required>
+                <button type="submit" id="send-btn">Send</button>
+            </form>
+            
+            <!-- Interactive Buttons Container -->
+            <div id="button-input-container"></div>
+        </div>
     </div>
 </div>
 
 <script>
-    const form = document.getElementById('chat-form');
-    const input = document.getElementById('question');
-    const history = document.getElementById('chat-history');
-    const btn = document.getElementById('send-btn');
+    const historyEl = document.getElementById('chat-history');
+    const textContainer = document.getElementById('text-input-container');
+    const buttonContainer = document.getElementById('button-input-container');
+    const inputEl = document.getElementById('user-input');
+    
+    let collectedFacts = {};
+    let activeCaseId = null;
 
-    let chatHistory = [];
-    let currentCaseId = null; // Store the active Case ID
+    // --- THE HARD-CODED INTAKE SCRIPT ---
+    const scriptFlow = {
+        START: {
+            msg: "Hi there! I'm Justine, a Labour Law Assistant. I'm here to help you understand your rights. To start, what is your current work situation?",
+            type: "buttons",
+            options: [
+                { label: "I was fired / dismissed", next: "FIRED_DATE", val: "Dismissed" },
+                { label: "I am still employed (but having issues)", next: "EMP_ISSUE", val: "Employed" },
+                { label: "I resigned / quit", next: "RESIGN_DATE", val: "Resigned" }
+            ],
+            saveAs: "employment_status"
+        },
+        
+        // PATH A: Fired
+        FIRED_DATE: { msg: "I'm sorry to hear that. The law has strict time limits. What was the exact date you were dismissed?", type: "date", next: "FIRED_HEARING", saveAs: "incident_date" },
+        FIRED_HEARING: { msg: "Did your employer hold a formal disciplinary hearing and give you a chance to defend yourself before firing you?", type: "buttons", options: [{label:"Yes", next:"FIRED_REASON", val:true}, {label:"No", next:"FIRED_REASON", val:false}], saveAs: "hearing_held" },
+        FIRED_REASON: { msg: "In a few short sentences, what reason did they give for firing you?", type: "text", next: "PROBATION", saveAs: "incident_description" },
+
+        // PATH B: Employed
+        EMP_ISSUE: { msg: "I understand. What is the main issue you are facing right now?", type: "buttons", options: [{label:"Suspended", next:"EMP_PAY", val:"Suspended"}, {label:"Facing a hearing", next:"PROBATION", val:"Facing a hearing"}, {label:"Unpaid wages", next:"PROBATION", val:"Unpaid wages"}, {label:"Unfair warning", next:"PROBATION", val:"Unfair warning"}], saveAs: "incident_description" },
+        EMP_PAY: { msg: "While you are on suspension, is your employer still paying your normal salary?", type: "buttons", options: [{label:"Yes", next:"PROBATION", val:true}, {label:"No", next:"PROBATION", val:false}], saveAs: "paid_suspension" },
+
+        // PATH C: Resigned
+        RESIGN_DATE: { msg: "What was the exact date you officially resigned?", type: "date", next: "RESIGN_CONST", saveAs: "incident_date" },
+        RESIGN_CONST: { msg: "Did you resign because your employer made your working environment so intolerable that you felt you had absolutely no choice but to leave?", type: "buttons", options: [{label:"Yes", next:"FIRED_REASON", val:true}, {label:"No", next:"FIRED_REASON", val:false}], saveAs: "constructive_dismissal" },
+
+        // MERGE: Universal Context
+        PROBATION: { msg: "Roughly how long have you worked for this employer?", type: "buttons", options: [{label:"Less than 3 months", next:"SECTOR", val:"< 3 months"}, {label:"3 to 6 months", next:"SECTOR", val:"3 - 6 months"}, {label:"More than 6 months", next:"SECTOR", val:"> 6 months"}], saveAs: "tenure" },
+        SECTOR: { msg: "What industry or sector do you work in?", type: "buttons", options: [{label:"Retail", next:"COMPANY_NAME", val:"Retail"}, {label:"Mining", next:"COMPANY_NAME", val:"Mining"}, {label:"Security", next:"COMPANY_NAME", val:"Security"}, {label:"Metal & Engineering", next:"COMPANY_NAME", val:"Metal & Engineering"}, {label:"Other", next:"COMPANY_NAME", val:"Other"}], saveAs: "sector" },
+
+        // LOGISTICS
+        COMPANY_NAME: { msg: "What is the exact name of the company you work(ed) for?", type: "text", next: "COMPANY_CONTACT", saveAs: "employer_name" },
+        COMPANY_CONTACT: { msg: "Please provide an email address or phone number for the company's HR department or your manager.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
+        CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_PHONE", saveAs: "client_name" },
+        CLIENT_PHONE: { msg: "And finally, what is the best cell phone number to reach you on?", type: "text", next: "HANDOFF", saveAs: "contact_info" },
+
+        // AI HANDOFF
+        HANDOFF: { action: "evaluate" }
+    };
+
+    let currentState = "START";
 
     function appendMessage(text, sender) {
-        const rowDiv = document.createElement('div');
-        rowDiv.classList.add('chat-row', sender === 'user' ? 'user-row' : 'bot-row');
-
+        const row = document.createElement('div');
+        row.className = `chat-row ${sender}-row`;
         if (sender === 'bot') {
-            const img = document.createElement('img');
-            img.src = 'justine-avatar.png';
-            img.classList.add('chat-avatar');
-            img.alt = 'Justine';
-            img.onerror = function() { this.src = 'https://ui-avatars.com/api/?name=Justine&background=random'; };
-            rowDiv.appendChild(img);
+            row.innerHTML = `<img src="justine-avatar.png" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"> <div class="message">${text}</div>`;
+        } else {
+            row.innerHTML = `<div class="message">${text}</div>`;
         }
-
-        const msgDiv = document.createElement('div');
-        msgDiv.classList.add('message');
-        msgDiv.innerHTML = text.replace(/\n/g, '<br>');
-        
-        rowDiv.appendChild(msgDiv);
-        history.appendChild(rowDiv);
-        history.scrollTop = history.scrollHeight;
+        historyEl.appendChild(row);
+        historyEl.scrollTop = historyEl.scrollHeight;
     }
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const query = input.value.trim();
-        if (!query) return;
-
-        appendMessage(query, 'user');
-        input.value = '';
-        input.disabled = true;
-        btn.disabled = true;
-
-        const loadingRow = document.createElement('div');
-        loadingRow.classList.add('chat-row', 'bot-row');
+    function renderState() {
+        const step = scriptFlow[currentState];
         
-        const loadingAvatar = document.createElement('img');
-        loadingAvatar.src = 'justine-avatar.png';
-        loadingAvatar.classList.add('chat-avatar');
-        loadingAvatar.onerror = function() { this.src = 'https://ui-avatars.com/api/?name=Justine&background=random'; };
-        
-        const loadingMsg = document.createElement('div');
-        loadingMsg.classList.add('message');
-        loadingMsg.innerHTML = 'Thinking<span class="loading-dots"></span>';
-        
-        loadingRow.appendChild(loadingAvatar);
-        loadingRow.appendChild(loadingMsg);
-        history.appendChild(loadingRow);
-        history.scrollTop = history.scrollHeight;
+        // Hide inputs while rendering
+        textContainer.style.display = 'none';
+        buttonContainer.style.display = 'none';
 
-        try {
-            const response = await fetch('/.netlify/functions/ask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    question: query,
-                    history: chatHistory,
-                    caseId: currentCaseId // Send the current Case ID if we have one
-                })
-            });
-
-            const data = await response.json();
-            
-            if (loadingRow.parentNode) history.removeChild(loadingRow);
-
-            if (data.error) {
-                appendMessage("Error: " + data.error, 'bot');
-            } else {
-                appendMessage(data.conversation, 'bot');
-
-                // Save the returned Case ID for future turns
-                if (data.caseId) {
-                    currentCaseId = data.caseId;
-                }
-
-                chatHistory.push({ role: 'user', content: query });
-                chatHistory.push({ role: 'model', content: data.conversation });
-                if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
-            }
-        } catch (err) {
-            if (loadingRow.parentNode) history.removeChild(loadingRow);
-            appendMessage("Network error. Please try again.", 'bot');
-            console.error(err);
+        if (step.action === "evaluate") {
+            appendMessage("Thank you! Give me just a moment to review your details against South African Labour Law...", "bot");
+            triggerAIEvaluation();
+            return;
         }
 
-        input.disabled = false;
-        btn.disabled = false;
-        input.focus();
-    });
+        // Show Bot Message
+        setTimeout(() => {
+            appendMessage(step.msg, "bot");
+            
+            // Show Inputs based on type
+            if (step.type === "buttons") {
+                buttonContainer.innerHTML = '';
+                step.options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'action-btn';
+                    btn.innerText = opt.label;
+                    btn.onclick = () => handleUserInput(opt.val, opt.label, step.saveAs, opt.next);
+                    buttonContainer.appendChild(btn);
+                });
+                buttonContainer.style.display = 'flex';
+            } else {
+                inputEl.type = step.type === "date" ? "date" : "text";
+                inputEl.value = "";
+                textContainer.style.display = 'flex';
+                inputEl.focus();
+            }
+        }, 500); // 500ms delay feels natural
+    }
+
+    textContainer.onsubmit = (e) => {
+        e.preventDefault();
+        const val = inputEl.value.trim();
+        if (!val) return;
+        const step = scriptFlow[currentState];
+        handleUserInput(val, val, step.saveAs, step.next);
+    };
+
+    function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
+        textContainer.style.display = 'none';
+        buttonContainer.style.display = 'none';
+        
+        appendMessage(displayValue, "user");
+        if (saveKey) collectedFacts[saveKey] = actualValue;
+        
+        currentState = nextStateKey;
+        renderState();
+    }
+
+    // --- AI INTEGRATION PHASE ---
+    async function triggerAIEvaluation() {
+        showLoading();
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "evaluate", facts: collectedFacts })
+            });
+            const data = await res.json();
+            hideLoading();
+            
+            activeCaseId = data.caseId;
+            appendMessage(data.pitch, "bot");
+            
+            // Show Final Decision Buttons
+            buttonContainer.innerHTML = '';
+            const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => closeCase(true);
+            const btnNo = document.createElement('button'); btnNo.className = 'action-btn'; btnNo.innerText = "No thank you."; btnNo.onclick = () => closeCase(false);
+            buttonContainer.appendChild(btnYes); buttonContainer.appendChild(btnNo);
+            buttonContainer.style.display = 'flex';
+
+        } catch (e) {
+            hideLoading();
+            appendMessage("Sorry, I had trouble connecting to the legal database. Please refresh and try again.", "bot");
+        }
+    }
+
+    async function closeCase(wantsLetter) {
+        buttonContainer.style.display = 'none';
+        appendMessage(wantsLetter ? "Yes, please draft the letter." : "No thank you.", "user");
+        showLoading();
+        
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter })
+            });
+            const data = await res.json();
+            hideLoading();
+            appendMessage(data.closing_message, "bot");
+        } catch(e) { hideLoading(); }
+    }
+
+    // Helpers
+    function showLoading() {
+        const row = document.createElement('div'); row.id = "loading-row"; row.className = "chat-row bot-row";
+        row.innerHTML = `<img src="justine-avatar.png" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"> <div class="message">Thinking<span class="loading-dots"></span></div>`;
+        historyEl.appendChild(row); historyEl.scrollTop = historyEl.scrollHeight;
+    }
+    function hideLoading() { const el = document.getElementById('loading-row'); if(el) el.remove(); }
+
+    // Start Chat
+    renderState();
 </script>
 
 </body>
