@@ -180,7 +180,7 @@
 </div>
 
 <script>
-    // --- 🚨 IMPORTANT: PASTE YOUR URL AND ANON KEY HERE 🚨 ---
+    // --- SUPABASE INITIALIZATION ---
     const SUPABASE_URL = 'https://pdjhgszpndwykeqlusho.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
     
@@ -210,14 +210,23 @@
         btn.innerText = "Authenticating...";
         err.style.display = 'none';
 
-        const { data, error } = await db.auth.signInWithPassword({ email, password });
-        
-        if (error) {
-            err.innerText = error.message;
+        try {
+            const { data, error } = await db.auth.signInWithPassword({ email, password });
+            
+            if (error) throw error;
+            if (!data.session) throw new Error("Login succeeded but no session was created. Did you check 'Auto Confirm User' in Supabase?");
+
+            currentToken = data.session.access_token;
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-dashboard').style.display = 'grid';
+            loadSettings();
+            fetchCases();
+
+        } catch (e) {
+            console.error("Login Error:", e);
+            err.innerText = e.message || "A network error occurred. Check browser console.";
             err.style.display = 'block';
             btn.innerText = "Secure Login";
-        } else {
-            checkAuth();
         }
     }
 
@@ -229,7 +238,6 @@
         document.getElementById('auth-password').value = '';
     }
 
-    // A helper to easily add the Authorization header to all our backend requests
     function getAuthHeaders() {
         return {
             'Content-Type': 'application/json',
@@ -275,6 +283,7 @@
             else if (c.letter_status === 'pending_review') { displayStatus = 'Needs Review'; statusClass = 'pending_review'; } 
             else if (c.letter_status === 'approved') { displayStatus = 'Approved'; statusClass = 'approved'; } 
             else if (c.case_facts && c.case_facts.wants_letter) { displayStatus = 'Needs Drafting'; statusClass = 'needs_drafting'; }
+            else if (c.case_facts && c.case_facts.wants_letter === false) { displayStatus = 'Closed / Declined'; statusClass = 'new'; }
 
             card.innerHTML = `<div class="case-title">${title}</div><div style="font-size: 0.85rem; margin-bottom: 10px; color: #334155;">${issue}</div><div class="case-meta"><span class="status-badge ${statusClass}">${displayStatus}</span><span>${formatDate(c.updated_at)}</span></div>`;
             listEl.appendChild(card);
@@ -295,16 +304,34 @@
         }
 
         const facts = c.case_facts || {};
-        const labels = { client_name: "Client Name", contact_info: "Client Contact", employer_name: "Employer Name", employer_contact_details: "Employer Contact", incident_date: "Incident Date", incident_description: "Incident Description", hearing_held: "Hearing Held?", wants_letter: "Wants Letter?" };
+        
+        // Expanded mapping to include the new deterministic keys
+        const labels = { 
+            client_name: "Client Name", 
+            contact_info: "Client Contact", 
+            employer_name: "Employer Name", 
+            employer_contact_details: "Employer Contact", 
+            incident_date: "Incident Date", 
+            incident_description: "Incident Description", 
+            hearing_held: "Hearing Held?", 
+            wants_letter: "Wants Letter?",
+            employment_status: "Employment Status",
+            paid_suspension: "Paid Suspension?",
+            constructive_dismissal: "Constructive Dismissal?",
+            tenure: "Tenure",
+            sector: "Sector"
+        };
 
         let factsHtml = '<div class="fact-grid">';
         for (const [key, val] of Object.entries(facts)) {
-            if (key === 'case_merit_assessed') continue;
+            // EXCLUDE Internal AI Reasoning fields from the editable grid
+            if (key === 'case_merit_assessed' || key === 'legal_reasoning' || key === 'merit_assessment') continue;
+            
             const label = labels[key] || key.replace(/_/g, ' ').toUpperCase();
             let inputHtml = '';
             
-            // FIX 1: Make boolean dropdowns smart enough to handle string "yes"/"no" from the AI
-            if (typeof val === 'boolean' || key === 'wants_letter' || key === 'hearing_held') {
+            // Smart dropdowns for all boolean or yes/no equivalent fields
+            if (typeof val === 'boolean' || key === 'wants_letter' || key === 'hearing_held' || key === 'paid_suspension' || key === 'constructive_dismissal') {
                 let boolVal = val;
                 if (typeof val === 'string') {
                     if (val.toLowerCase() === 'yes' || val.toLowerCase() === 'true') boolVal = true;
@@ -315,7 +342,6 @@
             } else if (key.includes('description')) {
                 inputHtml = `<textarea id="fact-${key}" class="fact-input" rows="3" placeholder="Pending...">${val || ''}</textarea>`;
             } else if (key.includes('date')) {
-                // FIX 2: Change input type="date" to type="text" so the browser doesn't hide non-standard date formats
                 inputHtml = `<input type="text" id="fact-${key}" class="fact-input" value="${val || ''}" placeholder="YYYY-MM-DD or text">`;
             } else {
                 inputHtml = `<input type="text" id="fact-${key}" class="fact-input" value="${val || ''}" placeholder="Pending...">`;
@@ -324,7 +350,37 @@
         }
         factsHtml += `<div style="grid-column: 1 / -1; text-align: right; margin-top: 10px; padding-top: 15px; border-top: 1px solid var(--border);"><button class="btn btn-primary" style="background: var(--primary);" onclick="saveCaseFacts('${c.id}')">💾 Save Case Details</button></div></div>`;
 
-        document.getElementById('details-content').innerHTML = `<div style="margin-bottom: 20px;"><h2 style="margin: 0 0 5px 0;">${c.client_name || 'Anonymous Client'}</h2><div style="color: var(--text-muted); font-size: 0.9rem;">Case ID: ${c.id}</div></div>${letterHtml}<div class="info-card"><h3>Matter Overview</h3><p style="margin: 0; font-size: 1.05rem;">${c.issue_summary || '<em>Gathering details...</em>'}</p><div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);"><strong>Last Updated:</strong> ${formatDate(c.updated_at)}</div></div><div class="info-card"><h3>Gathered Facts (Editable)</h3>${factsHtml}</div>`;
+        // Render AI Reasoning highlighted block if it exists
+        let reasoningHtml = '';
+        if (c.case_facts && c.case_facts.legal_reasoning) {
+            reasoningHtml = `
+                <div style="margin-top: 15px; padding: 15px; background: #f8fafc; border-left: 4px solid #64748b; font-size: 0.9rem; border-radius: 4px;">
+                    <strong style="color: #334155; display: block; margin-bottom: 8px;">🤖 AI Merit Assessment: ${c.case_facts.merit_assessment || 'Unknown'}</strong>
+                    <div style="line-height: 1.5; color: #475569;">${c.case_facts.legal_reasoning.replace(/\n/g, '<br>')}</div>
+                </div>
+            `;
+        }
+
+        // Build the complete Details panel
+        document.getElementById('details-content').innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <h2 style="margin: 0 0 5px 0;">${c.client_name || 'Anonymous Client'}</h2>
+                <div style="color: var(--text-muted); font-size: 0.9rem;">Case ID: ${c.id}</div>
+            </div>
+            ${letterHtml}
+            <div class="info-card">
+                <h3>Matter Overview</h3>
+                <p style="margin: 0; font-size: 1.05rem;">${c.issue_summary || '<em>Gathering details...</em>'}</p>
+                ${reasoningHtml}
+                <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
+                    <strong>Last Updated:</strong> ${formatDate(c.updated_at)}
+                </div>
+            </div>
+            <div class="info-card">
+                <h3>Gathered Facts (Editable)</h3>
+                ${factsHtml}
+            </div>
+        `;
     }
 
     async function saveCaseFacts(caseId) {
@@ -332,7 +388,8 @@
         if (!c) return;
         const updatedFacts = { ...c.case_facts };
         for (const key of Object.keys(updatedFacts)) {
-            if (key === 'case_merit_assessed') continue;
+            if (key === 'case_merit_assessed' || key === 'legal_reasoning' || key === 'merit_assessment') continue;
+            
             const el = document.getElementById(`fact-${key}`);
             if (el) {
                 let val = el.value;
