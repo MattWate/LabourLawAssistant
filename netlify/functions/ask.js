@@ -4,7 +4,7 @@ const OpenAI = require('openai');
 
 // Load environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_KEY; // Make sure this is your service_role key in Netlify!
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -14,189 +14,146 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 exports.handler = async (event, context) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
+    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
-  try {
-    const { question, history, caseId } = JSON.parse(event.body);
-    if (!question) return { statusCode: 400, body: JSON.stringify({ error: 'Question required' }) };
+    try {
+        const body = JSON.parse(event.body);
+        const action = body.action; // Expects "evaluate" or "close"
 
-    // Initialize Gemini Models (used for DB search)
-    const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const jsonModel = genAI.getGenerativeModel({ 
-        model: "gemini-2.0-flash", 
-        generationConfig: { responseMimeType: "application/json" } 
-    });
-    const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
+        // ==========================================
+        // ACTION 1: EVALUATE & PITCH
+        // ==========================================
+        if (action === "evaluate") {
+            const facts = body.facts;
+            
+            // 1. Build a search query based on what they told us
+            const searchQuery = `${facts.incident_description || ''} ${facts.sector || ''} unfair dismissal labour practice`;
+            
+            // 2. Search Database (RAG) using Gemini Embeddings
+            const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
+            const embeddingResult = await embeddingModel.embedContent(searchQuery);
+            
+            const { data: chunks } = await supabase.rpc('hybrid_search', {
+                query_text: searchQuery,
+                query_embedding: embeddingResult.embedding.values,
+                match_count: 5, 
+                full_text_weight: 1.0, 
+                semantic_weight: 2.0, 
+                rrf_k: 50
+            });
+            const contextText = chunks ? chunks.map(c => c.content).join("\n\n") : "No specific case law found.";
 
-    // ---------------------------------------------------------
-    // PHASE 1: SEARCH & RETRIEVAL (The Legal Brain)
-    // ---------------------------------------------------------
-    
-    // 1. Contextualize the question using chat history
-    let standaloneQuestion = question;
-    if (history && history.length > 0) {
-        const historyText = history.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join("\n");
-        const rewriteResult = await geminiModel.generateContent(`
-            Rewrite this "New User Question" into a standalone sentence using the "Chat History" for context.
-            New User Question: "${question}"
-            Chat History: ${historyText}
-        `);
-        standaloneQuestion = rewriteResult.response.text().trim();
-    }
+            // 3. Check Admin Settings for Active LLM
+            const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
+            const activeLLM = settingData ? settingData.setting_value : 'gemini';
 
-    // 2. Embed the question and search Supabase
-    const embeddingResult = await embeddingModel.embedContent(standaloneQuestion);
-    const vector = embeddingResult.embedding.values;
-    
-    const { data: chunks, error: searchError } = await supabase.rpc('hybrid_search', {
-      query_text: standaloneQuestion,
-      query_embedding: vector,
-      match_count: 10,
-      full_text_weight: 1.0, 
-      semantic_weight: 2.0, 
-      rrf_k: 50
-    });
+            // 4. Create the Evaluation Prompt
+            const prompt = `
+            You are Justine, a highly knowledgeable South African Labour Law Assistant. 
+            Review these collected facts and the legal context, then return a JSON object with a 'pitch' and 'legal_reasoning'.
+            
+            FACTS:
+            ${JSON.stringify(facts, null, 2)}
+            
+            LEGAL CONTEXT:
+            ${contextText}
+            
+            INSTRUCTIONS FOR THE PITCH:
+            1. Validate their experience warmly based on the facts (e.g., "Based on what you've told me, especially since they didn't hold a hearing...").
+            2. Tell them the law is likely on their side.
+            3. Pitch our "Demand Letter" service. Tell them our legal team will review the file and draft a formal demand letter to their employer for a small fixed fee.
+            4. End by asking: "Would you like our legal team to draft this letter for you?"
+            
+            RETURN ONLY A JSON OBJECT WITH THIS EXACT STRUCTURE:
+            {
+              "pitch": "Your warm, conversational response.",
+              "legal_reasoning": "Markdown bullet points explaining why the law is on their side based on the facts and context."
+            }
+            `;
 
-    if (searchError) throw new Error(`Database Error: ${searchError.message}`);
-    const contextText = chunks.map(c => `SOURCE (ID: ${c.id}):\n${c.content}`).join("\n\n---\n\n");
+            let aiResponse = null;
 
-    // ---------------------------------------------------------
-    // PHASE 2 & 3: COMBINED EXTRACTION, PERSONA & GENERATION
-    // ---------------------------------------------------------
-    
-    let activeCaseId = caseId;
-    let currentCaseFacts = {
-      client_name: null, contact_info: null, employer_name: null, employer_contact_details: null,
-      incident_date: null, incident_description: null, hearing_held: null, wants_letter: false
-    };
+            // 5. Ask the chosen LLM to evaluate and generate the pitch
+            if (activeLLM === 'openai' && openai) {
+                const completion = await openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        { role: "system", content: "You are a legal JSON processor. Always return strictly formatted JSON." },
+                        { role: "user", content: prompt }
+                    ],
+                    response_format: { type: "json_object" }
+                });
+                aiResponse = JSON.parse(completion.choices[0].message.content);
+            } else {
+                const jsonModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash", generationConfig: { responseMimeType: "application/json" } });
+                const result = await jsonModel.generateContent(prompt);
+                aiResponse = JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim());
+            }
 
-    // If we have an active case, fetch the existing facts so the AI knows where we left off
-    if (activeCaseId) {
-        const { data: existingCase } = await supabase.from('cases').select('case_facts').eq('id', activeCaseId).single();
-        if (existingCase && existingCase.case_facts) {
-            currentCaseFacts = { ...currentCaseFacts, ...existingCase.case_facts };
+            // 6. Save the new case to the Database
+            const dbPayload = {
+                client_name: facts.client_name,
+                contact_info: facts.contact_info,
+                issue_summary: facts.incident_description || 'Gathered via automated intake.',
+                case_facts: facts,
+                status: 'new'
+            };
+
+            const { data: newCase, error: dbErr } = await supabase.from('cases').insert(dbPayload).select().single();
+            
+            if (dbErr) throw new Error("Database save failed: " + dbErr.message);
+
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    pitch: aiResponse.pitch, 
+                    legal_reasoning: aiResponse.legal_reasoning,
+                    caseId: newCase.id 
+                })
+            };
         }
+
+        // ==========================================
+        // ACTION 2: CLOSE THE CASE (User clicked Yes/No)
+        // ==========================================
+        if (action === "close") {
+            const { caseId, wants_letter } = body;
+            
+            // 1. Update the database with their final decision
+            const updatePayload = {
+                updated_at: new Date().toISOString()
+            };
+
+            if (wants_letter) {
+                updatePayload.status = 'requires_attorney';
+                updatePayload.letter_status = 'needs_drafting';
+            }
+
+            // Fetch existing facts so we can inject the wants_letter boolean safely
+            const { data: existingCase } = await supabase.from('cases').select('case_facts').eq('id', caseId).single();
+            if (existingCase && existingCase.case_facts) {
+                updatePayload.case_facts = { ...existingCase.case_facts, wants_letter: wants_letter };
+            }
+
+            await supabase.from('cases').update(updatePayload).eq('id', caseId);
+
+            // 2. Return the final message
+            let closingMsg = wants_letter 
+                ? "Excellent. I have officially sent your file to our legal team! They will review the details and email you a secure payment link as soon as your letter is ready to be dispatched. We've got your back!" 
+                : "No problem at all! I have saved your file. If you change your mind and decide you want to take action, just reach out to us again. Wishing you the best of luck!";
+
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ closing_message: closingMsg })
+            };
+        }
+
+        return { statusCode: 400, body: JSON.stringify({ error: "Invalid action" }) };
+
+    } catch (error) {
+        console.error("Server Error:", error);
+        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
-
-    // Check which LLM the Admin wants to use for the conversation
-    const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
-    const activeLLM = settingData ? settingData.setting_value : 'gemini';
-
-    // NEW: Get today's actual date so Justine understands "yesterday"
-    const todayDate = new Date().toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const combinedPrompt = `
-    You are Justine, a friendly, empathetic, and highly knowledgeable Labour Law Assistant.
-    Your main clients are everyday South African workers (e.g., factory workers, retail staff, drivers, miners). 
-    You MUST speak in plain, simple, everyday English. Do not use heavy legal jargon in the conversation. 
-    Be warm, supportive, and talk to them like a helpful friend who knows the law. 
-    Keep your sentences relatively short and easy to understand.
-
-    TODAY's DATE IS: ${todayDate}. Use this context if the user says "yesterday", "last week", etc. to calculate the exact date.
-
-    CURRENT CASE FACTS:
-    ${JSON.stringify(currentCaseFacts, null, 2)}
-
-    CHAT HISTORY:
-    ${JSON.stringify(history)}
-
-    NEW USER QUERY:
-    ${question}
-
-    LEGAL CONTEXT (For reference):
-    ${contextText}
-
-    YOUR TASKS:
-    1. EXTRACT: Update the CURRENT CASE FACTS based on the NEW USER QUERY. If they provided a missing detail, update the null value. If they agreed to a letter, set "wants_letter" to true.
-    2. STRICT STAGE DETERMINATION & RESPOND (Write the "conversation" field):
-       - STEP A: Look at your newly updated facts. Are there ANY fields (except wants_letter) that are still null?
-       - STAGE 1 (Intake - if ANY fact is still null): You MUST ask the user for the FIRST missing fact. Do this naturally and warmly. Acknowledge what they said and show sympathy. You are STRICTLY FORBIDDEN from pitching the letter or drafting the letter until every single fact (name, contact info, employer name, employer contact, date, description, hearing) is provided.
-       - STAGE 2 (Pitch - if ALL facts are provided BUT wants_letter is false): Look at the LEGAL CONTEXT. Tell them simply if the law is on their side. Then, offer to help: tell them you can draft a formal, strong demand letter to the employer to fix the issue or ask for a settlement. Explain that our legal team will check and send it for a small fixed fee, and ask if they want you to write it for them now.
-       - STAGE 3 (Closing - if ALL facts are provided AND wants_letter is true): Reassure the user. Tell them you have successfully sent their file to our legal team. The team will review everything, draft the formal letter, and send them an email with a payment link when it's ready. Do NOT draft the letter yourself.
-
-    Return ONLY a JSON object with this exact structure. PAY STRICT ATTENTION TO DATA TYPES:
-    {
-      "updated_facts": {
-        "client_name": "string or null",
-        "contact_info": "string or null",
-        "employer_name": "string or null",
-        "employer_contact_details": "string or null",
-        "incident_date": "string (FORMAT MUST BE EXACTLY YYYY-MM-DD) or null",
-        "incident_description": "string or null",
-        "hearing_held": boolean (true or false ONLY) or null,
-        "wants_letter": boolean (true or false ONLY) or null
-      },
-      "conversation": "Your warm, simple, conversational response.",
-      "legal_reasoning": "Markdown notes detailing merits or reasoning."
-    }
-    `;
-
-    let responseJson = null;
-
-    // AI ROUTER: Route to the requested AI Model
-    if (activeLLM === 'openai' && openai) {
-        // Use ChatGPT
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                { role: "system", content: "You are a legal JSON processor. Always return strictly formatted JSON." },
-                { role: "user", content: combinedPrompt }
-            ],
-            response_format: { type: "json_object" }
-        });
-        responseJson = JSON.parse(completion.choices[0].message.content);
-    } else {
-        // Use Gemini
-        const result = await jsonModel.generateContent(combinedPrompt);
-        let rawText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-        responseJson = JSON.parse(rawText);
-    }
-
-    const newFacts = responseJson.updated_facts;
-
-    // ---------------------------------------------------------
-    // PHASE 4: SAVE TO SUPABASE
-    // ---------------------------------------------------------
-    
-    const dbPayload = {
-        updated_at: new Date().toISOString(),
-        issue_summary: newFacts.incident_description || 'Gathering facts...',
-        case_facts: newFacts,
-        ...(newFacts.client_name && { client_name: newFacts.client_name }),
-        ...(newFacts.contact_info && { contact_info: newFacts.contact_info }),
-    };
-
-    // Determine letter status: Tag it so the Admin knows it needs to be drafted
-    if (newFacts.wants_letter) {
-        dbPayload.letter_status = 'needs_drafting';
-        dbPayload.status = 'requires_attorney';
-    }
-
-    // Save
-    if (activeCaseId) {
-        await supabase.from('cases').update(dbPayload).eq('id', activeCaseId);
-    } else {
-        const { data: newCase } = await supabase.from('cases').insert(dbPayload).select().single();
-        activeCaseId = newCase.id;
-    }
-
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-          conversation: responseJson.conversation,
-          legal_reasoning: responseJson.legal_reasoning,
-          caseId: activeCaseId 
-      })
-    };
-
-  } catch (error) {
-    console.error("Server Error:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message })
-    };
-  }
 };
