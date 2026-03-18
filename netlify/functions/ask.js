@@ -47,10 +47,10 @@ exports.handler = async (event, context) => {
             const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
             const activeLLM = settingData ? settingData.setting_value : 'gemini';
 
-            // 4. Create the Evaluation Prompt
+            // 4. Create the Evaluation Prompt (Actual Merit Assessment)
             const prompt = `
             You are Justine, a highly knowledgeable South African Labour Law Assistant. 
-            Review these collected facts and the legal context, then return a JSON object with a 'pitch' and 'legal_reasoning'.
+            Review these collected facts and the legal context, then return a JSON object evaluating the case.
             
             FACTS:
             ${JSON.stringify(facts, null, 2)}
@@ -58,16 +58,16 @@ exports.handler = async (event, context) => {
             LEGAL CONTEXT:
             ${contextText}
             
-            INSTRUCTIONS FOR THE PITCH:
-            1. Validate their experience warmly based on the facts (e.g., "Based on what you've told me, especially since they didn't hold a hearing...").
-            2. Tell them the law is likely on their side.
-            3. Pitch our "Demand Letter" service. Tell them our legal team will review the file and draft a formal demand letter to their employer for a small fixed fee.
-            4. End by asking: "Would you like our legal team to draft this letter for you?"
+            INSTRUCTIONS:
+            1. Assess the merits of the case (Is there a procedural or substantive unfairness?).
+            2. If the case has merit (High/Medium), write a 'pitch' validating their experience, telling them the law is on their side, and offering to draft a Demand Letter for a small fixed fee. End by asking: "Would you like our legal team to draft this letter for you?"
+            3. If the case has NO merit (Low), write a 'pitch' politely explaining why the law might not support them based on the context, but offer that our attorneys will review the file just in case. Do NOT offer the demand letter.
             
             RETURN ONLY A JSON OBJECT WITH THIS EXACT STRUCTURE:
             {
-              "pitch": "Your warm, conversational response.",
-              "legal_reasoning": "Markdown bullet points explaining why the law is on their side based on the facts and context."
+              "merit_assessment": "High", "Medium", or "Low",
+              "legal_reasoning": "Markdown bullet points explaining your assessment.",
+              "pitch": "Your warm, conversational response to the user."
             }
             `;
 
@@ -90,12 +90,29 @@ exports.handler = async (event, context) => {
                 aiResponse = JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim());
             }
 
+            // Force standard formatting of facts so the Admin panel ALWAYS sees them
+            const coreFacts = {
+                client_name: facts.client_name || null,
+                contact_info: facts.contact_info || null,
+                employer_name: facts.employer_name || null,
+                employer_contact_details: facts.employer_contact_details || null,
+                incident_date: facts.incident_date || null,
+                incident_description: facts.incident_description || null,
+                hearing_held: facts.hearing_held !== undefined ? facts.hearing_held : null,
+                employment_status: facts.employment_status || null,
+                sector: facts.sector || null,
+                tenure: facts.tenure || null,
+                wants_letter: null, // Always initialize so it shows in Admin dropdowns
+                merit_assessment: aiResponse.merit_assessment || 'Unknown',
+                legal_reasoning: aiResponse.legal_reasoning || 'No reasoning provided.'
+            };
+
             // 6. Save the new case to the Database
             const dbPayload = {
                 client_name: facts.client_name,
                 contact_info: facts.contact_info,
                 issue_summary: facts.incident_description || 'Gathered via automated intake.',
-                case_facts: facts,
+                case_facts: coreFacts,
                 status: 'new'
             };
 
@@ -103,12 +120,14 @@ exports.handler = async (event, context) => {
             
             if (dbErr) throw new Error("Database save failed: " + dbErr.message);
 
+            const hasMerit = aiResponse.merit_assessment !== "Low";
+
             return {
                 statusCode: 200,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
                     pitch: aiResponse.pitch, 
-                    legal_reasoning: aiResponse.legal_reasoning,
+                    hasMerit: hasMerit,
                     caseId: newCase.id 
                 })
             };
@@ -141,7 +160,7 @@ exports.handler = async (event, context) => {
             // 2. Return the final message
             let closingMsg = wants_letter 
                 ? "Excellent. I have officially sent your file to our legal team! They will review the details and email you a secure payment link as soon as your letter is ready to be dispatched. We've got your back!" 
-                : "No problem at all! I have saved your file. If you change your mind and decide you want to take action, just reach out to us again. Wishing you the best of luck!";
+                : "No problem at all! I have saved your file. If you change your mind, just reach out to us again. Wishing you the best of luck!";
 
             return {
                 statusCode: 200,
