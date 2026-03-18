@@ -15,20 +15,39 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg);
             margin: 0;
+            padding: 0;
             display: flex;
             height: 100vh;
-            overflow: hidden;
+            width: 100vw;
+            overflow: hidden; /* Prevent body scrolling */
         }
 
         .app-container {
-            display: flex; flex-direction: column; width: 100%; max-width: 800px;
-            margin: 0 auto; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.05);
-            height: 100%; overflow: hidden;
+            display: flex; 
+            flex-direction: column; 
+            width: 100%; 
+            max-width: 800px;
+            margin: 0 auto; 
+            background: white; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            height: 100%; 
+        }
+
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+            flex: 1; /* Take up all available height in app-container */
+            min-height: 0; /* The absolute key to fixing flexbox scrolling bugs! */
         }
 
         .chat-header {
-            padding: 20px; border-bottom: 1px solid var(--border); background: white;
-            display: flex; align-items: center; gap: 15px; flex-shrink: 0; 
+            padding: 20px; 
+            border-bottom: 1px solid var(--border); 
+            background: white;
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            flex-shrink: 0; 
         }
         .header-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
         .chat-header-info h1 { margin: 0; font-size: 1.1rem; color: #1e293b; }
@@ -36,10 +55,23 @@
         .badge { background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 8px;}
 
         #chat-history {
-            flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; background: #fafafa;
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 20px; 
+            background: #fafafa;
+            /* Switched from flex to standard block layout for reliable scrolling */
         }
 
-        .chat-row { display: flex; gap: 12px; width: 100%; align-items: flex-end; }
+        .chat-row { 
+            display: flex; 
+            gap: 12px; 
+            width: 100%; 
+            align-items: flex-end; 
+            margin-bottom: 20px; /* Using margin instead of flex gap for bulletproof scrolling */
+        }
+        .chat-row:last-child {
+            margin-bottom: 0;
+        }
         .chat-row.user-row { justify-content: flex-end; }
         .chat-row.bot-row { justify-content: flex-start; }
 
@@ -143,6 +175,14 @@
 
     let currentState = "START";
 
+    // --- SCROLL HELPER ---
+    // A tiny delay ensures the browser has rendered the new elements before checking the height
+    function scrollToBottom() {
+        setTimeout(() => {
+            historyEl.scrollTop = historyEl.scrollHeight;
+        }, 50);
+    }
+
     function appendMessage(text, sender) {
         const row = document.createElement('div');
         row.className = `chat-row ${sender}-row`;
@@ -152,7 +192,7 @@
             row.innerHTML = `<div class="message">${text}</div>`;
         }
         historyEl.appendChild(row);
-        historyEl.scrollTop = historyEl.scrollHeight;
+        scrollToBottom();
     }
 
     function renderState() {
@@ -189,6 +229,7 @@
                 textContainer.style.display = 'flex';
                 inputEl.focus();
             }
+            scrollToBottom();
         }, 500); // 500ms delay feels natural
     }
 
@@ -242,6 +283,7 @@
                 buttonContainer.appendChild(btnOk);
             }
             buttonContainer.style.display = 'flex';
+            scrollToBottom();
 
         } catch (e) {
             hideLoading();
@@ -280,11 +322,11 @@
         }
     }
 
-    // Helpers
     function showLoading() {
         const row = document.createElement('div'); row.id = "loading-row"; row.className = "chat-row bot-row";
         row.innerHTML = `<img src="justine-avatar.png" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"> <div class="message">Thinking<span class="loading-dots"></span></div>`;
-        historyEl.appendChild(row); historyEl.scrollTop = historyEl.scrollHeight;
+        historyEl.appendChild(row); 
+        scrollToBottom();
     }
     function hideLoading() { const el = document.getElementById('loading-row'); if(el) el.remove(); }
 
