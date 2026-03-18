@@ -58,10 +58,14 @@ exports.handler = async (event, context) => {
             LEGAL CONTEXT:
             ${contextText}
             
+            CRITICAL DEFINITION OF "MERIT":
+            - "High/Medium Merit" means the EMPLOYEE (the user) has a strong claim because the employer acted unfairly (e.g., no disciplinary hearing was held, or the reason for dismissal was too harsh for the offense, like being late once).
+            - "Low Merit" means the employer likely acted fairly and lawfully, and the employee does not have a strong claim.
+
             INSTRUCTIONS:
-            1. Assess the merits of the case (Is there a procedural or substantive unfairness?).
-            2. If the case has merit (High/Medium), write a 'pitch' validating their experience, telling them the law is on their side, and offering to draft a Demand Letter for a small fixed fee. End by asking: "Would you like our legal team to draft this letter for you?"
-            3. If the case has NO merit (Low), write a 'pitch' politely explaining why the law might not support them based on the context, but offer that our attorneys will review the file just in case. Do NOT offer the demand letter.
+            1. Assess the merits of the case for the EMPLOYEE based on the definition above.
+            2. If the case has High/Medium merit, write a 'pitch' validating their experience, telling them the law is on their side, and offering to draft a Demand Letter for a small fixed fee. End by asking: "Would you like our legal team to draft this letter for you?"
+            3. If the case has Low merit (NO merit), write a 'pitch' politely explaining why the law might not support them based on the context. Do NOT offer the demand letter, and DO NOT ask any questions at the end (e.g., do not ask "Would you like us to review it?"), because the chat interface will only provide an "Okay, thank you" button to close the conversation.
             
             RETURN ONLY A JSON OBJECT WITH THIS EXACT STRUCTURE:
             {
