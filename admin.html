@@ -6,6 +6,8 @@
     <title>Secure Admin Dashboard</title>
     <!-- Import Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Import Marked.js for AI Markdown Formatting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary: #0f172a;
@@ -109,6 +111,12 @@
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
         .form-group input[type="text"], .form-group textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-family: inherit; }
         .logo-preview { max-height: 60px; margin-top: 10px; display: none; border-radius: 4px; border: 1px solid var(--border); padding: 5px; }
+        
+        /* Markdown Styling for AI Reasoning */
+        .markdown-content ul { margin: 0; padding-left: 20px; }
+        .markdown-content li { margin-bottom: 8px; }
+        .markdown-content p { margin-top: 0; margin-bottom: 10px; }
+        .markdown-content strong { color: #0f172a; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -358,13 +366,15 @@
             let reasoning = c.case_facts.legal_reasoning || 'No reasoning provided.';
             
             // --- AI SAFETY NET FIX ---
-            // If the AI returned an array of bullet points instead of a string, join them
             if (Array.isArray(reasoning)) {
-                reasoning = reasoning.map(point => `• ${point}`).join('\n');
+                reasoning = reasoning.map(point => `- ${point}`).join('\n');
             } else if (typeof reasoning !== 'string') {
-                reasoning = String(reasoning); // Catch-all for any other weird data type
+                reasoning = String(reasoning); 
             }
             // -------------------------
+            
+            // Parse the Markdown into beautiful HTML using the Marked library
+            const parsedReasoningHTML = marked.parse(reasoning);
             
             // Dynamic badge color based on merit
             let badgeColor = '#64748b'; // default grey
@@ -378,8 +388,8 @@
                         <h3 style="margin:0; border:none; padding:0; color: #1e293b; font-size: 1.1rem;">⚖️ AI Legal Assessment</h3>
                         <span style="background: ${badgeColor}; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Merit: ${merit}</span>
                     </div>
-                    <div style="font-size: 1.1rem; line-height: 1.7; color: #1e293b; padding: 20px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-                        ${reasoning.replace(/\n/g, '<br>')}
+                    <div class="markdown-content" style="font-size: 1.05rem; line-height: 1.7; color: #1e293b; padding: 20px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                        ${parsedReasoningHTML}
                     </div>
                 </div>
             `;
