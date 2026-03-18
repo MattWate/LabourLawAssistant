@@ -355,7 +355,16 @@
         let reasoningHtml = '';
         if (c.case_facts && (c.case_facts.legal_reasoning || c.case_facts.merit_assessment)) {
             const merit = c.case_facts.merit_assessment || 'Unknown';
-            const reasoning = c.case_facts.legal_reasoning || 'No reasoning provided.';
+            let reasoning = c.case_facts.legal_reasoning || 'No reasoning provided.';
+            
+            // --- AI SAFETY NET FIX ---
+            // If the AI returned an array of bullet points instead of a string, join them
+            if (Array.isArray(reasoning)) {
+                reasoning = reasoning.map(point => `• ${point}`).join('\n');
+            } else if (typeof reasoning !== 'string') {
+                reasoning = String(reasoning); // Catch-all for any other weird data type
+            }
+            // -------------------------
             
             // Dynamic badge color based on merit
             let badgeColor = '#64748b'; // default grey
