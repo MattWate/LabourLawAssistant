@@ -105,7 +105,7 @@ exports.handler = async (event, context) => {
                 hearing_held: facts.hearing_held !== undefined ? facts.hearing_held : null,
                 employment_status: facts.employment_status || null,
                 sector: facts.sector || null,
-                tenure: facts.tenure || null,
+                contract_type: facts.contract_type || null,
                 wants_letter: null, // Always initialize so it shows in Admin dropdowns
                 merit_assessment: aiResponse.merit_assessment || 'Unknown',
                 legal_reasoning: aiResponse.legal_reasoning || 'No reasoning provided.'
