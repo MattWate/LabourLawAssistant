@@ -145,24 +145,24 @@
             ],
             saveAs: "employment_status"
         },
-        
+
         // PATH A: Fired
         FIRED_DATE: { msg: "I'm sorry to hear that. The law has strict time limits. What was the exact date you were dismissed?", type: "date", next: "FIRED_HEARING", saveAs: "incident_date" },
         FIRED_HEARING: { msg: "Did your employer hold a formal disciplinary hearing and give you a chance to defend yourself before firing you?", type: "buttons", options: [{label:"Yes", next:"FIRED_REASON", val:true}, {label:"No", next:"FIRED_REASON", val:false}], saveAs: "hearing_held" },
-        FIRED_REASON: { msg: "In a few short sentences, what reason did they give for firing you?", type: "text", next: "PROBATION", saveAs: "incident_description" },
+        FIRED_REASON: { msg: "In a few short sentences, what reason did they give for firing you?", type: "text", next: "CONTRACT_TYPE", saveAs: "incident_description" },
 
         // PATH B: Employed
-        EMP_ISSUE: { msg: "I understand. What is the main issue you are facing right now?", type: "buttons", options: [{label:"Suspended", next:"EMP_PAY", val:"Suspended"}, {label:"Facing a hearing", next:"PROBATION", val:"Facing a hearing"}, {label:"Unpaid wages", next:"PROBATION", val:"Unpaid wages"}, {label:"Unfair warning", next:"PROBATION", val:"Unfair warning"}], saveAs: "incident_description" },
-        EMP_PAY: { msg: "While you are on suspension, is your employer still paying your normal salary?", type: "buttons", options: [{label:"Yes", next:"PROBATION", val:true}, {label:"No", next:"PROBATION", val:false}], saveAs: "paid_suspension" },
+        EMP_ISSUE: { msg: "I understand. What is the main issue you are facing right now?", type: "buttons", options: [{label:"Suspended", next:"EMP_PAY", val:"Suspended"}, {label:"Facing a hearing", next:"CONTRACT_TYPE", val:"Facing a hearing"}, {label:"Unpaid wages", next:"CONTRACT_TYPE", val:"Unpaid wages"}, {label:"Unfair warning", next:"CONTRACT_TYPE", val:"Unfair warning"}], saveAs: "incident_description" },
+        EMP_PAY: { msg: "While you are on suspension, is your employer still paying your normal salary?", type: "buttons", options: [{label:"Yes", next:"CONTRACT_TYPE", val:true}, {label:"No", next:"CONTRACT_TYPE", val:false}], saveAs: "paid_suspension" },
 
         // PATH C: Resigned
         RESIGN_DATE: { msg: "What was the exact date you officially resigned?", type: "date", next: "RESIGN_CONST", saveAs: "incident_date" },
         RESIGN_CONST: { msg: "Did you resign because your employer made your working environment so intolerable that you felt you had absolutely no choice but to leave?", type: "buttons", options: [{label:"Yes", next:"FIRED_REASON", val:true}, {label:"No", next:"FIRED_REASON", val:false}], saveAs: "constructive_dismissal" },
 
         // MERGE: Universal Context
-        PROBATION: { msg: "Roughly how long have you worked for this employer?", type: "buttons", options: [{label:"Less than 3 months", next:"SECTOR", val:"< 3 months"}, {label:"3 to 6 months", next:"SECTOR", val:"3 - 6 months"}, {label:"More than 6 months", next:"SECTOR", val:"> 6 months"}], saveAs: "tenure" },
+        CONTRACT_TYPE: { msg: "What type of employment contract do you have?", type: "buttons", options: [{label:"Permanent", next:"SECTOR", val:"Permanent"}, {label:"Fixed Term Contract", next:"SECTOR", val:"Fixed Term"}, {label:"Independent Contractor", next:"SECTOR", val:"Contractor"}], saveAs: "contract_type" },
         SECTOR: { msg: "What industry or sector do you work in?", type: "buttons", options: [{label:"Retail", next:"COMPANY_NAME", val:"Retail"}, {label:"Mining", next:"COMPANY_NAME", val:"Mining"}, {label:"Security", next:"COMPANY_NAME", val:"Security"}, {label:"Metal & Engineering", next:"COMPANY_NAME", val:"Metal & Engineering"}, {label:"Domestic", next:"COMPANY_NAME", val:"Domestic"}, {label:"Other", next:"COMPANY_NAME", val:"Other"}], saveAs: "sector" },
-
+       
         // LOGISTICS
         COMPANY_NAME: { msg: "What is the exact name of the company you work(ed) for?", type: "text", next: "COMPANY_CONTACT", saveAs: "employer_name" },
         COMPANY_CONTACT: { msg: "Please provide an email address or phone number for the company's HR department or your manager.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
