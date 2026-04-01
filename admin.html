@@ -141,7 +141,10 @@
                 <h1>Case Book Review</h1>
                 <p>Matter Management</p>
             </div>
-            <div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <!-- NEW MATTER BUTTON -->
+                <button class="btn btn-success" style="padding: 6px 12px; font-size: 0.8rem;" onclick="createNewMatter()">➕ New Matter</button>
+                
                 <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: #334155;" onclick="openSettingsModal()">⚙️ Settings</button>
                 <button class="btn btn-logout" onclick="handleLogout()">Logout</button>
             </div>
@@ -495,6 +498,37 @@
     async function updateLLMSetting(selectedLLM) {
         try { await fetch('/.netlify/functions/settings', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ active_llm: selectedLLM }) }); } 
         catch (e) { alert("Error updating AI engine."); }
+    }
+
+    // --- MANUAL CASE CREATION LOGIC ---
+    async function createNewMatter() {
+        if (!confirm("Create a new blank matter?")) return;
+        
+        // Change button text temporarily
+        const btn = document.querySelector('.btn-success');
+        const originalText = btn.innerText;
+        btn.innerText = "⏳ Creating...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/.netlify/functions/create_case', { 
+                method: 'POST', 
+                headers: getAuthHeaders() 
+            });
+            
+            if (res.ok) { 
+                await fetchCases(); // Refresh the list to show the new case at the top
+            } else { 
+                alert("Failed to create new matter. Please check your connection."); 
+            }
+        } catch (e) { 
+            alert("Error: " + e.message); 
+        } finally {
+            if (btn) {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
     }
 
     // Run on boot
