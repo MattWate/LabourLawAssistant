@@ -519,7 +519,15 @@
             if (res.ok) { 
                 await fetchCases(); // Refresh the list to show the new case at the top
             } else { 
-                alert("Failed to create new matter. Please check your connection."); 
+                // Enhanced error handling to surface the exact issue
+                let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+                try {
+                    const errorData = await res.json();
+                    if (errorData.error) errorMessage = errorData.error;
+                } catch (jsonErr) {
+                    // Ignore if response isn't JSON
+                }
+                alert("Failed to create new matter. Reason: " + errorMessage); 
             }
         } catch (e) { 
             alert("Error: " + e.message); 
