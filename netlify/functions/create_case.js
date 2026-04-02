@@ -9,10 +9,18 @@ exports.handler = async (event, context) => {
     // --- SECURITY CHECK ---
     const authHeader = event.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+        return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Missing Token' }) };
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Request-specific client authenticated as the Admin user
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Invalid Token' }) };
+    // ----------------------
 
     try {
         // Build the Skeleton "Blank" Facts
@@ -39,9 +47,10 @@ exports.handler = async (event, context) => {
             issue_summary: "Manual entry pending...",
             case_facts: blankFacts,
             status: 'requires_attorney',
-            letter_status: null
+            letter_status: 'not_drafted'
         };
 
+        // Insert and return the new row data securely
         const { data, error } = await supabase.from('cases').insert(dbPayload).select().single();
         
         if (error) throw error;
@@ -56,57 +65,3 @@ exports.handler = async (event, context) => {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };
-```
-
-### 2. Update the Admin Header (`admin.html`)
-In your `admin.html` file, find the `.header` section (around line 105). We are going to add a new green button next to the Settings button.
-
-Replace the header block with this:
-
-```html
-        <div class="header">
-            <div>
-                <h1>Case Book Review</h1>
-                <p>Matter Management</p>
-            </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <button class="btn btn-success" style="padding: 6px 12px; font-size: 0.8rem;" onclick="createNewMatter()">➕ New Matter</button>
-                
-                <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: #334155;" onclick="openSettingsModal()">⚙️ Settings</button>
-                <button class="btn btn-logout" onclick="handleLogout()">Logout</button>
-            </div>
-        </div>
-```
-
-### 3. Add the Javascript Function (`admin.html`)
-Scroll down to the bottom of your `<script>` block in `admin.html` (right before `checkAuth();` runs at the very end), and paste this function. It calls our new backend endpoint and refreshes the case list so the new blank case pops up at the top immediately.
-
-```javascript
-    // --- MANUAL CASE CREATION LOGIC ---
-    async function createNewMatter() {
-        if (!confirm("Create a new blank matter?")) return;
-        
-        // Change button text temporarily
-        const btn = document.querySelector('.btn-success');
-        const originalText = btn.innerText;
-        btn.innerText = "⏳ Creating...";
-        btn.disabled = true;
-
-        try {
-            const res = await fetch('/.netlify/functions/create_case', { 
-                method: 'POST', 
-                headers: getAuthHeaders() 
-            });
-            
-            if (res.ok) { 
-                await fetchCases(); // Refresh the list to show the new case at the top
-            } else { 
-                alert("Failed to create new matter. Please check your connection."); 
-            }
-        } catch (e) { 
-            alert("Error: " + e.message); 
-        } finally {
-            btn.innerText = originalText;
-            btn.disabled = false;
-        }
-    }
