@@ -54,9 +54,15 @@
 
         /* LEFT PANEL: Case List */
         .case-list-panel { background-color: var(--panel-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        .header { padding: 20px; border-bottom: 1px solid var(--border); background-color: var(--primary); color: white; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { margin: 0; font-size: 1.2rem; }
-        .header p { margin: 5px 0 0 0; font-size: 0.85rem; color: #94a3b8; }
+        
+        /* UPDATED HEADER CSS */
+        .header { padding: 20px; border-bottom: 1px solid var(--border); background-color: var(--primary); color: white; display: flex; flex-direction: column; gap: 15px; }
+        .header-text h1 { margin: 0; font-size: 1.2rem; }
+        .header-text p { margin: 5px 0 0 0; font-size: 0.85rem; color: #94a3b8; }
+        
+        /* New Button Container ensures equal width buttons */
+        .header-buttons { display: flex; gap: 8px; width: 100%; }
+        .header-buttons .btn { flex: 1; margin: 0; padding: 8px 0; font-size: 0.85rem; text-align: center; }
         
         /* Settings Bar */
         .settings-bar { padding: 10px 20px; background: #f1f5f9; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
@@ -97,7 +103,7 @@
         .btn-primary { background: var(--accent); color: white; }
         .btn-primary:hover { background: #1d4ed8; }
         .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
-        .btn-success { background: #16a34a; color: white; margin-left: 10px;}
+        .btn-success { background: #16a34a; color: white; margin-left: 10px; }
         .btn-success:hover { background: #15803d; }
         .btn-logout { background: #ef4444; color: white; padding: 6px 12px; font-size: 0.8rem; margin-left: 10px; }
 
@@ -136,16 +142,17 @@
 <!-- SECURE DASHBOARD -->
 <div class="admin-container" id="admin-dashboard">
     <div class="case-list-panel">
+        
+        <!-- UPDATED HEADER HTML -->
         <div class="header">
-            <div>
+            <div class="header-text">
                 <h1>Case Book Review</h1>
                 <p>Matter Management</p>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <!-- NEW MATTER BUTTON -->
-                <button class="btn btn-success" style="padding: 6px 12px; font-size: 0.8rem;" onclick="createNewMatter()">➕ New Matter</button>
-                
-                <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: #334155;" onclick="openSettingsModal()">⚙️ Settings</button>
+            <div class="header-buttons">
+                <!-- Stacked, equal-width buttons without emojis -->
+                <button class="btn btn-success" onclick="createNewMatter()">New Matter</button>
+                <button class="btn btn-primary" style="background: #334155;" onclick="openSettingsModal()">Settings</button>
                 <button class="btn btn-logout" onclick="handleLogout()">Logout</button>
             </div>
         </div>
@@ -519,14 +526,11 @@
             if (res.ok) { 
                 await fetchCases(); // Refresh the list to show the new case at the top
             } else { 
-                // Enhanced error handling to surface the exact issue
                 let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
                 try {
                     const errorData = await res.json();
                     if (errorData.error) errorMessage = errorData.error;
-                } catch (jsonErr) {
-                    // Ignore if response isn't JSON
-                }
+                } catch (jsonErr) {}
                 alert("Failed to create new matter. Reason: " + errorMessage); 
             }
         } catch (e) { 
