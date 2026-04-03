@@ -158,7 +158,7 @@
         </div>
         
         <div class="settings-bar">
-            <strong>Active AI Engine:</strong>
+            <strong>🧠 Active AI Engine:</strong>
             <select id="llm-toggle" onchange="updateLLMSetting(this.value)">
                 <option value="gemini">Google Gemini</option>
                 <option value="openai">OpenAI ChatGPT</option>
@@ -292,8 +292,12 @@
             card.className = 'case-card';
             card.onclick = () => showCaseDetails(c.id, card);
 
-            const title = c.client_name || 'Anonymous Client';
-            const issue = c.issue_summary || 'No issue summary yet';
+            // Pull directly from case_facts so it reflects changes instantly
+            const title = (c.case_facts && c.case_facts.client_name) ? c.case_facts.client_name : (c.client_name || 'Anonymous Client');
+            let issue = (c.case_facts && c.case_facts.incident_description) ? c.case_facts.incident_description : (c.issue_summary || 'No issue summary yet');
+            
+            // Truncate long descriptions so the card doesn't stretch down too far
+            if (issue.length > 70) issue = issue.substring(0, 70) + '...';
             
             let displayStatus = 'Gathering Facts';
             let statusClass = 'new';
@@ -408,14 +412,14 @@
         // Build the complete Details panel
         document.getElementById('details-content').innerHTML = `
             <div style="margin-bottom: 20px;">
-                <h2 style="margin: 0 0 5px 0;">${c.client_name || 'Anonymous Client'}</h2>
+                <h2 style="margin: 0 0 5px 0;">${(c.case_facts && c.case_facts.client_name) ? c.case_facts.client_name : (c.client_name || 'Anonymous Client')}</h2>
                 <div style="color: var(--text-muted); font-size: 0.9rem;">Case ID: ${c.id}</div>
             </div>
             ${letterHtml}
             ${reasoningHtml}
             <div class="info-card">
                 <h3>Matter Overview</h3>
-                <p style="margin: 0; font-size: 1.05rem;">${c.issue_summary || '<em>Gathering details...</em>'}</p>
+                <p style="margin: 0; font-size: 1.05rem;">${(c.case_facts && c.case_facts.incident_description) ? c.case_facts.incident_description : (c.issue_summary || '<em>Gathering details...</em>')}</p>
                 <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
                     <strong>Last Updated:</strong> ${formatDate(c.updated_at)}
                 </div>
@@ -445,7 +449,14 @@
             }
         }
         try {
-            const res = await fetch('/.netlify/functions/update_case', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ id: caseId, case_facts: updatedFacts }) });
+            // Push both the facts JSON and the top-level headers to the backend
+            const payload = { 
+                id: caseId, 
+                case_facts: updatedFacts,
+                client_name: updatedFacts.client_name,
+                issue_summary: updatedFacts.incident_description
+            };
+            const res = await fetch('/.netlify/functions/update_case', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
             if(res.ok) { alert("Case details saved successfully!"); fetchCases(); } else { alert("Failed to update."); }
         } catch (e) { alert("Error saving: " + e.message); }
     }
