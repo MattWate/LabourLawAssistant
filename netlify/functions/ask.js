@@ -26,8 +26,26 @@ exports.handler = async (event, context) => {
         if (action === "evaluate") {
             const facts = body.facts;
             
-            // 1. Build a search query based on what they told us
-            const searchQuery = `${facts.incident_description || ''} ${facts.sector || ''} unfair dismissal labour practice`;
+            // 1. DYNAMICALLY Build legal keywords based on the user's specific path
+            let legalKeywords = "labour law South Africa";
+            
+            if (facts.employment_status === "Dismissed") {
+                legalKeywords += " unfair dismissal misconduct schedule 8";
+            } else if (facts.employment_status === "Resigned") {
+                legalKeywords += " constructive dismissal intolerable working conditions";
+            } else if (facts.employment_status === "Employed") {
+                legalKeywords += " unfair labour practice";
+            } else if (facts.employment_status === "Discrimination") {
+                legalKeywords += " employment equity automatically unfair discrimination harassment";
+            }
+
+            // Add modifiers based on binary questions
+            if (facts.hearing_held === false) legalKeywords += " procedural fairness no hearing";
+            if (facts.paid_suspension === false) legalKeywords += " unpaid suspension";
+            if (facts.contract_type === "Contractor") legalKeywords += " independent contractor jurisdiction";
+            
+            // Final, highly targeted search query
+            const searchQuery = `${facts.incident_description || ''} ${facts.sector || ''} ${legalKeywords}`;
             
             // 2. Search Database (RAG) using Gemini Embeddings
             const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
@@ -105,7 +123,7 @@ exports.handler = async (event, context) => {
                 hearing_held: facts.hearing_held !== undefined ? facts.hearing_held : null,
                 employment_status: facts.employment_status || null,
                 sector: facts.sector || null,
-                contract_type: facts.contract_type || null,
+                tenure: facts.tenure || null,
                 wants_letter: null, // Always initialize so it shows in Admin dropdowns
                 merit_assessment: aiResponse.merit_assessment || 'Unknown',
                 legal_reasoning: aiResponse.legal_reasoning || 'No reasoning provided.'
