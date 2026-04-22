@@ -158,7 +158,6 @@
                 <p>Matter Management</p>
             </div>
             <div class="header-buttons">
-                <!-- Stacked, equal-width buttons without emojis -->
                 <button class="btn btn-success" onclick="createNewMatter()">New Matter</button>
                 <button class="btn btn-primary" style="background: #334155;" onclick="openSettingsModal()">Settings</button>
                 <button class="btn btn-logout" onclick="handleLogout()">Logout</button>
@@ -395,7 +394,7 @@
         for (const [key, val] of Object.entries(facts)) {
             // EXCLUDE Internal AI Reasoning fields from the editable grid
             const lowerKey = key.toLowerCase();
-            if (lowerKey.includes('reasoning') || lowerKey.includes('merit')) continue;
+            if (lowerKey.includes('reasoning') || lowerKey.includes('merit') || lowerKey.includes('score') || lowerKey.includes('viability') || lowerKey.includes('strengths') || lowerKey.includes('weaknesses') || lowerKey.includes('flag')) continue;
             
             const label = labels[key] || key.replace(/_/g, ' ').toUpperCase();
             let inputHtml = '';
@@ -428,7 +427,7 @@
         if (c.case_facts && (c.case_facts.substantive_score !== undefined || c.case_facts.procedural_score !== undefined || c.case_facts.legal_reasoning || c.case_facts.merit_assessment)) {
             
             // Handle the NEW AI Scorecard format
-            if (c.case_facts.overall_viability) {
+            if (c.case_facts.overall_viability && c.case_facts.overall_viability !== 'Unknown' && c.case_facts.overall_viability !== 'Manual entry pending...') {
                const subScore = c.case_facts.substantive_score || 0;
                const procScore = c.case_facts.procedural_score || 0;
                
@@ -469,9 +468,54 @@
                     </div>
                 </div>
                `;
-            } else {
+            } else if (c.case_facts.legal_reasoning || c.case_facts.merit_assessment) {
                 // Fallback for older legacy cases
                 const merit = c.case_facts.merit_assessment || 'Unknown';
+                let reasoning = c.case_facts.legal_reasoning || 'No reasoning provided.';
+                
+                if (Array.isArray(reasoning)) {
+                    reasoning = reasoning.map(point => `- ${point}`).join('\n');
+                } else if (typeof reasoning !== 'string') {
+                    reasoning = String(reasoning); 
+                }
+                
+                const parsedReasoningHTML = marked.parse(reasoning);
+                
+                let badgeColor = '#64748b'; 
+                if (merit.toLowerCase().includes('high')) badgeColor = '#16a34a'; 
+                else if (merit.toLowerCase().includes('medium')) badgeColor = '#d97706'; 
+                else if (merit.toLowerCase().includes('low')) badgeColor = '#dc2626'; 
+                
+                reasoningHtml = `
+                    <div class="info-card" style="border-left: 5px solid ${badgeColor}; background: #f8fafc; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                            <h3 style="margin:0; border:none; padding:0; color: #1e293b; font-size: 1.1rem;">⚖️ AI Legal Assessment</h3>
+                            <span style="background: ${badgeColor}; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">Merit: ${merit}</span>
+                        </div>
+                        <div class="markdown-content" style="font-size: 1.05rem; line-height: 1.7; color: #1e293b; padding: 20px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                            ${parsedReasoningHTML}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Build the complete Details panel
+        document.getElementById('details-content').innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <h2 style="margin: 0 0 5px 0;">${(c.case_facts && c.case_facts.client_name) ? c.case_facts.client_name : (c.client_name || 'Anonymous Client')}</h2>
+                <div style="color: var(--text-muted); font-size: 0.9rem;">Case ID: ${c.id}</div>
+            </div>
+            ${letterHtml}
+            ${reasoningHtml}
+            <div class="info-card">
+                <h3>Matter Overview</h3>
+                <p style="margin: 0; font-size: 1.05rem;">${(c.case_facts && c.case_facts.incident_description) ? c.case_facts.incident_description : (c.issue_summary || '<em>Gathering details...</em>')}</p>
+                <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
+                    <strong>Last Updated:</strong> ${formatDate(c.updated_at)}
+                </div>
+            </div>
+            <div class="info-card">
                 <h3>Gathered Facts (Editable)</h3>
                 ${factsHtml}
             </div>
@@ -485,7 +529,7 @@
         for (const key of Object.keys(updatedFacts)) {
             // FIX: Ensure we don't accidentally overwrite these fields with null on save
             const lowerKey = key.toLowerCase();
-            if (lowerKey.includes('reasoning') || lowerKey.includes('merit')) continue;
+            if (lowerKey.includes('reasoning') || lowerKey.includes('merit') || lowerKey.includes('score') || lowerKey.includes('viability') || lowerKey.includes('strengths') || lowerKey.includes('weaknesses') || lowerKey.includes('flag')) continue;
             
             const el = document.getElementById(`fact-${key}`);
             if (el) {
