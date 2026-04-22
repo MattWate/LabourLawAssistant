@@ -24,13 +24,15 @@ exports.handler = async (event, context) => {
 
     try {
         // Extract client_name and issue_summary from the payload
-        const { id, draft_letter, letter_status, case_facts, client_name, issue_summary } = JSON.parse(event.body);
+        const { id, draft_letter, letter_status, case_facts, client_name, issue_summary, status } = JSON.parse(event.body);
         if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'Case ID required' }) };
 
         const updatePayload = { updated_at: new Date().toISOString() };
         if (draft_letter !== undefined) updatePayload.draft_letter = draft_letter;
         if (letter_status !== undefined) updatePayload.letter_status = letter_status;
         if (case_facts !== undefined) updatePayload.case_facts = case_facts;
+        if (status !== undefined) updatePayload.status = status;
+        
         // Save top-level data so the database stays perfectly synced
         if (client_name !== undefined) updatePayload.client_name = client_name;
         if (issue_summary !== undefined) updatePayload.issue_summary = issue_summary;
