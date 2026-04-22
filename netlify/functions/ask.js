@@ -30,18 +30,28 @@ exports.handler = async (event, context) => {
             let legalKeywords = "labour law South Africa";
             
             if (facts.employment_status === "Dismissed") {
-                legalKeywords += " unfair dismissal misconduct schedule 8";
+                legalKeywords += " unfair dismissal";
+                if (facts.dismissal_reason_type === "Misconduct") legalKeywords += " misconduct schedule 8";
+                if (facts.dismissal_reason_type === "Poor Performance") legalKeywords += " incapacity poor work performance schedule 8";
+                if (facts.dismissal_reason_type === "Incapacity") legalKeywords += " incapacity ill health injury items 10 11";
+                if (facts.dismissal_reason_type === "Retrenchment") legalKeywords += " operational requirements retrenchment section 189";
             } else if (facts.employment_status === "Resigned") {
-                legalKeywords += " constructive dismissal intolerable working conditions";
+                legalKeywords += " constructive dismissal intolerable working conditions section 186(1)(e)";
             } else if (facts.employment_status === "Employed") {
                 legalKeywords += " unfair labour practice";
             } else if (facts.employment_status === "Discrimination") {
-                legalKeywords += " employment equity automatically unfair discrimination harassment";
+                legalKeywords += " employment equity automatically unfair discrimination harassment section 187";
+            } else if (facts.employment_status === "Advisory") {
+                legalKeywords += " BCEA grievance disciplinary hearing procedures";
             }
 
             // Add modifiers based on binary questions
-            if (facts.hearing_held === false) legalKeywords += " procedural fairness no hearing";
-            if (facts.paid_suspension === false) legalKeywords += " unpaid suspension";
+            if (facts.hearing_held === false || facts.proc_notice === "none") legalKeywords += " procedural fairness no hearing";
+            if (facts.proc_notice === false) legalKeywords += " no 48 hours notice";
+            if (facts.proc_rep === false) legalKeywords += " denied representation";
+            if (facts.proc_chair === false) legalKeywords += " biased chairperson";
+            if (facts.proc_consultation === false) legalKeywords += " failure to consult alternatives";
+            if (facts.paid_suspension === false) legalKeywords += " unpaid suspension section 186(2)(b)";
             if (facts.contract_type === "Contractor") legalKeywords += " independent contractor jurisdiction";
             
             // Final, highly targeted search query
@@ -65,10 +75,10 @@ exports.handler = async (event, context) => {
             const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
             const activeLLM = settingData ? settingData.setting_value : 'gemini';
 
-            // 4. Create the Evaluation Prompt (Actual Merit Assessment)
+            // 4. Create the Evaluation Prompt (Strict 1-10 Rubric)
             const prompt = `
             You are Justine, a highly knowledgeable South African Labour Law Assistant. 
-            Review these collected facts and the legal context, then return a JSON object evaluating the case.
+            Review these collected facts and the legal context, then return a strictly formatted JSON scorecard.
             
             FACTS:
             ${JSON.stringify(facts, null, 2)}
@@ -76,26 +86,40 @@ exports.handler = async (event, context) => {
             LEGAL CONTEXT:
             ${contextText}
             
-            CRITICAL DEFINITION OF "MERIT":
-            - "High/Medium Merit" means the EMPLOYEE (the user) has a strong claim because the employer acted unfairly (e.g., no disciplinary hearing was held, or the reason for dismissal was too harsh for the offense, like being late once).
-            - "Low Merit" means the employer likely acted fairly and lawfully, and the employee does not have a strong claim.
+            INSTRUCTIONS & RUBRIC:
+            You must independently score this case out of 10 for both Substantive Fairness (the "Why") and Procedural Fairness (the "How").
 
-            INSTRUCTIONS:
-            1. Assess the merits of the case for the EMPLOYEE based on the definition above.
-            2. If the case has High/Medium merit, write a 'pitch' validating their experience, telling them the law is on their side, and offering to draft a Demand Letter for a small fixed fee. End by asking: "Would you like our legal team to draft this letter for you?"
-            3. If the case has Low merit (NO merit), write a 'pitch' politely explaining why the law might not support them based on the context. Do NOT offer the demand letter, and DO NOT ask any questions at the end (e.g., do not ask "Would you like us to review it?"), because the chat interface will only provide an "Okay, thank you" button to close the conversation.
-            
+            1. SUBSTANTIVE FAIRNESS RUBRIC (1-10):
+            - 1 to 3 (Employer Favored): Employee admits to gross misconduct (theft, assault, fraud) or voluntary resignation without duress.
+            - 4 to 6 (Moderate/Gray Area): Minor offense (late, poor performance), but penalty might be too harsh.
+            - 7 to 9 (Employee Favored): Trivial reason given for dismissal/warning, unsubstantiated, or disproportionate.
+            - 10 (Automatic Unfairness): Protected grounds (discrimination, pregnancy) or completely baseless.
+            *Note: If Constructive Dismissal or ULP, adapt scale logically (10 = blatant employer abuse).*
+
+            2. PROCEDURAL FAIRNESS RUBRIC (1-10):
+            - 1 to 3 (Perfect Procedure): Proper hearing, 48h notice given, rep allowed, independent chair.
+            - 4 to 6 (Flawed Procedure): Hearing held, but corners cut (e.g., no rep allowed, biased chair, poor consultation for incapacity).
+            - 7 to 10 (Zero Procedure): Fired on the spot, fired via text, no hearing at all, or unpaid suspension without hearing.
+
+            3. PITCH TO CLIENT:
+            - If Substantive Score >= 6 OR Procedural Score >= 6: Write a conversational pitch validating their experience. State their scores briefly, explain the leverage (e.g. "Even if they had a reason to fire you, the way they did it was unlawful"), and ask: "Would you like our legal team to review your file and draft a Without Prejudice demand letter to open negotiations?"
+            - If Substantive Score < 6 AND Procedural Score < 6: Write a polite response explaining why the law favors the employer here. Do NOT offer the demand letter.
+
             RETURN ONLY A JSON OBJECT WITH THIS EXACT STRUCTURE:
             {
-              "merit_assessment": "High", "Medium", or "Low",
-              "legal_reasoning": "Markdown bullet points explaining your assessment.",
-              "pitch": "Your warm, conversational response to the user."
+              "substantive_score": number (1 to 10),
+              "procedural_score": number (1 to 10),
+              "overall_viability": "Short summary of leverage, e.g., 'Strong procedural leverage for settlement'",
+              "strengths": ["bullet point 1", "bullet point 2"],
+              "weaknesses": ["bullet point 1"],
+              "attorney_review_flag": boolean,
+              "pitch_to_client": "Your conversational response to the user."
             }
             `;
 
             let aiResponse = null;
 
-            // 5. Ask the chosen LLM to evaluate and generate the pitch
+            // 5. Ask the chosen LLM to evaluate and generate the scorecard
             if (activeLLM === 'openai' && openai) {
                 const completion = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
@@ -120,13 +144,26 @@ exports.handler = async (event, context) => {
                 employer_contact_details: facts.employer_contact_details || null,
                 incident_date: facts.incident_date || null,
                 incident_description: facts.incident_description || null,
-                hearing_held: facts.hearing_held !== undefined ? facts.hearing_held : null,
                 employment_status: facts.employment_status || null,
+                dismissal_reason_type: facts.dismissal_reason_type || null,
+                hearing_held: facts.hearing_held !== undefined ? facts.hearing_held : null,
+                proc_notice: facts.proc_notice !== undefined ? facts.proc_notice : null,
+                proc_rep: facts.proc_rep !== undefined ? facts.proc_rep : null,
+                proc_chair: facts.proc_chair !== undefined ? facts.proc_chair : null,
+                proc_consultation: facts.proc_consultation !== undefined ? facts.proc_consultation : null,
+                paid_suspension: facts.paid_suspension !== undefined ? facts.paid_suspension : null,
+                constructive_dismissal: facts.constructive_dismissal !== undefined ? facts.constructive_dismissal : null,
                 sector: facts.sector || null,
-                tenure: facts.tenure || null,
-                wants_letter: null, // Always initialize so it shows in Admin dropdowns
-                merit_assessment: aiResponse.merit_assessment || 'Unknown',
-                legal_reasoning: aiResponse.legal_reasoning || 'No reasoning provided.'
+                contract_type: facts.contract_type || null,
+                wants_letter: null,
+                
+                // AI Scorecard Data
+                substantive_score: aiResponse.substantive_score || 0,
+                procedural_score: aiResponse.procedural_score || 0,
+                overall_viability: aiResponse.overall_viability || 'Unknown',
+                strengths: aiResponse.strengths || [],
+                weaknesses: aiResponse.weaknesses || [],
+                attorney_review_flag: aiResponse.attorney_review_flag || false
             };
 
             // 6. Save the new case to the Database
@@ -142,13 +179,14 @@ exports.handler = async (event, context) => {
             
             if (dbErr) throw new Error("Database save failed: " + dbErr.message);
 
-            const hasMerit = aiResponse.merit_assessment !== "Low";
+            // A case has merit if EITHER substantive OR procedural is 6 or higher
+            const hasMerit = (aiResponse.substantive_score >= 6 || aiResponse.procedural_score >= 6);
 
             return {
                 statusCode: 200,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ 
-                    pitch: aiResponse.pitch, 
+                    pitch: aiResponse.pitch_to_client, 
                     hasMerit: hasMerit,
                     caseId: newCase.id 
                 })
