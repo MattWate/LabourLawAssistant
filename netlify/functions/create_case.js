@@ -31,15 +31,26 @@ exports.handler = async (event, context) => {
             employer_contact_details: "",
             incident_date: "",
             incident_description: "",
-            hearing_held: null,
-            wants_letter: true, // Forces the 'Generate Draft' button to appear in the UI
             employment_status: "",
+            dismissal_reason_type: "",
+            hearing_held: null,
+            proc_notice: null,
+            proc_rep: null,
+            proc_chair: null,
+            proc_consultation: null,
             paid_suspension: null,
             constructive_dismissal: null,
             contract_type: "",
             sector: "",
-            merit_assessment: "Manual Override",
-            legal_reasoning: "Matter created manually by Attorney. No preliminary AI assessment performed."
+            wants_letter: true, // Forces the 'Generate Draft' button to appear in the UI
+            
+            // Default Scorecard setup
+            substantive_score: 0,
+            procedural_score: 0,
+            overall_viability: "Manual entry pending...",
+            strengths: ["Attorney to assess"],
+            weaknesses: ["Attorney to assess"],
+            attorney_review_flag: true
         };
 
         const dbPayload = {
