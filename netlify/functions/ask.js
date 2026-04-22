@@ -4,7 +4,7 @@ const OpenAI = require('openai');
 
 // Load environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY; // Make sure this is your service_role key in Netlify!
+const SUPABASE_KEY = process.env.SUPABASE_KEY; 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -18,13 +18,69 @@ exports.handler = async (event, context) => {
 
     try {
         const body = JSON.parse(event.body);
-        const action = body.action; // Expects "evaluate" or "close"
+        const action = body.action; // Expects "classify", "evaluate" or "close"
 
         // ==========================================
-        // ACTION 1: EVALUATE & PITCH
+        // ACTION 0: CLASSIFY INITIAL QUERY (The Hybrid Router)
+        // ==========================================
+        if (action === "classify") {
+            const userText = body.text;
+
+            // Check Admin Settings for Active LLM
+            const { data: settingData } = await supabase.from('system_settings').select('setting_value').eq('setting_name', 'active_llm').single();
+            const activeLLM = settingData ? settingData.setting_value : 'gemini';
+
+            const prompt = `
+            You are a South African Labour Law triage router.
+            The user has provided the following initial query:
+            "${userText}"
+
+            Categorize their issue strictly into ONE of the following exact strings:
+            - "Dismissed" (User was fired, retrenched, let go, or contract ended)
+            - "Resigned" (User quit, forced to resign, or constructively dismissed)
+            - "Discrimination" (User faces racism, sexism, harassment, or EEA issues)
+            - "Advisory" (User is still employed and needs help with a warning, grievance, hearing prep, or pay issue)
+            - "UIF" (User is explicitly asking about Unemployment Insurance Fund claims)
+
+            If the user's text is too vague, short, or ambiguous to confidently place into one of those 5 categories (e.g., "I need help", "My boss is bad"), you MUST return the exact string: "Ambiguous".
+
+            Return ONLY a JSON object with this exact format:
+            { "category": "String" }
+            `;
+
+            let category = "Ambiguous";
+
+            if (activeLLM === 'openai' && openai) {
+                const completion = await openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        { role: "system", content: "You are a routing JSON processor. Always return strictly formatted JSON." },
+                        { role: "user", content: prompt }
+                    ],
+                    response_format: { type: "json_object" }
+                });
+                category = JSON.parse(completion.choices[0].message.content).category;
+            } else {
+                const jsonModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash", generationConfig: { responseMimeType: "application/json" } });
+                const result = await jsonModel.generateContent(prompt);
+                category = JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim()).category;
+            }
+
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ category: category })
+            };
+        }
+
+        // ==========================================
+        // ACTION 1: EVALUATE & PITCH (The 1-10 Rubric)
         // ==========================================
         if (action === "evaluate") {
             const facts = body.facts;
+            
+            // Combine their initial story with their detailed description for maximum context
+            const fullStory = (facts.initial_query ? facts.initial_query + " " : "") + (facts.incident_description || "");
             
             // 1. DYNAMICALLY Build legal keywords based on the user's specific path
             let legalKeywords = "labour law South Africa";
@@ -55,7 +111,7 @@ exports.handler = async (event, context) => {
             if (facts.contract_type === "Contractor") legalKeywords += " independent contractor jurisdiction";
             
             // Final, highly targeted search query
-            const searchQuery = `${facts.incident_description || ''} ${facts.sector || ''} ${legalKeywords}`;
+            const searchQuery = `${fullStory} ${facts.sector || ''} ${legalKeywords}`;
             
             // 2. Search Database (RAG) using Gemini Embeddings
             const embeddingModel = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" });
@@ -148,7 +204,7 @@ exports.handler = async (event, context) => {
                 employer_name: facts.employer_name || null,
                 employer_contact_details: facts.employer_contact_details || null,
                 incident_date: facts.incident_date || null,
-                incident_description: facts.incident_description || null,
+                incident_description: fullStory || null,
                 employment_status: facts.employment_status || null,
                 dismissal_reason_type: facts.dismissal_reason_type || null,
                 hearing_held: facts.hearing_held !== undefined ? facts.hearing_held : null,
@@ -175,7 +231,7 @@ exports.handler = async (event, context) => {
             const dbPayload = {
                 client_name: facts.client_name,
                 contact_info: facts.contact_info,
-                issue_summary: facts.incident_description || 'Gathered via automated intake.',
+                issue_summary: fullStory || 'Gathered via automated intake.',
                 case_facts: coreFacts,
                 status: 'new'
             };
@@ -204,7 +260,6 @@ exports.handler = async (event, context) => {
         if (action === "close") {
             const { caseId, wants_letter } = body;
             
-            // 1. Update the database with their final decision
             const updatePayload = {
                 updated_at: new Date().toISOString()
             };
@@ -214,7 +269,6 @@ exports.handler = async (event, context) => {
                 updatePayload.letter_status = 'needs_drafting';
             }
 
-            // Fetch existing facts so we can inject the wants_letter boolean safely
             const { data: existingCase } = await supabase.from('cases').select('case_facts').eq('id', caseId).single();
             if (existingCase && existingCase.case_facts) {
                 updatePayload.case_facts = { ...existingCase.case_facts, wants_letter: wants_letter };
@@ -222,7 +276,6 @@ exports.handler = async (event, context) => {
 
             await supabase.from('cases').update(updatePayload).eq('id', caseId);
 
-            // 2. Return the final message
             let closingMsg = wants_letter 
                 ? "Excellent. I have officially sent your file to our legal team! They will review the details and email you a secure payment link as soon as your letter is ready to be dispatched. We've got your back!" 
                 : "No problem at all! I have saved your file. If you change your mind, just reach out to us again. Wishing you the best of luck!";
@@ -234,7 +287,7 @@ exports.handler = async (event, context) => {
             };
         }
 
-        return { statusCode: 400, body: JSON.stringify({ error: "Invalid action" }) };
+        return { statusCode: 400, body: JSON.stringify({ error: "Invalid action provided" }) };
 
     } catch (error) {
         console.error("Server Error:", error);
