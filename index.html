@@ -133,10 +133,17 @@
     let collectedFacts = {};
     let activeCaseId = null;
 
-    // --- THE HARD-CODED INTAKE SCRIPT (V2 - Advanced Merits Hub) ---
+     // --- THE HARD-CODED INTAKE SCRIPT (V2 - Advanced Merits Hub) ---
     const scriptFlow = {
         START: {
-            msg: "Hi there! I'm Justine, a Labour Law Assistant. What work matter do you need help with?",
+            msg: "Hi there! I'm Justine, a Labour Law Assistant. Briefly tell me about the work issue you need help with so I can guide you.",
+            type: "text",
+            action: "classify"
+        },
+        
+        // The Graceful Fallback (If LLM gets confused)
+        START_FALLBACK: {
+            msg: "I want to make sure I give you the exact right advice for your situation. Could you click the option below that best describes what happened?",
             type: "buttons",
             options: [
                 { label: "I was fired / dismissed", next: "FIRED_DATE", val: "Dismissed" },
@@ -314,11 +321,53 @@
         }, 500); // 500ms delay feels natural
     }
 
-    textContainer.onsubmit = (e) => {
+       textContainer.onsubmit = async (e) => {
         e.preventDefault();
         const val = inputEl.value.trim();
         if (!val) return;
         const step = scriptFlow[currentState];
+
+        // NEW: Invisible LLM Classification Intercept
+        if (step.action === "classify") {
+            textContainer.style.display = 'none';
+            appendMessage(val, "user");
+            collectedFacts["initial_query"] = val; // Save their story to give to the attorneys later
+
+            showLoading();
+            try {
+                const res = await fetch('/.netlify/functions/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "classify", text: val })
+                });
+                const data = await res.json();
+                hideLoading();
+
+                // The Safety Net: If AI is confused, show the buttons
+                if (data.category === "Ambiguous" || !data.category) {
+                    currentState = "START_FALLBACK";
+                } else {
+                    // Snap to the correct grid!
+                    collectedFacts["employment_status"] = data.category;
+                    const routeMap = {
+                        "Dismissed": "FIRED_DATE",
+                        "Resigned": "RESIGN_DATE",
+                        "Discrimination": "DISC_STATUS",
+                        "Advisory": "ADV_ISSUE",
+                        "UIF": "UIF_DESC"
+                    };
+                    currentState = routeMap[data.category] || "START_FALLBACK";
+                }
+                renderState();
+            } catch(error) {
+                hideLoading();
+                console.error("Classification error:", error);
+                currentState = "START_FALLBACK"; // Default to buttons if network fails
+                renderState();
+            }
+            return;
+        }
+
         handleUserInput(val, val, step.saveAs, step.next);
     };
 
