@@ -21,7 +21,7 @@ exports.handler = async (event, context) => {
         const action = body.action; // Expects "classify", "evaluate" or "close"
 
         // ==========================================
-        // ACTION 0: CLASSIFY INITIAL QUERY (The Hybrid Router)
+        // ACTION 0: CLASSIFY INITIAL QUERY (The Smart Extractor)
         // ==========================================
         if (action === "classify") {
             const userText = body.text;
@@ -35,6 +35,7 @@ exports.handler = async (event, context) => {
             The user has provided the following initial query:
             "${userText}"
 
+            TASK 1: CATEGORIZE
             Categorize their issue strictly into ONE of the following exact strings:
             - "Dismissed" (User was fired, retrenched, let go, or contract ended)
             - "Resigned" (User quit, forced to resign, or constructively dismissed)
@@ -42,13 +43,22 @@ exports.handler = async (event, context) => {
             - "Advisory" (User is still employed and needs help with a warning, grievance, hearing prep, or pay issue)
             - "UIF" (User is explicitly asking about Unemployment Insurance Fund claims)
 
-            If the user's text is too vague, short, or ambiguous to confidently place into one of those 5 categories (e.g., "I need help", "My boss is bad"), you MUST return the exact string: "Ambiguous".
+            If the user's text is too vague, short, or ambiguous, return "Ambiguous".
+
+            TASK 2: SMART EXTRACTION
+            If the user provided enough detail in their story, extract the sub-category so we don't have to ask them again. If it is NOT obvious, return null.
+            - "dismissal_reason_type": Only if category is Dismissed. Choose strictly from: "Misconduct" (breaking rules, stealing, fighting), "Poor Performance" (too slow, targets missed), "Incapacity" (ill health, injury), "Retrenchment" (downsizing).
+            - "advisory_topic": Only if category is Advisory. Choose strictly from: "Hearing Prep", "Warning", "Grievance", "Pay Issue".
 
             Return ONLY a JSON object with this exact format:
-            { "category": "String" }
+            { 
+              "category": "String",
+              "dismissal_reason_type": "String or null",
+              "advisory_topic": "String or null"
+            }
             `;
 
-            let category = "Ambiguous";
+            let resultData = { category: "Ambiguous", dismissal_reason_type: null, advisory_topic: null };
 
             if (activeLLM === 'openai' && openai) {
                 const completion = await openai.chat.completions.create({
@@ -59,17 +69,17 @@ exports.handler = async (event, context) => {
                     ],
                     response_format: { type: "json_object" }
                 });
-                category = JSON.parse(completion.choices[0].message.content).category;
+                resultData = JSON.parse(completion.choices[0].message.content);
             } else {
                 const jsonModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash", generationConfig: { responseMimeType: "application/json" } });
                 const result = await jsonModel.generateContent(prompt);
-                category = JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim()).category;
+                resultData = JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim());
             }
 
             return {
                 statusCode: 200,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category: category })
+                body: JSON.stringify(resultData)
             };
         }
 
