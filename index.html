@@ -268,24 +268,34 @@
     }
 
     function renderState() {
-        const step = scriptFlow[currentState];
+        let step = scriptFlow[currentState];
         
+        // ==========================================
+        // 🧠 THE SMART SKIPPER
+        // If the AI already extracted the answer to this question, skip it silently!
+        // ==========================================
+        while (step && step.saveAs && collectedFacts[step.saveAs] !== undefined) {
+            const knownVal = collectedFacts[step.saveAs];
+            let nextState = step.next;
+            
+            // If it's a button question, we need to map the known value to the correct specific 'next' path
+            if (step.type === "buttons" && step.options) {
+                const matchedOption = step.options.find(opt => opt.val === knownVal);
+                if (matchedOption && matchedOption.next) {
+                    nextState = matchedOption.next;
+                }
+            }
+            
+            if (!nextState) break; // Safety break
+            currentState = nextState;
+            step = scriptFlow[currentState];
+        }
+        // ==========================================
+
         textContainer.style.display = 'none';
         buttonContainer.style.display = 'none';
 
         if (step.action === "evaluate") {
-            appendMessage("Thank you! Give me just a moment to review your details against South African Labour Law...", "bot");
-            triggerAIEvaluation();
-            return;
-        }
-        
-        if (step.type === "end") {
-            setTimeout(() => {
-                appendMessage(step.msg, "bot");
-                scrollToBottom();
-            }, 500);
-            return;
-        }
 
         setTimeout(() => {
             appendMessage(step.msg, "bot");
