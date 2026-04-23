@@ -296,6 +296,18 @@
         buttonContainer.style.display = 'none';
 
         if (step.action === "evaluate") {
+            appendMessage("Thank you! Give me just a moment to review your details against South African Labour Law...", "bot");
+            triggerAIEvaluation();
+            return;
+        }
+        
+        if (step.type === "end") {
+            setTimeout(() => {
+                appendMessage(step.msg, "bot");
+                scrollToBottom();
+            }, 500);
+            return;
+        }
 
         setTimeout(() => {
             appendMessage(step.msg, "bot");
@@ -326,11 +338,17 @@
         if (!val) return;
         const step = scriptFlow[currentState];
 
-        // NEW: Invisible LLM Classification Intercept with Fuzzy Matching
+        // NEW: Invisible LLM Classification & Smart Extraction Intercept
         if (step.action === "classify") {
             textContainer.style.display = 'none';
             appendMessage(val, "user");
             collectedFacts["initial_query"] = val; 
+            
+            // If they wrote more than 5 words, they already told us their story!
+            // Let's save it, which triggers the Skipper to jump the annoying "describe what happened" box later.
+            if (val.split(' ').length > 5) {
+                collectedFacts["incident_description"] = val; 
+            }
 
             showLoading();
             try {
@@ -341,6 +359,14 @@
                 });
                 const data = await res.json();
                 hideLoading();
+
+                if (data.error) {
+                    appendMessage("⚠️ Backend Error: " + data.error, "bot");
+                    console.error("Ask.js Error:", data.error);
+                    currentState = "START_FALLBACK";
+                    renderState();
+                    return;
+                }
 
                 // 1. Extract the raw response safely
                 let aiCategory = data.category ? data.category.toLowerCase() : "ambiguous";
@@ -364,6 +390,11 @@
                     currentState = "START_FALLBACK";
                 } else {
                     collectedFacts["employment_status"] = finalCategory;
+                    
+                    // Inject the Smart Extractor facts so the Skipper can jump them!
+                    if (data.dismissal_reason_type) collectedFacts["dismissal_reason_type"] = data.dismissal_reason_type;
+                    if (data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
+
                     const routeMap = {
                         "Dismissed": "FIRED_DATE",
                         "Resigned": "RESIGN_DATE",
@@ -385,7 +416,7 @@
 
         handleUserInput(val, val, step.saveAs, step.next);
     };
-
+    
     function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
         textContainer.style.display = 'none';
         buttonContainer.style.display = 'none';
