@@ -152,25 +152,27 @@ exports.handler = async (event, context) => {
             LEGAL CONTEXT:
             ${contextText}
             
-            INSTRUCTIONS & RUBRIC:
-            You must independently score this case out of 10 for both Substantive Fairness (the "Why") and Procedural Fairness (the "How").
+           INSTRUCTIONS & RUBRIC:
+            You must evaluate this case strictly from the perspective of the EMPLOYEE (your client). 
+            Scores are out of 10. A score of 10 means the EMPLOYEE has a massive advantage to win at the CCMA. A score of 1 means the EMPLOYER has a perfect defense.
 
-            1. SUBSTANTIVE FAIRNESS RUBRIC (1-10):
-            - 1 to 3 (Employer Favored): Employee admits to gross misconduct (theft, assault, fraud) or voluntary resignation without duress.
-            - 4 to 6 (Moderate/Gray Area): Minor offense (late, poor performance), OR unproven accusation (e.g., "my boss said I was drunk but didn't test me").
-            - 7 to 9 (Employee Favored): Trivial reason given for dismissal/warning, unsubstantiated, or disproportionate.
-            - 10 (Automatic Unfairness): Protected grounds (discrimination, pregnancy) or completely baseless.
+            1. SUBSTANTIVE FAIRNESS SCORE (1-10): (How likely is the employee to win based on the reason for dismissal?)
+            - 1 to 3: Employee will lose. They admitted to severe gross misconduct (theft, assault, fraud).
+            - 4 to 6: Gray area. Minor offense, but employee has warnings, OR a "he-said-she-said" scenario.
+            - 7 to 9: Employee will likely win. Dismissal was completely disproportionate (e.g., fired for swearing once with a 6-year clean record), unsubstantiated, or trivial.
+            - 10: Automatic unfairness (Discrimination, pregnancy, etc).
 
-            2. PROCEDURAL FAIRNESS RUBRIC (1-10):
-            - 1 to 3 (Perfect Procedure): Proper hearing, 48h notice given, rep allowed, independent chair.
-            - 4 to 6 (Flawed Procedure): Hearing held, but corners cut (e.g., no rep allowed, biased chair, poor consultation for incapacity).
-            - 7 to 10 (Zero Procedure): Fired on the spot, fired via text, no hearing at all, or unpaid suspension without hearing.
+            2. PROCEDURAL FAIRNESS SCORE (1-10): (How likely is the employee to win based on how the firing was handled?)
+            - 1 to 3: Employee will lose procedurally. Employer held a perfect, unbiased hearing with 48h notice and representation.
+            - 4 to 6: Employee has some leverage. Hearing was held, but there were minor flaws or biases.
+            - 7 to 10: Employee has massive leverage. No hearing at all, same-day notice, severely biased chairperson (e.g., the manager involved chaired the hearing), or denied representation.
 
-            3. JUSTIFICATION (FOR THE ATTORNEY DASHBOARD):
-            - Under "strengths" and "weaknesses", you MUST explicitly reference the user's facts and tie them to Schedule 8, Section 188, or Items 10/11 of the LRA. 
-            - Explain EXACTLY why you gave the specific 1-10 scores. Show your legal math.
+            3. JUSTIFICATION (STRENGTHS & WEAKNESSES):
+            - "Strengths": List facts that help the EMPLOYEE win (e.g., "The employer failed to provide 48 hours notice, violating Schedule 8").
+            - "Weaknesses": List facts that hurt the EMPLOYEE'S case (e.g., "The employee admitted to swearing at the supervisor, which is insubordination").
 
             4. PITCH TO CLIENT (TRANSPARENT FEEDBACK):
+            - Explain the split to the client so they understand the merits of their own case based on the scores above.
             - Do not just say "the law is on your side." You must explain the split to the client so they understand the merits of their own case.
             - Example format: "Based on what you've told me, here is where you stand. Substantively (the reason for dismissal), your case is a [Score]/10 because [Insert Fact]. However, Procedurally (how they fired you), you have a [Score]/10 because [Insert Fact]."
             - If Substantive Score >= 6 OR Procedural Score >= 6: Conclude by offering the Without Prejudice demand letter to leverage their procedural or substantive strong points for a settlement.
