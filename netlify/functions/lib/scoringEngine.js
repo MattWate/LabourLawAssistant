@@ -103,18 +103,36 @@ function tenurePoint(facts, breakdown) {
 function scoreByTrack(track, facts, breakdown) {
   let substantive = 3;
   let procedural = 3;
+  let substantiveCap = null;
   const story = `${facts.initial_query || ''} ${facts.incident_description || ''}`;
 
   if (track === 'UD-MISCONDUCT') {
     const admission = clean(facts.conduct_admission || facts.admission || facts.admit_dispute);
-    const gross = hasAny(story, ['theft', 'fraud', 'assault', 'dishonest', 'gross misconduct']);
-    if (admission.includes('admit') && gross) { substantive = Math.min(substantive, 3); add(breakdown, 'substantive', -2, 'Gross misconduct appears admitted', 'Schedule 8 Item 7'); }
-    else if (admission.includes('partial')) { substantive += 1; add(breakdown, 'substantive', 1, 'Partial admission leaves limited proportionality room', 'Schedule 8 Item 7'); }
-    else if (admission.includes('dispute')) { substantive += 2; add(breakdown, 'substantive', 2, 'The alleged misconduct is disputed', 'LRA s188'); }
+    const category = clean(facts.misconduct_category || facts.dismissal_reason_type || facts.reason_type);
+    const gross = hasAny(`${category} ${story}`, ['theft', 'fraud', 'assault', 'dishonest', 'dishonesty', 'gross misconduct']);
+
+    if (admission.includes('partial')) {
+      substantive += 1;
+      substantiveCap = 5;
+      add(breakdown, 'substantive', 1, 'Partial admission leaves limited proportionality room', 'Schedule 8 Item 7');
+      add(breakdown, 'substantive', -1, 'Partial admission caps substantive merit at 5/10', 'Schedule 8 Item 7');
+    } else if (admission.includes('admit') && gross) {
+      substantiveCap = 3;
+      add(breakdown, 'substantive', -2, 'Gross misconduct appears admitted', 'Schedule 8 Item 7');
+    } else if (admission.includes('admit')) {
+      substantiveCap = 5;
+      add(breakdown, 'substantive', -1, 'Misconduct appears admitted, so substantive merit is capped at 5/10', 'Schedule 8 Item 7');
+    } else if (admission.includes('dispute')) {
+      substantive += 2;
+      add(breakdown, 'substantive', 2, 'The alleged misconduct is disputed', 'LRA s188');
+    }
+
     const warnings = clean(facts.prior_warnings || facts.warnings);
     if (warnings.includes('none') && !gross) { substantive += 2; add(breakdown, 'substantive', 2, 'No prior warning for a non-gross offence', 'Schedule 8 Item 7'); }
     if (warnings.includes('multiple')) { substantive -= 1; add(breakdown, 'substantive', -1, 'Multiple prior warnings weaken proportionality', 'Schedule 8 Item 7'); }
     substantive += tenurePoint(facts, breakdown);
+    if (substantiveCap !== null) substantive = Math.min(substantive, substantiveCap);
+
     if (facts.hearing_held === false || clean(facts.hearing_held).includes('no')) { procedural += 4; add(breakdown, 'procedural', 4, 'No formal disciplinary hearing before dismissal', 'Schedule 8 Item 4'); }
     if (facts.proc_notice === false || clean(facts.proc_notice).includes('no') || clean(facts.proc_notice).includes('same')) { procedural += 2; add(breakdown, 'procedural', 2, 'Insufficient notice of hearing or charges', 'Schedule 8 Item 4'); }
     if (facts.proc_rep === false || clean(facts.proc_rep).includes('no')) { procedural += 2; add(breakdown, 'procedural', 2, 'Representation was refused or not allowed', 'Schedule 8 Item 4'); }
