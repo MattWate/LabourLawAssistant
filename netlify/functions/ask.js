@@ -141,6 +141,58 @@ function normalizeCoreFacts(facts, fullStory, scorecard, contextText) {
   };
 }
 
+function buildTriageFacts(facts = {}, outcome = 'UNKNOWN') {
+  const outcomeMap = {
+    CONTRACTOR: {
+      label: 'Independent contractor triage',
+      recommended_forum: 'Civil contract advice / dominant impression assessment',
+      legal_basis: ['LRA s200A; dominant impression test']
+    },
+    CROSS_BORDER: {
+      label: 'Cross-border jurisdiction triage',
+      recommended_forum: 'International or cross-border employment advice',
+      legal_basis: ['LRA s4; jurisdictional reach']
+    },
+    PUBLIC_SERVICE: {
+      label: 'Public service / government agency triage',
+      recommended_forum: 'PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures, depending on employer and sector',
+      legal_basis: ['LRA s2(2)', 'LRA s9', 'Public-sector bargaining council jurisdiction']
+    },
+    SOE_UNCLEAR: {
+      label: 'Schedule 2 SOE eligibility triage',
+      recommended_forum: 'Attorney review to confirm CCMA eligibility or correct bargaining council/forum',
+      legal_basis: ['LRA general application; case-by-case sectoral assessment']
+    },
+    UNKNOWN: {
+      label: 'Jurisdiction triage',
+      recommended_forum: 'Attorney review required',
+      legal_basis: ['Jurisdiction to be confirmed']
+    }
+  };
+
+  const config = outcomeMap[outcome] || outcomeMap.UNKNOWN;
+  return {
+    track: 'JURISDICTION_TRIAGE',
+    track_label: config.label,
+    jurisdiction_outcome: outcome,
+    recommended_forum: config.recommended_forum,
+    legal_basis: config.legal_basis,
+    jurisdiction_answers: {
+      worker_status: facts.worker_status || null,
+      contractor_control_test: facts.contractor_control_test || null,
+      south_african_employer: facts.south_african_employer || null,
+      public_service_or_excluded_agency: facts.public_service_or_excluded_agency || null,
+      schedule_2_soe_ccma_eligible: facts.schedule_2_soe_ccma_eligible || null
+    },
+    wp_eligible: false,
+    wp_type: null,
+    merit_band: 'NO MERIT',
+    recommended_next_step: `Jurisdiction triage captured. Recommended forum: ${config.recommended_forum}.`,
+    attorney_review_flag: true,
+    wp_letter_status: 'NOT_APPLICABLE'
+  };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
@@ -185,6 +237,38 @@ Return ONLY a JSON object with this exact format:
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(resultData)
+      };
+    }
+
+    if (action === 'triage') {
+      const facts = body.facts || {};
+      const outcome = body.outcome || 'UNKNOWN';
+      const triageFacts = buildTriageFacts(facts, outcome);
+
+      const { data: newCase, error: dbErr } = await supabase
+        .from('cases')
+        .insert({
+          client_name: facts.client_name || 'Jurisdiction triage lead',
+          contact_info: facts.contact_info || null,
+          issue_summary: triageFacts.recommended_next_step,
+          case_facts: triageFacts,
+          status: 'jurisdiction_triage',
+          letter_status: 'not_applicable'
+        })
+        .select()
+        .single();
+
+      if (dbErr) throw new Error(`Jurisdiction triage save failed: ${dbErr.message}`);
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          caseId: newCase.id,
+          triage: triageFacts,
+          message: triageFacts.recommended_next_step
+        })
       };
     }
 
