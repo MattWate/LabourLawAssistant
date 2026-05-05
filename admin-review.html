@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Justine — Master Guide Review Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary: #0f172a;
+      --accent: #2563eb;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --border: #e2e8f0;
+      --muted: #64748b;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+      --purple: #7c3aed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: #1e293b;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: var(--primary);
+    }
+    .login-box {
+      width: 360px;
+      background: white;
+      border-radius: 14px;
+      padding: 32px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.22);
+    }
+    .login-box h1 { margin: 0 0 6px; font-size: 1.35rem; }
+    .login-box p { margin: 0 0 22px; color: var(--muted); font-size: .9rem; }
+    .login-box input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: white;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn.secondary { background: #334155; }
+    .btn.danger { background: #ef4444; }
+    .btn.full { width: 100%; padding: 12px; }
+    #login-error { display: none; color: var(--red); font-size: .9rem; margin-bottom: 12px; }
+    #dashboard { display: none; height: 100vh; grid-template-columns: 430px 1fr; }
+    aside {
+      background: white;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .side-header {
+      background: var(--primary);
+      color: white;
+      padding: 20px;
+    }
+    .side-header h1 { margin: 0; font-size: 1.2rem; }
+    .side-header p { margin: 6px 0 14px; color: #cbd5e1; font-size: .9rem; }
+    .header-actions { display: flex; gap: 8px; }
+    .filters {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      background: #f8fafc;
+    }
+    .filter {
+      white-space: nowrap;
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: .78rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+    }
+    .filter.active { background: var(--primary); color: white; border-color: var(--primary); }
+    #case-list { overflow-y: auto; padding: 12px; }
+    .case-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: white;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .case-card:hover, .case-card.active { border-color: var(--accent); background: #eff6ff; }
+    .case-top { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .case-title { font-weight: 800; font-size: .95rem; }
+    .case-subtitle { color: var(--muted); font-size: .82rem; margin: 5px 0 9px; line-height: 1.35; }
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 800;
+      background: #e2e8f0;
+      color: #475569;
+      text-transform: uppercase;
+    }
+    .badge.high { background: #dcfce7; color: #166534; }
+    .badge.medium-high { background: #dbeafe; color: #1e40af; }
+    .badge.medium { background: #fef3c7; color: #92400e; }
+    .badge.low, .badge.no-merit { background: #fee2e2; color: #991b1b; }
+    .badge.triage { background: #ede9fe; color: #5b21b6; }
+    .badge.wp { background: #cffafe; color: #155e75; }
+    main { overflow-y: auto; padding: 24px; }
+    .empty {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .metric {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.03);
+    }
+    .metric .label { color: var(--muted); font-weight: 800; font-size: .76rem; text-transform: uppercase; margin-bottom: 8px; }
+    .metric .value { font-size: 1.5rem; font-weight: 900; }
+    .metric .value.small { font-size: 1rem; line-height: 1.35; }
+    .card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.03);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: .95rem;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    .fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .fact { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+    .fact .label { display: block; color: var(--muted); font-size: .75rem; font-weight: 800; text-transform: uppercase; margin-bottom: 5px; }
+    .fact .value { white-space: pre-wrap; word-break: break-word; font-size: .92rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 10px 8px; vertical-align: top; font-size: .9rem; }
+    th { color: var(--muted); font-size: .75rem; text-transform: uppercase; }
+    .points-pos { color: var(--green); font-weight: 900; }
+    .points-neg { color: var(--red); font-weight: 900; }
+    pre {
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 14px;
+      border-radius: 10px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      font-size: .85rem;
+    }
+    .advisory {
+      white-space: pre-wrap;
+      line-height: 1.55;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .loader { padding: 20px; color: var(--muted); text-align: center; }
+    @media (max-width: 1000px) {
+      #dashboard { grid-template-columns: 1fr; }
+      aside { height: 45vh; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .fact-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <section id="login-screen">
+    <div class="login-box">
+      <h1>Justine Review</h1>
+      <p>Master Guide scorecard dashboard</p>
+      <div id="login-error">Invalid email or password.</div>
+      <input type="email" id="auth-email" placeholder="Admin email" />
+      <input type="password" id="auth-password" placeholder="Password" />
+      <button class="btn full" id="auth-btn" onclick="handleLogin()">Secure Login</button>
+    </div>
+  </section>
+
+  <section id="dashboard">
+    <aside>
+      <div class="side-header">
+        <h1>Master Guide Review</h1>
+        <p>Track, scoring, WP and triage visibility</p>
+        <div class="header-actions">
+          <button class="btn secondary" onclick="fetchCases()">Refresh</button>
+          <button class="btn danger" onclick="handleLogout()">Logout</button>
+        </div>
+      </div>
+      <div class="filters">
+        <button class="filter active" onclick="setFilter('all', this)">All</button>
+        <button class="filter" onclick="setFilter('wp', this)">WP Eligible</button>
+        <button class="filter" onclick="setFilter('triage', this)">Triage</button>
+        <button class="filter" onclick="setFilter('high', this)">High / Med-High</button>
+        <button class="filter" onclick="setFilter('review', this)">Attorney Review</button>
+      </div>
+      <div id="case-list"><div class="loader">Loading cases...</div></div>
+    </aside>
+    <main id="details"><div class="empty">Select a case to view the new Master Guide fields.</div></main>
+  </section>
+
+  <script>
+    const SUPABASE_URL = 'https://pdjhgszpndwykeqlusho.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwZGpoZ3N6cG5kd3lrZXFsdXNobyIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzcwMTE4MDYwLCJleHAiOjIwODU2OTQwNjB9.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentToken = null;
+    let casesData = [];
+    let currentFilter = 'all';
+
+    checkAuth();
+
+    async function checkAuth() {
+      const { data: { session } } = await db.auth.getSession();
+      if (session) {
+        currentToken = session.access_token;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'grid';
+        fetchCases();
+      }
+    }
+
+    async function handleLogin() {
+      const email = document.getElementById('auth-email').value;
+      const password = document.getElementById('auth-password').value;
+      const btn = document.getElementById('auth-btn');
+      const err = document.getElementById('login-error');
+      err.style.display = 'none';
+      btn.textContent = 'Authenticating...';
+      try {
+        const { data, error } = await db.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        currentToken = data.session.access_token;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'grid';
+        fetchCases();
+      } catch (e) {
+        err.textContent = e.message || 'Login failed.';
+        err.style.display = 'block';
+        btn.textContent = 'Secure Login';
+      }
+    }
+
+    async function handleLogout() {
+      await db.auth.signOut();
+      currentToken = null;
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+
+    function headers() {
+      return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` };
+    }
+
+    async function fetchCases() {
+      document.getElementById('case-list').innerHTML = '<div class="loader">Loading cases...</div>';
+      const res = await fetch('/.netlify/functions/get_cases', { headers: headers() });
+      if (!res.ok) {
+        document.getElementById('case-list').innerHTML = '<div class="loader">Could not load cases. Please log in again.</div>';
+        return;
+      }
+      casesData = await res.json();
+      renderList();
+    }
+
+    function setFilter(filter, el) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      renderList();
+    }
+
+    function facts(c) { return c.case_facts || {}; }
+    function displayDate(value) { return value ? new Date(value).toLocaleString('en-ZA') : 'Unknown'; }
+    function safe(value) {
+      if (value === null || value === undefined || value === '') return '—';
+      if (typeof value === 'object') return JSON.stringify(value, null, 2);
+      return String(value);
+    }
+    function badgeClass(band) {
+      const b = String(band || '').toLowerCase().replace(/\s+/g, '-');
+      if (b.includes('medium-high')) return 'medium-high';
+      if (b.includes('high')) return 'high';
+      if (b.includes('medium')) return 'medium';
+      if (b.includes('no')) return 'no-merit';
+      if (b.includes('low')) return 'low';
+      return '';
+    }
+
+    function filteredCases() {
+      return casesData.filter(c => {
+        const f = facts(c);
+        if (currentFilter === 'wp') return f.wp_eligible === true;
+        if (currentFilter === 'triage') return f.track === 'JURISDICTION_TRIAGE' || c.status === 'jurisdiction_triage';
+        if (currentFilter === 'high') return ['HIGH', 'MEDIUM-HIGH'].includes(f.merit_band);
+        if (currentFilter === 'review') return f.attorney_review_flag === true;
+        return true;
+      });
+    }
+
+    function renderList() {
+      const list = document.getElementById('case-list');
+      const rows = filteredCases();
+      if (!rows.length) {
+        list.innerHTML = '<div class="loader">No cases in this filter.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      rows.forEach(c => {
+        const f = facts(c);
+        const card = document.createElement('div');
+        card.className = 'case-card';
+        card.onclick = () => showDetails(c.id, card);
+        const title = f.client_name || c.client_name || 'Anonymous / triage lead';
+        const track = f.track_label || f.track || 'Unclassified';
+        const summary = f.incident_description || c.issue_summary || f.recommended_next_step || 'No summary';
+        card.innerHTML = `
+          <div class="case-top">
+            <div>
+              <div class="case-title">${escapeHtml(title)}</div>
+              <div class="case-subtitle">${escapeHtml(track)}</div>
+            </div>
+            <span class="badge ${f.track === 'JURISDICTION_TRIAGE' ? 'triage' : badgeClass(f.merit_band)}">${escapeHtml(f.merit_band || c.status || 'new')}</span>
+          </div>
+          <div class="case-subtitle">${escapeHtml(summary.slice(0, 110))}${summary.length > 110 ? '...' : ''}</div>
+          <div class="badges">
+            ${f.wp_eligible ? '<span class="badge wp">WP ' + escapeHtml(f.wp_type || 'eligible') + '</span>' : '<span class="badge">WP N/A</span>'}
+            ${f.attorney_review_flag ? '<span class="badge medium">Attorney Review</span>' : ''}
+            <span class="badge">${escapeHtml(c.letter_status || 'no letter')}</span>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function showDetails(caseId, card) {
+      document.querySelectorAll('.case-card').forEach(x => x.classList.remove('active'));
+      card.classList.add('active');
+      const c = casesData.find(x => x.id === caseId);
+      const f = facts(c);
+      const details = document.getElementById('details');
+
+      details.innerHTML = `
+        <div class="grid">
+          <div class="metric"><div class="label">Track</div><div class="value small">${escapeHtml(f.track_label || f.track || '—')}</div></div>
+          <div class="metric"><div class="label">Substantive</div><div class="value">${safe(f.substantive_score)}${f.substantive_score !== undefined ? '/10' : ''}</div></div>
+          <div class="metric"><div class="label">Procedural</div><div class="value">${safe(f.procedural_score)}${f.procedural_score !== undefined ? '/10' : ''}</div></div>
+          <div class="metric"><div class="label">Merit / Status</div><div class="value small">${escapeHtml(f.merit_band || c.status || '—')}</div></div>
+        </div>
+
+        <div class="card">
+          <h2>Decision Summary</h2>
+          <div class="fact-grid">
+            ${fact('Case ID', c.id)}
+            ${fact('Created', displayDate(c.created_at))}
+            ${fact('Letter Status', c.letter_status)}
+            ${fact('WP Eligible', f.wp_eligible === true ? 'Yes' : 'No')}
+            ${fact('WP Type', f.wp_type)}
+            ${fact('CCMA Deadline', f.ccma_deadline_status ? `${f.ccma_deadline_status.status} (${f.ccma_deadline_status.daysRemaining ?? '—'} days remaining)` : '—')}
+            ${fact('Hard Disqualifier', f.hard_disqualifier ? `${f.hard_disqualifier.name} — ${f.hard_disqualifier.legalBasis}` : 'None')}
+            ${fact('Merit Bonus Trigger', f.merit_bonus_trigger ? `${f.merit_bonus_trigger.name} — ${f.merit_bonus_trigger.legalBasis}` : 'None')}
+            ${fact('Recommended Next Step', f.recommended_next_step || f.overall_viability || '—')}
+            ${fact('Recommended Forum', f.recommended_forum || '—')}
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Client and Employer</h2>
+          <div class="fact-grid">
+            ${fact('Client Name', f.client_name || c.client_name)}
+            ${fact('Client Contact', f.contact_info || c.contact_info)}
+            ${fact('Employer', f.employer_name)}
+            ${fact('Employer Contact', f.employer_contact_details)}
+            ${fact('Incident Date', f.incident_date)}
+            ${fact('Employment Status', f.employment_status)}
+            ${fact('Dismissal Reason', f.dismissal_reason_type)}
+            ${fact('Advisory Topic', f.advisory_topic)}
+            ${fact('Incident Description', f.incident_description || c.issue_summary, true)}
+          </div>
+        </div>
+
+        ${renderScoringBreakdown(f)}
+        ${renderLegalBasis(f)}
+        ${renderAdvisory(f)}
+        ${renderTriage(f)}
+        ${renderRaw(f)}
+      `;
+    }
+
+    function fact(label, value, wide = false) {
+      return `<div class="fact" style="${wide ? 'grid-column:1/-1;' : ''}"><span class="label">${escapeHtml(label)}</span><div class="value">${escapeHtml(safe(value))}</div></div>`;
+    }
+
+    function renderScoringBreakdown(f) {
+      const rows = f.scoring_breakdown || [];
+      if (!rows.length) return '<div class="card"><h2>Scoring Breakdown</h2><p>No scoring breakdown recorded for this matter.</p></div>';
+      return `<div class="card"><h2>Scoring Breakdown</h2><table><thead><tr><th>Channel</th><th>Points</th><th>Factor</th><th>Legal Hook</th></tr></thead><tbody>${rows.map(r => `<tr><td>${escapeHtml(r.channel)}</td><td class="${Number(r.points) >= 0 ? 'points-pos' : 'points-neg'}">${Number(r.points) >= 0 ? '+' : ''}${escapeHtml(r.points)}</td><td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.legalHook)}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function renderLegalBasis(f) {
+      const legal = f.legal_basis || [];
+      return `<div class="card"><h2>Legal Basis</h2>${legal.length ? '<ul>' + legal.map(x => `<li>${escapeHtml(x)}</li>`).join('') + '</ul>' : '<p>None recorded.</p>'}</div>`;
+    }
+
+    function renderAdvisory(f) {
+      return `<div class="card"><h2>Advisory / Preparation Pack Output</h2><div class="advisory">${escapeHtml(f.advisory_note || f.overall_viability || f.recommended_next_step || 'No advisory output recorded.')}</div></div>`;
+    }
+
+    function renderTriage(f) {
+      if (f.track !== 'JURISDICTION_TRIAGE') return '';
+      return `<div class="card"><h2>Jurisdiction Triage</h2><div class="fact-grid">
+        ${fact('Outcome', f.jurisdiction_outcome)}
+        ${fact('Recommended Forum', f.recommended_forum)}
+        ${fact('Jurisdiction Answers', f.jurisdiction_answers, true)}
+      </div></div>`;
+    }
+
+    function renderRaw(f) {
+      return `<div class="card"><h2>Raw case_facts JSON</h2><pre>${escapeHtml(JSON.stringify(f, null, 2))}</pre></div>`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
