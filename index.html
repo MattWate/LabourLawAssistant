@@ -599,47 +599,206 @@
         },
 
         // ==========================================
-        // PATH B: CONSTRUCTIVE DISMISSAL
+        // TRACK B: CONSTRUCTIVE DISMISSAL
+        // Section 6.5 of the Master Guide.
         // ==========================================
         RESIGN_DATE: {
-            msg: "What was the exact date you officially resigned?",
+            msg: "What was the date you officially resigned?",
             type: "date",
-            next: "RESIGN_CONST",
+            next: "B2_INTOLERABLE_CONDUCT",
             saveAs: "incident_date"
         },
-        RESIGN_CONST: {
-            msg: "Did your employer make your working environment so intolerable that you felt you had absolutely no choice but to leave?",
+
+        B2_INTOLERABLE_CONDUCT: {
+            msg: "What conduct made your working environment intolerable?",
             type: "buttons",
             options: [
-                { label: "Yes", next: "RESIGN_DESC", val: true },
-                { label: "No", next: "RESIGN_DESC", val: false }
+                { label: "Demotion", next: "B3_DURATION", val: "demotion" },
+                { label: "Salary reduction or non-payment", next: "B3_DURATION", val: "salary reduction or non-payment" },
+                { label: "Harassment or bullying", next: "B3_DURATION", val: "harassment or bullying" },
+                { label: "Discrimination", next: "B3_DURATION", val: "discrimination" },
+                { label: "Unsafe conditions", next: "B3_DURATION", val: "unsafe conditions" },
+                { label: "Victimisation after grievance", next: "B3_DURATION", val: "victimisation after grievance" },
+                { label: "Unilateral contract change", next: "B3_DURATION", val: "unilateral contract change" },
+                { label: "Other", next: "B3_DURATION", val: "other" }
             ],
-            saveAs: "constructive_dismissal"
+            saveAs: "intolerable_conduct"
         },
-        RESIGN_DESC: {
-            msg: "Briefly explain what happened to make you resign.",
+
+        B3_DURATION: {
+            msg: "How long were these conditions ongoing before you resigned?",
+            type: "buttons",
+            options: [
+                { label: "<1 month", next: "B4_GRIEVANCE", val: "<1 month" },
+                { label: "1-3 months", next: "B4_GRIEVANCE", val: "1-3 months" },
+                { label: "3-6 months", next: "B4_GRIEVANCE", val: "3-6 months" },
+                { label: "6+ months", next: "B4_GRIEVANCE", val: "6+ months" }
+            ],
+            saveAs: "intolerable_duration"
+        },
+
+        B4_GRIEVANCE: {
+            msg: "Did you formally raise your grievance with your employer before resigning?",
+            type: "buttons",
+            options: [
+                { label: "Yes, in writing", next: "B6_EMPLOYER_ACTION", val: "Yes, in writing" },
+                { label: "Yes, verbally", next: "B6_EMPLOYER_ACTION", val: "Yes, verbally" },
+                { label: "No", next: "B5_NO_GRIEVANCE_REASON", val: "No" }
+            ],
+            saveAs: "grievance_raised"
+        },
+
+        B5_NO_GRIEVANCE_REASON: {
+            msg: "If you did not raise a grievance, why not?",
+            type: "buttons",
+            options: [
+                { label: "Did not know I could", next: "B6_EMPLOYER_ACTION", val: "Did not know I could" },
+                { label: "Feared retaliation", next: "B6_EMPLOYER_ACTION", val: "Feared retaliation" },
+                { label: "Conduct was so severe (e.g., assault) that grievance was futile", next: "B6_EMPLOYER_ACTION", val: "Conduct was so severe that grievance was futile" },
+                { label: "Employer is the alleged perpetrator", next: "B6_EMPLOYER_ACTION", val: "Employer is the alleged perpetrator" },
+                { label: "Other", next: "B6_EMPLOYER_ACTION", val: "Other" }
+            ],
+            saveAs: "no_grievance_reason"
+        },
+
+        B6_EMPLOYER_ACTION: {
+            msg: "Did the employer take any action to address your concerns?",
+            type: "buttons",
+            options: [
+                { label: "No action", next: "B7_WAIT_PERIOD", val: "No action" },
+                { label: "Partial", next: "B7_WAIT_PERIOD", val: "Partial" },
+                { label: "Full resolution", next: "B7_WAIT_PERIOD", val: "Full resolution" }
+            ],
+            saveAs: "employer_response"
+        },
+
+        B7_WAIT_PERIOD: {
+            msg: "How long after raising the grievance did you wait before resigning?",
+            type: "buttons",
+            options: [
+                { label: "Did not raise", next: "B8_COLLEAGUES", val: "Did not raise" },
+                { label: "<2 weeks", next: "B8_COLLEAGUES", val: "<2 weeks" },
+                { label: "2-4 weeks", next: "B8_COLLEAGUES", val: "2-4 weeks" },
+                { label: "1-3 months", next: "B8_COLLEAGUES", val: "1-3 months" },
+                { label: "3+ months", next: "B8_COLLEAGUES", val: "3+ months" }
+            ],
+            saveAs: "wait_after_grievance"
+        },
+
+        B8_COLLEAGUES: {
+            msg: "Did colleagues witness or experience similar treatment?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "B9_SALARY", val: "Yes" },
+                { label: "No", next: "B9_SALARY", val: "No" },
+                { label: "Unsure", next: "B9_SALARY", val: "Unsure" }
+            ],
+            saveAs: "colleagues_witnessed"
+        },
+
+        B9_SALARY: {
+            msg: "What was your gross monthly salary?",
+            type: "text",
+            next: "B10_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        B10_NARRATIVE: {
+            msg: "In your own words, describe what made your working conditions intolerable.",
             type: "text",
             next: "COMPANY_NAME",
-            saveAs: "incident_description"
+            saveAs: "incident_description",
+            minWords: 50
         },
 
         // ==========================================
-        // PATH C: DISCRIMINATION
+        // TRACK C: AUTOMATICALLY UNFAIR DISMISSAL AND UNFAIR LABOUR PRACTICE
+        // Section 6.6 of the Master Guide.
         // ==========================================
         DISC_STATUS: {
-            msg: "Are you still employed, or did you leave/get fired because of this?",
+            msg: "Are you still employed, or have you been dismissed or resigned?",
             type: "buttons",
             options: [
-                { label: "Still Employed", next: "DISC_DESC", val: "Employed" },
-                { label: "Left or Fired", next: "DISC_DESC", val: "Left" }
+                { label: "Still employed", next: "C2_PROTECTED_GROUND", val: "Still employed" },
+                { label: "Dismissed", next: "C2_PROTECTED_GROUND", val: "Dismissed" },
+                { label: "Resigned", next: "RESIGN_DATE", val: "Resigned" }
             ],
             saveAs: "disc_status"
         },
-        DISC_DESC: {
-            msg: "Briefly describe the discrimination or harassment you are facing (e.g., based on race, gender, pregnancy).",
+
+        C2_PROTECTED_GROUND: {
+            msg: "Which protected ground do you believe is the basis of your treatment?",
+            type: "buttons",
+            options: [
+                { label: "Race", next: "C3_COMPARATOR", val: "race" },
+                { label: "Gender", next: "C3_COMPARATOR", val: "gender" },
+                { label: "Pregnancy", next: "C3_COMPARATOR", val: "pregnancy" },
+                { label: "Sexual orientation", next: "C3_COMPARATOR", val: "sexual orientation" },
+                { label: "Disability", next: "C3_COMPARATOR", val: "disability" },
+                { label: "HIV status", next: "C3_COMPARATOR", val: "HIV status" },
+                { label: "Religion", next: "C3_COMPARATOR", val: "religion" },
+                { label: "Age", next: "C3_COMPARATOR", val: "age" },
+                { label: "Political opinion", next: "C3_COMPARATOR", val: "political opinion" },
+                { label: "Union activity", next: "C3_COMPARATOR", val: "union activity" },
+                { label: "Whistleblowing", next: "C3_COMPARATOR", val: "whistleblowing" },
+                { label: "Other", next: "C3_COMPARATOR", val: "other" }
+            ],
+            saveAs: "protected_ground"
+        },
+
+        C3_COMPARATOR: {
+            msg: "Can you identify another employee in a similar role who was treated differently?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "C4_REPORTED", val: "Yes" },
+                { label: "No", next: "C4_REPORTED", val: "No" },
+                { label: "Unsure", next: "C4_REPORTED", val: "Unsure" }
+            ],
+            saveAs: "protected_ground_comparator"
+        },
+
+        C4_REPORTED: {
+            msg: "Did you formally report the discrimination or unfair treatment?",
+            type: "buttons",
+            options: [
+                { label: "Yes, in writing", next: "C5_WORSENED", val: "Yes, in writing" },
+                { label: "Yes, verbally", next: "C5_WORSENED", val: "Yes, verbally" },
+                { label: "No", next: "C5_WORSENED", val: "No" }
+            ],
+            saveAs: "protected_ground_reported"
+        },
+
+        C5_WORSENED: {
+            msg: "Did the employer's response worsen your situation after you reported it?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "C6_LENGTH", val: "Yes" },
+                { label: "No", next: "C6_LENGTH", val: "No" },
+                { label: "No response", next: "C6_LENGTH", val: "No response" }
+            ],
+            saveAs: "employer_response_worsened"
+        },
+
+        C6_LENGTH: {
+            msg: "How long have you worked for this employer?",
+            type: "text",
+            next: "C7_SALARY",
+            saveAs: "length_of_service"
+        },
+
+        C7_SALARY: {
+            msg: "What was (or is) your gross monthly salary?",
+            type: "text",
+            next: "C8_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        C8_NARRATIVE: {
+            msg: "Describe what happened, including specific incidents with dates and any named individuals.",
             type: "text",
             next: "COMPANY_NAME",
-            saveAs: "incident_description"
+            saveAs: "incident_description",
+            minWords: 75
         },
 
         // ==========================================
@@ -992,6 +1151,18 @@
         }
         if (saveKey === "prior_performance_warnings") {
             collectedFacts["performance_warnings"] = actualValue;
+        }
+        if (saveKey === "intolerable_conduct") {
+            collectedFacts["constructive_dismissal"] = true;
+        }
+        if (saveKey === "grievance_raised") {
+            collectedFacts["constructive_grievance_raised"] = actualValue;
+        }
+        if (saveKey === "protected_ground") {
+            collectedFacts["protected_ground"] = actualValue;
+        }
+        if (saveKey === "disc_status") {
+            collectedFacts["protected_ground_status"] = actualValue;
         }
 
         currentState = nextStateKey;
