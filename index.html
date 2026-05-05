@@ -171,7 +171,7 @@
             type: "buttons",
             options: [
                 { label: "Yes", next: "DEFLECT_PUBLIC_SERVICE", val: "yes" },
-                { label: "No", next: "JUR_SOE", val: "no" },
+                { label: "No", next: "START", val: "no" },
                 { label: "Unsure", next: "JUR_SOE", val: "unsure" }
             ],
             saveAs: "public_service_or_excluded_agency"
@@ -183,7 +183,7 @@
             options: [
                 { label: "Yes", next: "START", val: "yes" },
                 { label: "No", next: "START", val: "no" },
-                { label: "Unclear", next: "START", val: "unclear" }
+                { label: "Unclear", next: "DEFLECT_SOE_UNCLEAR", val: "unclear" }
             ],
             saveAs: "schedule_2_soe_ccma_eligible"
         },
@@ -708,20 +708,30 @@
         // ==========================================
         DEFLECT_CONTRACTOR: {
             msg: "Based on your answer, this may fall outside the ordinary employee protections of the LRA and BCEA. The correct next step is to get civil contract advice before a labour-law merits assessment is done.",
-            type: "end"
+            type: "end",
+            triageOutcome: "CONTRACTOR"
         },
         DEFLECT_CROSS_BORDER: {
             msg: "This may require international or cross-border advice before a South African labour-law merits assessment is done.",
-            type: "end"
+            type: "end",
+            triageOutcome: "CROSS_BORDER"
         },
         DEFLECT_PUBLIC_SERVICE: {
             msg: "This matter should be triaged to the correct public-sector forum, which may include the PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures. A blanket rejection should not be applied.",
-            type: "end"
+            type: "end",
+            triageOutcome: "PUBLIC_SERVICE"
         },
 
         DEFLECT_GOV: {
             msg: "This matter should be triaged to the correct public-sector forum, which may include the PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures. A blanket rejection should not be applied.",
-            type: "end"
+            type: "end",
+            triageOutcome: "PUBLIC_SERVICE"
+        },
+
+        DEFLECT_SOE_UNCLEAR: {
+            msg: "This matter should be flagged for attorney review before proceeding, so that CCMA eligibility or the correct bargaining council or forum can be confirmed.",
+            type: "end",
+            triageOutcome: "SOE_UNCLEAR"
         },
 
         // ==========================================
@@ -822,7 +832,10 @@
         }
 
         if (step.type === "end") {
-            setTimeout(() => {
+            setTimeout(async () => {
+                if (step.triageOutcome) {
+                    await triggerJurisdictionTriage(step.triageOutcome);
+                }
                 appendMessage(step.msg, "bot");
                 scrollToBottom();
             }, 500);
@@ -983,6 +996,39 @@
 
         currentState = nextStateKey;
         renderState();
+    }
+
+    async function triggerJurisdictionTriage(outcome) {
+        showLoading();
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "triage",
+                    outcome,
+                    facts: collectedFacts
+                })
+            });
+
+            const data = await res.json();
+            hideLoading();
+
+            if (data.error) {
+                console.error("Triage save error:", data.error);
+                appendMessage("I could not save the triage record, but I can still give you the correct next step.", "bot");
+                return;
+            }
+
+            if (data.caseId) {
+                activeCaseId = data.caseId;
+                console.log("Jurisdiction triage captured:", data.caseId);
+            }
+        } catch (error) {
+            hideLoading();
+            console.error("Triage save failed:", error);
+            appendMessage("I could not save the triage record, but I can still give you the correct next step.", "bot");
+        }
     }
 
     async function triggerAIEvaluation() {
