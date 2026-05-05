@@ -63,6 +63,7 @@
     <button onclick="runTest('misconduct')">Test 1: Misconduct — admitted with procedural defects</button>
     <button onclick="runTest('incapacity')">Test 2: Incapacity — back injury, brief meeting</button>
     <button onclick="runTest('poorPerformance')">Test 3: Poor Performance — PIP and comparator issue</button>
+    <button onclick="runTest('ancillaryWarning')">Test 4: Ancillary — final written warning</button>
   </div>
 
   <h2>Result</h2>
@@ -155,6 +156,21 @@
         salary: "25000",
         initial_query: "I was dismissed for poor performance.",
         incident_description: "I was dismissed for poor performance after working there for fourteen months. I was placed on a thirty day performance improvement plan, but the targets were unrealistic because nobody on my team was reaching them. I also did not receive proper training or support, and external factors affected the numbers I was measured against."
+      },
+
+      ancillaryWarning: {
+        ...baseFacts,
+        employment_status: "Advisory",
+        advisory_topic: "Warning",
+        ancillary_topic: "Warning Challenge",
+        incident_date: recentDate(5),
+        relevant_event_date: recentDate(5),
+        length_of_service: "6m-2y",
+        tenure: "6m-2y",
+        gross_monthly_salary: "18000",
+        salary: "18000",
+        initial_query: "I received a final written warning for being late because of taxi strikes. I have not been dismissed.",
+        incident_description: "I received a final written warning for lateness after taxi strikes affected transport in my area. I have not been dismissed and I am still employed. I want help challenging the warning and understanding whether I can lodge a written response or internal appeal."
       }
     };
 
