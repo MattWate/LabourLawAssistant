@@ -226,7 +226,7 @@
             options: [
                 { label: "Misconduct", next: "A2_MISCONDUCT_CATEGORY", val: "Misconduct" },
                 { label: "Poor Performance", next: "PROC_NOTICE", val: "Poor Performance" },
-                { label: "Incapacity (illness, injury or inability)", next: "INC_CONSULT", val: "Incapacity" },
+                { label: "Incapacity (illness, injury or inability)", next: "I2_INCAPACITY_NATURE", val: "Incapacity" },
                 { label: "Retrenchment or Operational Requirements", next: "INC_CONSULT", val: "Retrenchment" },
                 { label: "Other", next: "A2_MISCONDUCT_CATEGORY", val: "Other" }
             ], 
@@ -340,6 +340,103 @@
             next: "COMPANY_NAME",
             saveAs: "incident_description",
             minWords: 50
+        },
+
+        // ==========================================
+        // TRACK A.3: UNFAIR DISMISSAL — INCAPACITY
+        // Section 6.3 of the Master Guide.
+        // Critical build note: this path must not use misconduct language.
+        // ==========================================
+        I2_INCAPACITY_NATURE: {
+            msg: "What was the nature of your incapacity?",
+            type: "buttons",
+            options: [
+                { label: "Illness", next: "I3_INCAPACITY_DURATION", val: "Illness" },
+                { label: "Injury", next: "I3_INCAPACITY_DURATION", val: "Injury" },
+                { label: "Disability", next: "I3_INCAPACITY_DURATION", val: "Disability" },
+                { label: "Mental health", next: "I3_INCAPACITY_DURATION", val: "Mental health" }
+            ],
+            saveAs: "incapacity_nature"
+        },
+
+        I3_INCAPACITY_DURATION: {
+            msg: "Was your incapacity temporary or permanent at the time of dismissal?",
+            type: "buttons",
+            options: [
+                { label: "Temporary", next: "I4_CONSULTATION", val: "Temporary" },
+                { label: "Permanent", next: "I4_CONSULTATION", val: "Permanent" },
+                { label: "Uncertain", next: "I4_CONSULTATION", val: "Uncertain" }
+            ],
+            saveAs: "incapacity_duration"
+        },
+
+        I4_CONSULTATION: {
+            msg: "Did your employer formally consult with you to investigate the extent of your illness or injury?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I5_MEDICAL_REPORTS", val: true },
+                { label: "No", next: "I5_MEDICAL_REPORTS", val: false },
+                { label: "Brief meeting only", next: "I5_MEDICAL_REPORTS", val: "Brief meeting only" }
+            ],
+            saveAs: "proc_consultation"
+        },
+
+        I5_MEDICAL_REPORTS: {
+            msg: "Did the employer review medical reports or speak to your medical practitioner?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I6_ALTERNATIVES", val: true },
+                { label: "No", next: "I6_ALTERNATIVES", val: false },
+                { label: "I was not asked to provide medical evidence", next: "I6_ALTERNATIVES", val: "I was not asked to provide medical evidence" }
+            ],
+            saveAs: "medical_review"
+        },
+
+        I6_ALTERNATIVES: {
+            msg: "Did the employer explore alternatives to dismissal, such as adapted duties, an alternative role, reduced hours or a longer recovery period?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I7_STATE_CASE", val: true },
+                { label: "No", next: "I7_STATE_CASE", val: false },
+                { label: "Unclear", next: "I7_STATE_CASE", val: "Unclear" }
+            ],
+            saveAs: "alternatives_explored"
+        },
+
+        I7_STATE_CASE: {
+            msg: "Were you given the opportunity to state your case, with the assistance of a representative if you wished?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I8_EMPLOYMENT_LENGTH", val: true },
+                { label: "No", next: "I8_EMPLOYMENT_LENGTH", val: false }
+            ],
+            saveAs: "opportunity_to_state_case"
+        },
+
+        I8_EMPLOYMENT_LENGTH: {
+            msg: "How long had you been employed?",
+            type: "buttons",
+            options: [
+                { label: "<6 months", next: "I9_SALARY", val: "<6 months" },
+                { label: "6m-2y", next: "I9_SALARY", val: "6m-2y" },
+                { label: "2-5y", next: "I9_SALARY", val: "2-5y" },
+                { label: "5+y", next: "I9_SALARY", val: "5 years" }
+            ],
+            saveAs: "length_of_service"
+        },
+
+        I9_SALARY: {
+            msg: "What was your gross monthly salary?",
+            type: "text",
+            next: "I10_INCAPACITY_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        I10_INCAPACITY_NARRATIVE: {
+            msg: "In your own words, describe the circumstances of your illness or injury and how the dismissal came about.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description"
         },
 
         // ==========================================
@@ -749,6 +846,18 @@
         }
         if (saveKey === "gross_monthly_salary") {
             collectedFacts["salary"] = actualValue;
+        }
+        if (saveKey === "incapacity_duration") {
+            collectedFacts["incapacity_status"] = actualValue;
+        }
+        if (saveKey === "medical_review") {
+            collectedFacts["proc_medical_review"] = actualValue;
+        }
+        if (saveKey === "alternatives_explored") {
+            collectedFacts["proc_alternatives_explored"] = actualValue;
+        }
+        if (saveKey === "opportunity_to_state_case") {
+            collectedFacts["proc_opportunity_to_state_case"] = actualValue;
         }
 
         currentState = nextStateKey;
