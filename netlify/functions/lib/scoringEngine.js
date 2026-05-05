@@ -140,10 +140,64 @@ function scoreByTrack(track, facts, breakdown) {
   }
 
   if (track === 'UD-POOR_PERFORMANCE') {
-    if (facts.performance_standards_communicated === false || hasAny(story, ['unclear target', 'unclear standard', 'never told'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Performance standards may not have been clearly communicated', 'Schedule 8 Item 9'); }
-    if (facts.pip_given === false || hasAny(story, ['no pip', 'no performance improvement plan'])) { procedural += 4; add(breakdown, 'procedural', 4, 'No formal opportunity to improve', 'Schedule 8 Item 9'); }
-    if (facts.training_provided === false || hasAny(story, ['no training', 'no support', 'no guidance'])) { procedural += 2; add(breakdown, 'procedural', 2, 'No training, instruction or guidance provided', 'Schedule 8 Item 9'); }
-    if (hasAny(story, ['nobody hit target', 'team missed target', 'comparator'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Comparator evidence suggests the standard may not have been reasonable', 'Schedule 8 Item 9'); }
+    const standards = clean(facts.performance_standards_communicated);
+    const pipGiven = facts.pip_given;
+    const pipDuration = clean(facts.pip_duration || facts.performance_improvement_period);
+    const training = clean(facts.training_provided);
+    const comparator = clean(facts.team_meeting_standards || facts.performance_comparator);
+    const control = clean(facts.performance_control || facts.performance_external_factors);
+    const warnings = clean(facts.prior_performance_warnings || facts.performance_warnings);
+
+    if (facts.performance_standards_communicated === false || standards.includes('false') || standards.includes('no') || hasAny(story, ['unclear target', 'unclear standard', 'never told'])) {
+      substantive += 3;
+      add(breakdown, 'substantive', 3, 'Performance standards may not have been clearly communicated', 'Schedule 8 Item 9');
+    } else if (standards.includes('unclear')) {
+      substantive += 1;
+      add(breakdown, 'substantive', 1, 'Performance standards were unclear', 'Schedule 8 Item 9');
+    }
+
+    if (pipGiven === false || clean(pipGiven).includes('false') || clean(pipGiven).includes('no') || hasAny(story, ['no pip', 'no performance improvement plan'])) {
+      procedural += 4;
+      add(breakdown, 'procedural', 4, 'No formal opportunity to improve', 'Schedule 8 Item 9');
+    }
+
+    if (pipDuration.includes('<2') || pipDuration.includes('less than 2')) {
+      procedural += 2;
+      add(breakdown, 'procedural', 2, 'The improvement period appears rushed', 'Schedule 8 Item 9');
+    } else if (pipDuration.includes('2-4')) {
+      procedural += 1;
+      add(breakdown, 'procedural', 1, 'The improvement period may have been short', 'Schedule 8 Item 9');
+    } else if (pipDuration.includes('3+')) {
+      procedural -= 1;
+      add(breakdown, 'procedural', -1, 'The employer appears to have allowed a longer improvement period', 'Schedule 8 Item 9');
+    }
+
+    if (facts.training_provided === false || training.includes('false') || training.includes('no') || hasAny(story, ['no training', 'no support', 'no guidance'])) {
+      procedural += 2;
+      add(breakdown, 'procedural', 2, 'No training, instruction or guidance provided', 'Schedule 8 Item 9');
+    } else if (training.includes('inadequate')) {
+      procedural += 1;
+      add(breakdown, 'procedural', 1, 'Training, instruction or guidance may have been inadequate', 'Schedule 8 Item 9');
+    }
+
+    if (comparator === 'no' || hasAny(story, ['nobody hit target', 'nobody on my team', 'team missed target', 'comparator'])) {
+      substantive += 3;
+      add(breakdown, 'substantive', 3, 'Comparator evidence suggests the standard may not have been reasonable', 'Schedule 8 Item 9');
+    }
+
+    if (control.includes('external')) {
+      substantive += 2;
+      add(breakdown, 'substantive', 2, 'External factors may have affected performance', 'Schedule 8 Item 9');
+    } else if (control.includes('both')) {
+      substantive += 1;
+      add(breakdown, 'substantive', 1, 'Performance may have been partly affected by external factors', 'Schedule 8 Item 9');
+    }
+
+    if (warnings.includes('none')) {
+      procedural += 2;
+      add(breakdown, 'procedural', 2, 'No prior performance warnings were given before dismissal', 'Schedule 8 Item 9');
+    }
+
     substantive += tenurePoint(facts, breakdown);
   }
 
@@ -201,12 +255,13 @@ function buildAdvisory(result, facts) {
       ? 'The ordinary 30-day CCMA referral window appears to have lapsed. Condonation may be required.'
       : 'The CCMA deadline cannot be confirmed because the relevant date is missing or invalid.';
   const legal = result.legal_basis.map(x => `- ${x}`).join('\n') || '- To be confirmed by attorney review.';
+  const headlineMeritText = result.merit_band === 'NO MERIT' ? 'NO MERIT' : `${result.merit_band} MERIT`;
 
   if (result.hard_disqualifier) {
     return `${result.track_label}: NO MERIT\n\nSubstantive Score: 0 / 10\nThe matter currently triggers a hard threshold issue: ${result.hard_disqualifier.name}.\n\nProcedural Score: 0 / 10\nNo procedural merit assessment is completed until this threshold issue is resolved.\n\nFactors in your favour:\n${positives}\n\nRisks or weaknesses:\n- ${result.hard_disqualifier.name} [${result.hard_disqualifier.legalBasis}]\n\nCCMA deadline status: ${deadline}\n\nRecommended next step: ${result.recommended_next_step}\n\nLegal basis:\n${legal}\n\nAttorney review tag: PENDING`;
   }
 
-  return `${result.track_label}: ${result.merit_band} MERIT\n\nSubstantive Score: ${result.substantive_score} / 10\nThis score reflects the current strength of the employee's position on the reason for the employer's conduct or dismissal.\n\nProcedural Score: ${result.procedural_score} / 10\nThis score reflects the current strength of the employee's position on the process followed, or in constructive dismissal matters, the reasonableness of the employee's steps before resignation.\n\nFactors in your favour:\n${positives}\n\nRisks or weaknesses:\n${risks}\n\nCCMA deadline status: ${deadline}\n\nRecommended next step: ${result.recommended_next_step}\n\nLegal basis:\n${legal}\n\nAttorney review tag: PENDING${result.merit_bonus_trigger ? `\n\nPriority flag: ${result.merit_bonus_trigger.name} [${result.merit_bonus_trigger.legalBasis}]` : ''}`;
+  return `${result.track_label}: ${headlineMeritText}\n\nSubstantive Score: ${result.substantive_score} / 10\nThis score reflects the current strength of the employee's position on the reason for the employer's conduct or dismissal.\n\nProcedural Score: ${result.procedural_score} / 10\nThis score reflects the current strength of the employee's position on the process followed, or in constructive dismissal matters, the reasonableness of the employee's steps before resignation.\n\nFactors in your favour:\n${positives}\n\nRisks or weaknesses:\n${risks}\n\nCCMA deadline status: ${deadline}\n\nRecommended next step: ${result.recommended_next_step}\n\nLegal basis:\n${legal}\n\nAttorney review tag: PENDING${result.merit_bonus_trigger ? `\n\nPriority flag: ${result.merit_bonus_trigger.name} [${result.merit_bonus_trigger.legalBasis}]` : ''}`;
 }
 
 function scoreCase(facts = {}) {
