@@ -202,7 +202,7 @@ Return ONLY a JSON object with this exact format:
         issue_summary: fullStory || 'Gathered via automated intake.',
         case_facts: coreFacts,
         status: 'new',
-        letter_status: scorecard.wp_eligible ? 'eligible_pending_user_confirmation' : 'not_applicable'
+        letter_status: scorecard.wp_eligible ? 'not_drafted' : 'not_applicable'
       };
 
       const { data: newCase, error: dbErr } = await supabase
