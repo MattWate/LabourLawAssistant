@@ -5,65 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Justine Test Harness</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 24px;
-      background: #f8fafc;
-      color: #0f172a;
-    }
+    body { font-family: Arial, sans-serif; padding: 24px; background: #f8fafc; color: #0f172a; }
     h1 { margin-top: 0; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    button {
-      display: block;
-      padding: 12px 14px;
-      cursor: pointer;
-      border: 1px solid #2563eb;
-      border-radius: 8px;
-      background: white;
-      color: #2563eb;
-      font-weight: 700;
-      text-align: left;
-    }
-    button:hover {
-      background: #2563eb;
-      color: white;
-    }
-    .note {
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
-      padding: 12px 14px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-    }
-    pre {
-      background: #111827;
-      color: #e5e7eb;
-      padding: 16px;
-      white-space: pre-wrap;
-      border-radius: 8px;
-      min-height: 320px;
-      overflow-x: auto;
-    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    button { display: block; padding: 12px 14px; cursor: pointer; border: 1px solid #2563eb; border-radius: 8px; background: white; color: #2563eb; font-weight: 700; text-align: left; }
+    button:hover { background: #2563eb; color: white; }
+    .note { background: #fff7ed; border: 1px solid #fed7aa; padding: 12px 14px; border-radius: 8px; margin-bottom: 20px; }
+    pre { background: #111827; color: #e5e7eb; padding: 16px; white-space: pre-wrap; border-radius: 8px; min-height: 320px; overflow-x: auto; }
   </style>
 </head>
 <body>
   <h1>Justine Test Harness</h1>
   <p>This page calls <code>/.netlify/functions/ask</code> directly with predefined case facts. It is for backend scoring and routing checks.</p>
 
-  <div class="note">
-    <strong>Note:</strong> These tests currently create real rows in the <code>cases</code> table. They use clear test names so they can be filtered or deleted later.
-  </div>
+  <div class="note"><strong>Note:</strong> These tests currently create real rows in the <code>cases</code> table. They use clear test names so they can be filtered or deleted later.</div>
 
   <div class="grid">
     <button onclick="runTest('misconduct')">Test 1: Misconduct — admitted with procedural defects</button>
     <button onclick="runTest('incapacity')">Test 2: Incapacity — back injury, brief meeting</button>
     <button onclick="runTest('poorPerformance')">Test 3: Poor Performance — PIP and comparator issue</button>
     <button onclick="runTest('ancillaryWarning')">Test 4: Ancillary — final written warning</button>
+    <button onclick="runTest('constructiveDismissal')">Test 7/8: Constructive Dismissal — grievance and intolerability</button>
+    <button onclick="runTest('audPregnancy')">Test 9: AUD — pregnancy dismissal</button>
   </div>
 
   <h2>Result</h2>
@@ -110,7 +73,6 @@
         initial_query: "I was dismissed for misconduct.",
         incident_description: "I was dismissed after swearing at my supervisor during an argument. I accept that I used bad language, but I had worked at the company for six years with a clean disciplinary record. I was given notice of the hearing on the same day, I was not allowed to bring a colleague or union representative, and my direct manager chaired the hearing."
       },
-
       incapacity: {
         ...baseFacts,
         employment_status: "Dismissed",
@@ -133,7 +95,6 @@
         initial_query: "I was dismissed because of a back injury.",
         incident_description: "I had a back injury and was off intermittently for eight months. I gave medical certificates to my employer. They only had one brief meeting with me before dismissing me. They did not explore adapted duties, reduced hours, an alternative role, or a longer recovery period."
       },
-
       poorPerformance: {
         ...baseFacts,
         employment_status: "Dismissed",
@@ -157,7 +118,6 @@
         initial_query: "I was dismissed for poor performance.",
         incident_description: "I was dismissed for poor performance after working there for fourteen months. I was placed on a thirty day performance improvement plan, but the targets were unrealistic because nobody on my team was reaching them. I also did not receive proper training or support, and external factors affected the numbers I was measured against."
       },
-
       ancillaryWarning: {
         ...baseFacts,
         employment_status: "Advisory",
@@ -171,24 +131,52 @@
         salary: "18000",
         initial_query: "I received a final written warning for being late because of taxi strikes. I have not been dismissed.",
         incident_description: "I received a final written warning for lateness after taxi strikes affected transport in my area. I have not been dismissed and I am still employed. I want help challenging the warning and understanding whether I can lodge a written response or internal appeal."
+      },
+      constructiveDismissal: {
+        ...baseFacts,
+        employment_status: "Resigned",
+        incident_date: recentDate(6),
+        resignation_date: recentDate(6),
+        intolerable_conduct: "harassment or bullying",
+        intolerable_duration: "6+ months",
+        grievance_raised: "Yes, in writing",
+        constructive_grievance_raised: "Yes, in writing",
+        employer_response: "No action",
+        wait_after_grievance: "1-3 months",
+        colleagues_witnessed: "Yes",
+        gross_monthly_salary: "22000",
+        salary: "22000",
+        initial_query: "I resigned because my working conditions became intolerable.",
+        incident_description: "For more than six months I was bullied and humiliated by my manager in front of colleagues. I raised a written grievance with HR and attached examples of the behaviour, but the employer took no action. I waited more than a month after raising the grievance before resigning because the situation did not improve and colleagues witnessed similar treatment."
+      },
+      audPregnancy: {
+        ...baseFacts,
+        employment_status: "Discrimination",
+        disc_status: "Dismissed",
+        protected_ground_status: "Dismissed",
+        incident_date: recentDate(2),
+        protected_ground: "pregnancy",
+        protected_ground_comparator: "Yes",
+        protected_ground_reported: "Yes, in writing",
+        employer_response_worsened: "Yes",
+        length_of_service: "5 years",
+        tenure: "5 years",
+        gross_monthly_salary: "30000",
+        salary: "30000",
+        initial_query: "I was dismissed shortly after telling my employer I was pregnant.",
+        incident_description: "I told my employer in writing that I was pregnant. Shortly after that disclosure I was dismissed. Other employees in similar roles were not treated the same way. After I reported the pregnancy-related treatment, the employer's response worsened my situation and I lost my job."
       }
     };
 
     async function runTest(name) {
       output.textContent = `Running ${name}...`;
-
       try {
         const res = await fetch("/.netlify/functions/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "evaluate",
-            facts: cases[name]
-          })
+          body: JSON.stringify({ action: "evaluate", facts: cases[name] })
         });
-
         const data = await res.json();
-
         output.textContent = JSON.stringify({
           httpStatus: res.status,
           caseId: data.caseId,
