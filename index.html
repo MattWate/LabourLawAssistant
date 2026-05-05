@@ -130,8 +130,62 @@
 
     // --- THE HARD-CODED INTAKE SCRIPT (V2 - Advanced Merits Hub) ---
     const scriptFlow = {
+        JUR_EMPLOYEE: {
+            msg: "Are you an employee, as opposed to an independent contractor?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "JUR_SA_EMPLOYER", val: "Employee" },
+                { label: "No", next: "JUR_CONTRACTOR_CONTROL", val: "Contractor" },
+                { label: "Unsure", next: "JUR_CONTRACTOR_CONTROL", val: "Unsure" }
+            ],
+            saveAs: "worker_status"
+        },
+        
+        JUR_CONTRACTOR_CONTROL: {
+            msg: "Does someone tell you when to start work, when to stop work, and how to do the work?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "JUR_SA_EMPLOYER", val: "yes" },
+                { label: "No", next: "DEFLECT_CONTRACTOR", val: "no" }
+            ],
+            saveAs: "contractor_control_test"
+        },
+        
+        JUR_SA_EMPLOYER: {
+            msg: "Is your employer a South African registered entity, or operating in South Africa?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "JUR_PUBLIC_SERVICE", val: "yes" },
+                { label: "No", next: "DEFLECT_CROSS_BORDER", val: "no" },
+                { label: "Unsure", next: "JUR_PUBLIC_SERVICE", val: "unsure" }
+            ],
+            saveAs: "south_african_employer"
+        },
+        
+        JUR_PUBLIC_SERVICE: {
+            msg: "Are you employed in the public service under the Public Service Act, or by a government agency such as DOL, DPW, DOH, SAPS, or by the SANDF?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "DEFLECT_PUBLIC_SERVICE", val: "yes" },
+                { label: "No", next: "JUR_SOE", val: "no" },
+                { label: "Unsure", next: "JUR_SOE", val: "unsure" }
+            ],
+            saveAs: "public_service_or_excluded_agency"
+        },
+        
+        JUR_SOE: {
+            msg: "Are you a Schedule 2 SOE employee whose dispute remains CCMA-eligible?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "START", val: "yes" },
+                { label: "No", next: "START", val: "no" },
+                { label: "Unclear", next: "START", val: "unclear" }
+            ],
+            saveAs: "schedule_2_soe_ccma_eligible"
+        },
+        
         START: {
-            msg: "Hi there! I'm Justine, a Labour Law Assistant. Briefly tell me about the work issue you need help with so I can guide you.",
+            msg: "Hi there. I am Justine, a Labour Law Assistant. Briefly tell me about the work issue you need help with so I can guide you. There is no right or wrong way to describe it. In your own words, what has happened?",
             type: "text",
             action: "classify"
         },
@@ -176,20 +230,20 @@
         INC_CONSULT: { msg: "Did the employer properly consult with you and genuinely look for alternatives before dismissing you?", type: "buttons", options: [{label:"Yes", next:"FIRED_DESC", val:true}, {label:"No", next:"FIRED_DESC", val:false}], saveAs: "proc_consultation" },
 
         // Substantive Story
-        FIRED_DESC: { msg: "In a few short sentences, describe exactly what happened.", type: "text", next: "CONTRACT_TYPE", saveAs: "incident_description" },
-
+       FIRED_DESC: { msg: "In a few short sentences, describe exactly what happened.", type: "text", next: "COMPANY_NAME", saveAs: "incident_description" },
+     
         // ==========================================
         // PATH B: CONSTRUCTIVE DISMISSAL
         // ==========================================
         RESIGN_DATE: { msg: "What was the exact date you officially resigned?", type: "date", next: "RESIGN_CONST", saveAs: "incident_date" },
         RESIGN_CONST: { msg: "Did your employer make your working environment so intolerable that you felt you had absolutely no choice but to leave?", type: "buttons", options: [{label:"Yes", next:"RESIGN_DESC", val:true}, {label:"No", next:"RESIGN_DESC", val:false}], saveAs: "constructive_dismissal" },
-        RESIGN_DESC: { msg: "Briefly explain what happened to make you resign.", type: "text", next: "CONTRACT_TYPE", saveAs: "incident_description" },
+        RESIGN_DESC: { msg: "Briefly explain what happened to make you resign.", type: "text", next: "COMPANY_NAME", saveAs: "incident_description" },
 
         // ==========================================
         // PATH C: DISCRIMINATION
         // ==========================================
         DISC_STATUS: { msg: "Are you still employed, or did you leave/get fired because of this?", type: "buttons", options: [{label:"Still Employed", next:"DISC_DESC", val:"Employed"}, {label:"Left or Fired", next:"DISC_DESC", val:"Left"}], saveAs: "disc_status" },
-        DISC_DESC: { msg: "Briefly describe the discrimination or harassment you are facing (e.g., based on race, gender, pregnancy).", type: "text", next: "CONTRACT_TYPE", saveAs: "incident_description" },
+       DISC_DESC: { msg: "Briefly describe the discrimination or harassment you are facing (e.g., based on race, gender, pregnancy).", type: "text", next: "COMPANY_NAME", saveAs: "incident_description" },
 
         // ==========================================
         // PATH D: ADVISORY HUB
@@ -205,12 +259,12 @@
             ], 
             saveAs: "advisory_topic" 
         },
-        ADV_DESC: { msg: "Briefly explain the situation you are dealing with.", type: "text", next: "CONTRACT_TYPE", saveAs: "incident_description" },
+        ADV_DESC: { msg: "Briefly explain the situation you are dealing with.", type: "text", next: "COMPANY_NAME", saveAs: "incident_description" },
 
         // ==========================================
         // PATH E: UIF
         // ==========================================
-        UIF_DESC: { msg: "Briefly describe your UIF query and how you need help.", type: "text", next: "CONTRACT_TYPE", saveAs: "incident_description" },
+       UIF_DESC: { msg: "Briefly describe your UIF query and how you need help.", type: "text", next: "COMPANY_NAME", saveAs: "incident_description" },
 
         // ==========================================
         // MERGE: UNIVERSAL CONTEXT
@@ -226,15 +280,20 @@
                 { label: "Security", next: "COMPANY_NAME", val: "Security" }, 
                 { label: "Metal & Engineering", next: "COMPANY_NAME", val: "Metal & Engineering" }, 
                 { label: "Domestic", next: "COMPANY_NAME", val: "Domestic" }, 
-                { label: "Government / SOE (Police, Military, Teachers)", next: "DEFLECT_GOV", val: "Government" },
+                { label: "Government / SOE (Police, Military, Teachers)", next: "COMPANY_NAME", val: "Government / SOE" },
                 { label: "Other", next: "COMPANY_NAME", val: "Other" }
             ], 
             saveAs: "sector" 
         },
 
-        // Automated Hard Filter
-        DEFLECT_GOV: { msg: "Because you are a state or SOE employee, your dispute falls under specific public sector legislation and bargaining councils (such as the PSCBC). Our firm specializes strictly in private sector disputes, so we are unable to assist you at this time. Wishing you the best of luck.", type: "end" },
-
+        // Jurisdictional Gate Off-Ramps
+        DEFLECT_CONTRACTOR: { msg: "Based on your answer, this may fall outside the ordinary employee protections of the LRA and BCEA. The correct next step is to get civil contract advice before a labour-law merits assessment is done.", type: "end" },
+        DEFLECT_CROSS_BORDER: { msg: "This may require international or cross-border advice before a South African labour-law merits assessment is done.", type: "end" },
+        DEFLECT_PUBLIC_SERVICE: { msg: "This matter should be triaged to the correct public-sector forum, which may include the PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures. A blanket rejection should not be applied.", type: "end" },
+        
+        // Legacy hard filter retained only as a safety fallback. The main flow now uses the Jurisdictional Gate above.
+        DEFLECT_GOV: { msg: "This matter should be triaged to the correct public-sector forum, which may include the PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures. A blanket rejection should not be applied.", type: "end" },
+        
         // ==========================================
         // LOGISTICS
         // ==========================================
@@ -247,7 +306,7 @@
         HANDOFF: { action: "evaluate" }
     };
 
-    let currentState = "START";
+    let currentState = "JUR_EMPLOYEE";
 
     function scrollToBottom() {
         setTimeout(() => {
