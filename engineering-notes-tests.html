@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Justine Engineering Notes Regression Tests</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; background: #f8fafc; color: #0f172a; }
+    h1 { margin-top: 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    button { display: block; padding: 12px 14px; cursor: pointer; border: 1px solid #7c3aed; border-radius: 8px; background: white; color: #5b21b6; font-weight: 700; text-align: left; }
+    button:hover { background: #7c3aed; color: white; }
+    .note { background: #fff7ed; border: 1px solid #fed7aa; padding: 12px 14px; border-radius: 8px; margin-bottom: 20px; }
+    pre { background: #111827; color: #e5e7eb; padding: 16px; white-space: pre-wrap; border-radius: 8px; min-height: 360px; overflow-x: auto; }
+    code { background: #e2e8f0; padding: 2px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Justine Engineering Notes Regression Tests</h1>
+  <p>These tests target the client feedback from the 7 May engineering notes.</p>
+
+  <div class="note">
+    <strong>Important:</strong> These currently call <code>/.netlify/functions/ask</code> with <code>action: evaluate</code>, so they create real test rows in the <code>cases</code> table.
+  </div>
+
+  <div class="grid">
+    <button onclick="runTest('whistleblowerMisconduct')">EN Test 01: Whistleblower disguised as misconduct</button>
+    <button onclick="runTest('pregnancyRetrenchment')">EN Test 02: Pregnancy disguised as retrenchment</button>
+    <button onclick="runTest('cdDiscriminationOverlay')">EN Test 03: CD with discrimination overlay</button>
+  </div>
+
+  <h2>Result</h2>
+  <pre id="output">Choose a test...</pre>
+
+  <script>
+    const output = document.getElementById('output');
+
+    function recentDate(daysAgo = 2) {
+      const date = new Date();
+      date.setDate(date.getDate() - daysAgo);
+      return date.toISOString().slice(0, 10);
+    }
+
+    const baseFacts = {
+      worker_status: 'Employee',
+      contract_type: 'Employee',
+      south_african_employer: 'yes',
+      public_service_or_excluded_agency: 'no',
+      schedule_2_soe_ccma_eligible: 'no',
+      employer_name: 'ENGINEERING NOTE TEST EMPLOYER',
+      employer_contact_details: 'hr@testcase.example',
+      client_name: 'ENGINEERING NOTE TEST USER',
+      contact_info: '0820000000'
+    };
+
+    const cases = {
+      whistleblowerMisconduct: {
+        ...baseFacts,
+        employment_status: 'Dismissed',
+        dismissal_reason_type: 'Misconduct',
+        incident_date: recentDate(3),
+        misconduct_category: 'insubordination',
+        conduct_admission: 'Dispute',
+        hearing_held: false,
+        prior_warnings: 'None',
+        length_of_service: '2-5y',
+        tenure: '2-5y',
+        gross_monthly_salary: '38000',
+        salary: '38000',
+        initial_query: 'I was let go because I refused to remove customer complaints from the compliance register before the auditors came in.',
+        incident_description: 'I was let go on Friday, they said it was for insubordination because I refused to follow a direct instruction from my manager. The instruction was to remove three customer complaints from the compliance register before the auditors came in this week. I told him I would not do that and that he must put the request in writing if he wanted me to. Two days later HR called me in and told me my services were terminated with immediate effect. I worked there for four years with no warnings ever. My salary was R38000 a month.'
+      },
+
+      pregnancyRetrenchment: {
+        ...baseFacts,
+        employment_status: 'Dismissed',
+        dismissal_reason_type: 'Retrenchment',
+        incident_date: recentDate(2),
+        length_of_service: '2-5y',
+        tenure: '2-5y',
+        gross_monthly_salary: '32000',
+        salary: '32000',
+        initial_query: 'I was retrenched two weeks after telling my manager I am pregnant.',
+        incident_description: 'I work at a marketing agency and I told my manager two weeks ago that I am pregnant. I am 14 weeks. On Tuesday this week I was called into a meeting and told that they are restructuring and my position is being made redundant. There is one other junior in my team and she is staying. The company is doing well as far as I know, we just signed two new clients last month. They gave me one month notice and a small severance. I have been there three years and never had any performance issues. I earn R32000.'
+      },
+
+      cdDiscriminationOverlay: {
+        ...baseFacts,
+        employment_status: 'Resigned',
+        incident_date: recentDate(21),
+        resignation_date: recentDate(21),
+        intolerable_conduct: 'discrimination',
+        intolerable_duration: '3-6 months',
+        grievance_raised: 'Yes, verbally',
+        constructive_grievance_raised: 'Yes, verbally',
+        employer_response: 'No action',
+        wait_after_grievance: '<2 weeks',
+        colleagues_witnessed: 'Unsure',
+        protected_ground: 'national origin',
+        protected_ground_comparator: 'Yes',
+        gross_monthly_salary: '45000',
+        salary: '45000',
+        initial_query: 'I resigned three weeks ago because my manager kept making comments about my accent and asking when I am going home.',
+        incident_description: 'I resigned three weeks ago because I could not handle it anymore. My new manager who started in January kept making comments about my accent and asking when I am going home. I am from Zimbabwe but I have been working in South Africa legally for six years. He moved me off the senior projects and gave them to a junior who joined last year. I tried to talk to HR about it twice but nothing happened. In the end I just resigned, I had to. Now I am out of work and I want to know what I can do. I was earning R45000 a month.'
+      }
+    };
+
+    async function runTest(name) {
+      output.textContent = `Running ${name}...`;
+      try {
+        const res = await fetch('/.netlify/functions/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'evaluate', facts: cases[name] })
+        });
+        const data = await res.json();
+        output.textContent = JSON.stringify({
+          httpStatus: res.status,
+          caseId: data.caseId,
+          hasMerit: data.hasMerit,
+          track: data.scorecard && data.scorecard.track,
+          secondaryTrack: data.scorecard && data.scorecard.secondary_track,
+          overrideFlags: data.scorecard && data.scorecard.override_flags,
+          trackLabel: data.scorecard && data.scorecard.track_label,
+          substantiveScore: data.scorecard && data.scorecard.substantive_score,
+          proceduralScore: data.scorecard && data.scorecard.procedural_score,
+          meritBand: data.scorecard && data.scorecard.merit_band,
+          wpEligible: data.scorecard && data.scorecard.wp_eligible,
+          wpType: data.scorecard && data.scorecard.wp_type,
+          legalBasis: data.scorecard && data.scorecard.legal_basis,
+          recommendedNextStep: data.scorecard && data.scorecard.recommended_next_step,
+          scoringBreakdown: data.scorecard && data.scorecard.scoring_breakdown,
+          advisoryNote: data.pitch,
+          raw: data
+        }, null, 2);
+      } catch (err) {
+        output.textContent = err.stack || err.message;
+      }
+    }
+  </script>
+</body>
+</html>
