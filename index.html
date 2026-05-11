@@ -910,6 +910,105 @@
             minWords: 75
         },
 
+
+        // ==========================================
+        // TRACK D: PRE-DISMISSAL ADVISORY
+        // Section 6.7 of the Master Guide.
+        // ==========================================
+        D1_HEARING_DATE: {
+            msg: "When is your disciplinary hearing scheduled?",
+            type: "date",
+            next: "D2_CHARGE_SHEET",
+            saveAs: "hearing_date"
+        },
+
+        D2_CHARGE_SHEET: {
+            msg: "Have you received a written charge sheet detailing the allegations?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "D3_48H_NOTICE", val: true },
+                { label: "No", next: "D3_48H_NOTICE", val: false }
+            ],
+            saveAs: "charge_sheet_received"
+        },
+
+        D3_48H_NOTICE: {
+            msg: "Does the charge sheet give you at least 48 hours notice of the hearing?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "D4_SUSPENSION", val: true },
+                { label: "No", next: "D4_SUSPENSION", val: false },
+                { label: "Postponed already", next: "D4_SUSPENSION", val: "Postponed already" }
+            ],
+            saveAs: "proc_notice"
+        },
+
+        D4_SUSPENSION: {
+            msg: "Have you been suspended pending the hearing?",
+            type: "buttons",
+            options: [
+                { label: "Yes, with pay", next: "D5_REPRESENTATION", val: "Yes, with pay" },
+                { label: "Yes, without pay", next: "D5_REPRESENTATION", val: "Yes, without pay" },
+                { label: "No", next: "D5_REPRESENTATION", val: "No" }
+            ],
+            saveAs: "paid_suspension"
+        },
+
+        D5_REPRESENTATION: {
+            msg: "Have you been offered the right to bring a union representative or colleague?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "D6_ALLEGATION_NATURE", val: true },
+                { label: "No", next: "D6_ALLEGATION_NATURE", val: false },
+                { label: "Not told either way", next: "D6_ALLEGATION_NATURE", val: "Not told either way" }
+            ],
+            saveAs: "proc_rep"
+        },
+
+        D6_ALLEGATION_NATURE: {
+            msg: "What is the nature of the allegation?",
+            type: "buttons",
+            options: [
+                { label: "Theft", next: "D7_PRIOR_WARNINGS", val: "theft" },
+                { label: "Assault", next: "D7_PRIOR_WARNINGS", val: "assault" },
+                { label: "Dishonesty", next: "D7_PRIOR_WARNINGS", val: "dishonesty" },
+                { label: "Insubordination", next: "D7_PRIOR_WARNINGS", val: "insubordination" },
+                { label: "Absenteeism", next: "D7_PRIOR_WARNINGS", val: "absenteeism" },
+                { label: "Other", next: "D7_PRIOR_WARNINGS", val: "other" }
+            ],
+            saveAs: "allegation_nature"
+        },
+
+        D7_PRIOR_WARNINGS: {
+            msg: "Have you received any prior warnings for similar conduct?",
+            type: "buttons",
+            options: [
+                { label: "None", next: "D8_EMPLOYMENT_LENGTH", val: "None" },
+                { label: "One", next: "D8_EMPLOYMENT_LENGTH", val: "One" },
+                { label: "Multiple", next: "D8_EMPLOYMENT_LENGTH", val: "Multiple" }
+            ],
+            saveAs: "prior_warnings"
+        },
+
+        D8_EMPLOYMENT_LENGTH: {
+            msg: "How long have you been employed?",
+            type: "buttons",
+            options: [
+                { label: "<6 months", next: "D9_PDA_NARRATIVE", val: "<6 months" },
+                { label: "6m-2y", next: "D9_PDA_NARRATIVE", val: "6m-2y" },
+                { label: "2-5y", next: "D9_PDA_NARRATIVE", val: "2-5y" },
+                { label: "5+y", next: "D9_PDA_NARRATIVE", val: "5 years" }
+            ],
+            saveAs: "length_of_service"
+        },
+
+        D9_PDA_NARRATIVE: {
+            msg: "Describe the allegation and your version of events.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description"
+        },
+
         // ==========================================
         // PATH D: ADVISORY HUB
         // ==========================================
@@ -917,7 +1016,7 @@
             msg: "What do you need help with right now?", 
             type: "buttons", 
             options: [
-                { label: "Hearing Prep", next: "ADV_DESC", val: "Hearing Prep" },
+                { label: "Hearing Prep", next: "D1_HEARING_DATE", val: "Hearing Prep" },
                 { label: "Challenging a Warning", next: "ADV_DESC", val: "Warning" },
                 { label: "Lodging a Grievance", next: "ADV_DESC", val: "Grievance" },
                 { label: "Pay / Contract Issue", next: "ADV_DESC", val: "Pay Issue" }
@@ -1282,6 +1381,16 @@
         }
         if (saveKey === "retrenchment_alternatives") {
             collectedFacts["retrenchment_alternatives_offered"] = actualValue;
+        }
+        if (saveKey === "hearing_date") {
+            collectedFacts["incident_date"] = actualValue;
+            collectedFacts["event_type"] = "pre_dismissal_advisory";
+        }
+        if (saveKey === "charge_sheet_received") {
+            collectedFacts["charge_sheet_received"] = actualValue;
+        }
+        if (saveKey === "allegation_nature") {
+            collectedFacts["misconduct_category"] = actualValue;
         }
 
         currentState = nextStateKey;
