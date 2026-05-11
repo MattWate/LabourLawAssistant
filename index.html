@@ -1012,19 +1012,72 @@
         // ==========================================
         // PATH D: ADVISORY HUB
         // ==========================================
-        ADV_ISSUE: { 
-            msg: "What do you need help with right now?", 
-            type: "buttons", 
+        // ==========================================
+        // TRACK E: ANCILLARY ADVISORY
+        // Section 6.8 of the Master Guide.
+        // Hard rule: WP letter pathway is disabled for Track E.
+        // ==========================================
+        ADV_ISSUE: {
+            msg: "What specific issue do you need help with?",
+            type: "buttons",
             options: [
-                { label: "Hearing Prep", next: "D1_HEARING_DATE", val: "Hearing Prep" },
-                { label: "Challenging a Warning", next: "ADV_DESC", val: "Warning" },
-                { label: "Lodging a Grievance", next: "ADV_DESC", val: "Grievance" },
-                { label: "Pay / Contract Issue", next: "ADV_DESC", val: "Pay Issue" }
-            ], 
-            saveAs: "advisory_topic" 
+                { label: "Warning", next: "E2_EMPLOYMENT_LENGTH", val: "Warning" },
+                { label: "Grievance", next: "E2_EMPLOYMENT_LENGTH", val: "Grievance" },
+                { label: "Hearing prep", next: "D1_HEARING_DATE", val: "Hearing Prep" },
+                { label: "BCEA query", next: "E2_EMPLOYMENT_LENGTH", val: "BCEA query" },
+                { label: "Reference letter", next: "E2_EMPLOYMENT_LENGTH", val: "Reference letter" },
+                { label: "Pay dispute", next: "E2_EMPLOYMENT_LENGTH", val: "Pay dispute" },
+                { label: "Other", next: "E2_EMPLOYMENT_LENGTH", val: "Other" }
+            ],
+            saveAs: "advisory_topic"
         },
+
+        E2_EMPLOYMENT_LENGTH: {
+            msg: "How long have you been employed?",
+            type: "buttons",
+            options: [
+                { label: "<6 months", next: "E3_RELEVANT_EVENT_DATE", val: "<6 months" },
+                { label: "6m-2y", next: "E3_RELEVANT_EVENT_DATE", val: "6m-2y" },
+                { label: "2-5y", next: "E3_RELEVANT_EVENT_DATE", val: "2-5y" },
+                { label: "5+y", next: "E3_RELEVANT_EVENT_DATE", val: "5 years" }
+            ],
+            saveAs: "length_of_service"
+        },
+
+        E3_RELEVANT_EVENT_DATE: {
+            msg: "Date of the relevant event (warning issued, grievance arose, hearing scheduled, etc.)?",
+            type: "date",
+            next: "E4_INTERNAL_RAISED",
+            saveAs: "relevant_event_date"
+        },
+
+        E4_INTERNAL_RAISED: {
+            msg: "Have you raised this internally yet?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "E5_SALARY", val: "Yes" },
+                { label: "No", next: "E5_SALARY", val: "No" },
+                { label: "Started but not finished", next: "E5_SALARY", val: "Started but not finished" }
+            ],
+            saveAs: "raised_internally"
+        },
+
+        E5_SALARY: {
+            msg: "What is your gross monthly salary?",
+            type: "text",
+            next: "E6_ANCILLARY_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        E6_ANCILLARY_NARRATIVE: {
+            msg: "Describe the situation in your own words.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description"
+        },
+
         ADV_DESC: {
-            msg: "Briefly explain the situation you are dealing with.",
+            msg: "Describe the situation in your own words.",
             type: "text",
             next: "COMPANY_NAME",
             saveAs: "incident_description"
@@ -1391,6 +1444,20 @@
         }
         if (saveKey === "allegation_nature") {
             collectedFacts["misconduct_category"] = actualValue;
+        }
+        if (saveKey === "advisory_topic") {
+            collectedFacts["ancillary_topic"] = actualValue;
+            if (actualValue !== "Hearing Prep") {
+                collectedFacts["employment_status"] = "Advisory";
+                collectedFacts["wp_eligible"] = false;
+                collectedFacts["wp_type"] = null;
+            }
+        }
+        if (saveKey === "relevant_event_date") {
+            collectedFacts["incident_date"] = actualValue;
+        }
+        if (saveKey === "raised_internally") {
+            collectedFacts["internal_escalation"] = actualValue;
         }
 
         currentState = nextStateKey;
