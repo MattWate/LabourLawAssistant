@@ -1,102 +1,1422 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Justine - Labour Law Assistant</title>
-<style>
-:root{--primary:#2563eb;--bg:#f1f5f9;--border:#e2e8f0}*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);margin:0;display:flex;height:100vh;width:100vw;overflow:hidden}.app-container{display:flex;flex-direction:column;width:100%;max-width:800px;margin:0 auto;background:white;box-shadow:0 0 20px rgba(0,0,0,.05);height:100%}.chat-panel{display:flex;flex-direction:column;flex:1;min-height:0}.chat-header{padding:20px;border-bottom:1px solid var(--border);background:white;display:flex;align-items:center;gap:15px;flex-shrink:0}.header-avatar,.chat-avatar{border-radius:50%;object-fit:cover}.header-avatar{width:40px;height:40px;border:2px solid var(--border)}.chat-avatar{width:32px;height:32px;flex-shrink:0;background:#e2e8f0;border:1px solid white;box-shadow:0 2px 4px rgba(0,0,0,.1)}.chat-header-info h1{margin:0;font-size:1.1rem;color:#1e293b}.chat-header-info span{font-size:.8rem;color:#64748b}.badge{background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:4px;font-size:.7rem;font-weight:600;margin-left:8px}#chat-history{flex:1;overflow-y:auto;padding:20px;background:#fafafa}.chat-row{display:flex;gap:12px;width:100%;align-items:flex-end;margin-bottom:20px}.user-row{justify-content:flex-end}.bot-row{justify-content:flex-start}.message{max-width:80%;padding:12px 16px;border-radius:12px;line-height:1.5;font-size:.95rem;box-shadow:0 1px 2px rgba(0,0,0,.05);white-space:pre-wrap}.bot-row .message{background:white;border:1px solid var(--border);color:#1e293b;border-bottom-left-radius:2px}.user-row .message{background:var(--primary);color:white;border-bottom-right-radius:2px}.input-area{padding:20px;border-top:1px solid var(--border);background:white;flex-shrink:0}#text-input-container{display:none;gap:10px;width:100%}#text-input-container input{flex:1;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:1rem;outline:none}#text-input-container input:focus{border-color:var(--primary)}#text-input-container button{background:var(--primary);color:white;border:0;padding:0 24px;border-radius:8px;font-weight:600;cursor:pointer}#button-input-container{display:none;flex-direction:column;gap:10px;width:100%}.action-btn{background:#f8fafc;border:1px solid var(--primary);color:var(--primary);padding:12px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;text-align:center}.action-btn:hover{background:var(--primary);color:white}.loading-dots:after{content:".";animation:dots 1.5s steps(5,end) infinite}@keyframes dots{0%,20%{content:"."}40%{content:".."}60%{content:"..."}100%{content:""}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Justine - Labour Law Assistant</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f1f5f9;
+            --chat-bg: #ffffff;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex; 
+            flex-direction: column; 
+            width: 100%; 
+            max-width: 800px;
+            margin: 0 auto; 
+            background: white; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            height: 100%; 
+        }
+
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .chat-header {
+            padding: 20px; 
+            border-bottom: 1px solid var(--border); 
+            background: white;
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            flex-shrink: 0; 
+        }
+        .header-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
+        .chat-header-info h1 { margin: 0; font-size: 1.1rem; color: #1e293b; }
+        .chat-header-info span { font-size: 0.8rem; color: #64748b; }
+        .badge { background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 8px;}
+
+        #chat-history {
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 20px; 
+            background: #fafafa;
+        }
+
+        .chat-row { 
+            display: flex; 
+            gap: 12px; 
+            width: 100%; 
+            align-items: flex-end; 
+            margin-bottom: 20px;
+        }
+        .chat-row:last-child {
+            margin-bottom: 0;
+        }
+        .chat-row.user-row { justify-content: flex-end; }
+        .chat-row.bot-row { justify-content: flex-start; }
+
+        .chat-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background-color: #e2e8f0; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 12px; line-height: 1.5; font-size: 0.95rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); white-space: pre-wrap; }
+        .bot-row .message { background-color: white; border: 1px solid var(--border); color: #1e293b; border-bottom-left-radius: 2px; }
+        .user-row .message { background-color: var(--primary); color: white; border-bottom-right-radius: 2px; }
+
+        .input-area { padding: 20px; border-top: 1px solid var(--border); background: white; flex-shrink: 0; }
+
+        #text-input-container { display: none; gap: 10px; width: 100%; }
+        #text-input-container input { flex: 1; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; outline: none; }
+        #text-input-container input:focus { border-color: var(--primary); }
+        #text-input-container button { background-color: var(--primary); color: white; border: none; padding: 0 24px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+        #button-input-container { display: none; flex-direction: column; gap: 10px; width: 100%; }
+        .action-btn { background: #f8fafc; border: 1px solid var(--primary); color: var(--primary); padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .action-btn:hover { background: var(--primary); color: white; }
+
+        .loading-dots:after { content: '.'; animation: dots 1.5s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 100% { content: ''; } }
+    </style>
 </head>
 <body>
-<div class="app-container"><div class="chat-panel"><div class="chat-header"><img src="justine-avatar.png" class="header-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"><div class="chat-header-info"><h1>Justine <span class="badge">BETA</span></h1><span>Labour Law Assistant</span></div></div><div id="chat-history"></div><div class="input-area"><form id="text-input-container"><input type="text" id="user-input" autocomplete="off" required><button type="submit">Send</button></form><div id="button-input-container"></div></div></div></div>
+
+<div class="app-container">
+    <div class="chat-panel">
+        <div class="chat-header">
+            <img src="justine-avatar.png" class="header-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'">
+            <div class="chat-header-info">
+                <h1>Justine <span class="badge">BETA</span></h1>
+                <span>Labour Law Assistant</span>
+            </div>
+        </div>
+
+        <div id="chat-history"></div>
+
+        <div class="input-area">
+            <form id="text-input-container">
+                <input type="text" id="user-input" autocomplete="off" required>
+                <button type="submit" id="send-btn">Send</button>
+            </form>
+            <div id="button-input-container"></div>
+        </div>
+    </div>
+</div>
+
 <script>
-const historyEl=document.getElementById('chat-history'),textContainer=document.getElementById('text-input-container'),buttonContainer=document.getElementById('button-input-container'),inputEl=document.getElementById('user-input');let collectedFacts={},activeCaseId=null;
-const opt=(label,next,val)=>({label,next,val});
-const scriptFlow={
-JUR_EMPLOYEE:{msg:'Are you an employee, as opposed to an independent contractor?',type:'buttons',options:[opt('Yes','JUR_SA_EMPLOYER','Employee'),opt('No','JUR_CONTRACTOR_CONTROL','Contractor'),opt('Unsure','JUR_CONTRACTOR_CONTROL','Unsure')],saveAs:'worker_status'},
-JUR_CONTRACTOR_CONTROL:{msg:'Does someone tell you when to start work, when to stop work, and how to do the work?',type:'buttons',options:[opt('Yes','JUR_SA_EMPLOYER','yes'),opt('No','DEFLECT_CONTRACTOR','no')],saveAs:'contractor_control_test'},
-JUR_SA_EMPLOYER:{msg:'Is your employer a South African registered entity, or operating in South Africa?',type:'buttons',options:[opt('Yes','JUR_PUBLIC_SERVICE','yes'),opt('No','DEFLECT_CROSS_BORDER','no'),opt('Unsure','JUR_PUBLIC_SERVICE','unsure')],saveAs:'south_african_employer'},
-JUR_PUBLIC_SERVICE:{msg:'Are you employed in the public service under the Public Service Act, or by a government agency such as DOL, DPW, DOH, SAPS, or by the SANDF?',type:'buttons',options:[opt('Yes','DEFLECT_PUBLIC_SERVICE','yes'),opt('No','START','no'),opt('Unsure','JUR_SOE','unsure')],saveAs:'public_service_or_excluded_agency'},
-JUR_SOE:{msg:'Are you a Schedule 2 SOE employee whose dispute remains CCMA-eligible?',type:'buttons',options:[opt('Yes','START','yes'),opt('No','START','no'),opt('Unclear','DEFLECT_SOE_UNCLEAR','unclear')],saveAs:'schedule_2_soe_ccma_eligible'},
-START:{msg:'Hi there. I am Justine, a Labour Law Assistant. Briefly tell me about the work issue you need help with so I can guide you. There is no right or wrong way to describe it. In your own words, what has happened?',type:'text',action:'classify'},
-START_FALLBACK:{msg:'I want to make sure I give you the exact right advice for your situation. Could you click the option below that best describes what happened?',type:'buttons',options:[opt('I was fired / dismissed','FIRED_DATE','Dismissed'),opt('I was forced to resign','RESIGN_DATE','Resigned'),opt('I am facing discrimination','DISC_STATUS','Discrimination'),opt('I am still employed and need advice','ADV_ISSUE','Advisory'),opt('I need help with UIF','UIF_DESC','UIF')],saveAs:'employment_status'},
-FIRED_DATE:{msg:'What was the exact date of your dismissal?',type:'date',next:'FIRED_REASON_TYPE',saveAs:'incident_date'},
-FIRED_REASON_TYPE:{msg:'What was the stated reason given for your dismissal?',type:'buttons',options:[opt('Misconduct','A2_MISCONDUCT_CATEGORY','Misconduct'),opt('Poor Performance','P2_PERFORMANCE_STANDARDS','Poor Performance'),opt('Incapacity (illness, injury or inability)','I2_INCAPACITY_NATURE','Incapacity'),opt('Retrenchment or Operational Requirements','RETRENCHMENT_HOLDING','Retrenchment'),opt('Other','A2_MISCONDUCT_CATEGORY','Other')],saveAs:'dismissal_reason_type'},
-A2_MISCONDUCT_CATEGORY:{msg:'What was the stated reason given for your dismissal?',type:'buttons',options:[opt('Theft','A3_CONDUCT_ADMISSION','theft'),opt('Assault','A3_CONDUCT_ADMISSION','assault'),opt('Dishonesty','A3_CONDUCT_ADMISSION','dishonesty'),opt('Insubordination','A3_CONDUCT_ADMISSION','insubordination'),opt('Absenteeism','A3_CONDUCT_ADMISSION','absenteeism'),opt('Other','A3_CONDUCT_ADMISSION','other')],saveAs:'misconduct_category'},
-A3_CONDUCT_ADMISSION:{msg:'Do you admit or dispute the conduct alleged?',type:'buttons',options:[opt('Admit','A4_HEARING_HELD','Admit'),opt('Dispute','A4_HEARING_HELD','Dispute'),opt('Partially admit','A4_HEARING_HELD','Partially admit')],saveAs:'conduct_admission'},
-A4_HEARING_HELD:{msg:'Did your employer hold a formal disciplinary hearing before dismissing you?',type:'buttons',options:[opt('Yes','A5_NOTICE',true),opt('No','A8_PRIOR_WARNINGS',false)],saveAs:'hearing_held'},
-A5_NOTICE:{msg:'Were you given written notice of the hearing and the charges at least 48 hours before it took place?',type:'buttons',options:[opt('Yes','A6_REPRESENTATIVE',true),opt('No','A6_REPRESENTATIVE',false),opt('Unsure','A6_REPRESENTATIVE','unsure')],saveAs:'proc_notice'},
-A6_REPRESENTATIVE:{msg:'Were you allowed to have a representative (colleague or trade union representative) present at the hearing?',type:'buttons',options:[opt('Yes','A7_CHAIRPERSON',true),opt('No','A7_CHAIRPERSON',false)],saveAs:'proc_rep'},
-A7_CHAIRPERSON:{msg:'Was the chairperson of the hearing independent of the dispute (not your direct manager and not the person who laid the charge)?',type:'buttons',options:[opt('Yes','A8_PRIOR_WARNINGS',true),opt('No','A8_PRIOR_WARNINGS',false),opt('Unsure','A8_PRIOR_WARNINGS','unsure')],saveAs:'proc_chair'},
-A8_PRIOR_WARNINGS:{msg:'Had you received any prior written warnings for the same or similar conduct before this dismissal?',type:'buttons',options:[opt('None','A9_EMPLOYMENT_LENGTH','None'),opt('One','A9_EMPLOYMENT_LENGTH','One'),opt('Multiple','A9_EMPLOYMENT_LENGTH','Multiple')],saveAs:'prior_warnings'},
-A9_EMPLOYMENT_LENGTH:{msg:'How long had you been employed at this company?',type:'buttons',options:[opt('<6 months','A10_SALARY','<6 months'),opt('6m-2y','A10_SALARY','6m-2y'),opt('2-5y','A10_SALARY','2-5y'),opt('5+y','A10_SALARY','5 years')],saveAs:'length_of_service'},
-A10_SALARY:{msg:'What was your gross monthly salary?',type:'text',next:'A11_MISCONDUCT_NARRATIVE',saveAs:'gross_monthly_salary'},
-A11_MISCONDUCT_NARRATIVE:{msg:'In your own words, describe what happened leading up to your dismissal.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description',minWords:50},
-P2_PERFORMANCE_STANDARDS:{msg:'Did your employer clearly communicate the performance standards expected of you?',type:'buttons',options:[opt('Yes','P3_PIP',true),opt('No','P3_PIP',false),opt('Unclear','P3_PIP','Unclear')],saveAs:'performance_standards_communicated'},
-P3_PIP:{msg:'Were you placed on a Performance Improvement Plan or given a formal opportunity to improve?',type:'buttons',options:[opt('Yes','P4_PIP_DURATION',true),opt('No','P5_TRAINING',false)],saveAs:'pip_given'},
-P4_PIP_DURATION:{msg:'How long was the improvement period?',type:'buttons',options:[opt('<2 weeks','P5_TRAINING','<2 weeks'),opt('2-4 weeks','P5_TRAINING','2-4 weeks'),opt('1-3 months','P5_TRAINING','1-3 months'),opt('3+ months','P5_TRAINING','3+ months')],saveAs:'pip_duration'},
-P5_TRAINING:{msg:'Did the employer provide training, instruction or guidance to help you improve?',type:'buttons',options:[opt('Yes','P6_COMPARATORS',true),opt('No','P6_COMPARATORS',false),opt('Inadequate','P6_COMPARATORS','Inadequate')],saveAs:'training_provided'},
-P6_COMPARATORS:{msg:'Were others on your team meeting the performance standards you were measured against?',type:'buttons',options:[opt('Yes','P7_CONTROL','Yes'),opt('No','P7_CONTROL','No'),opt('Unsure','P7_CONTROL','Unsure'),opt('Unable to compare','P7_CONTROL','Unable to compare')],saveAs:'team_meeting_standards'},
-P7_CONTROL:{msg:'Were the performance targets within your control, or did external factors (broken equipment, support team failures, market conditions) affect them?',type:'buttons',options:[opt('Within my control','P8_PERFORMANCE_WARNINGS','Within my control'),opt('External factors','P8_PERFORMANCE_WARNINGS','External factors'),opt('Both','P8_PERFORMANCE_WARNINGS','Both')],saveAs:'performance_control'},
-P8_PERFORMANCE_WARNINGS:{msg:'Had you received any prior performance warnings before this dismissal?',type:'buttons',options:[opt('None','P9_EMPLOYMENT_LENGTH','None'),opt('One','P9_EMPLOYMENT_LENGTH','One'),opt('Multiple','P9_EMPLOYMENT_LENGTH','Multiple')],saveAs:'prior_performance_warnings'},
-P9_EMPLOYMENT_LENGTH:{msg:'How long had you been employed?',type:'buttons',options:[opt('<6 months','P10_SALARY','<6 months'),opt('6m-2y','P10_SALARY','6m-2y'),opt('2-5y','P10_SALARY','2-5y'),opt('5+y','P10_SALARY','5 years')],saveAs:'length_of_service'},
-P10_SALARY:{msg:'What was your gross monthly salary?',type:'text',next:'P11_PERFORMANCE_NARRATIVE',saveAs:'gross_monthly_salary'},
-P11_PERFORMANCE_NARRATIVE:{msg:'In your own words, describe the performance issues raised and what happened.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description',minWords:50},
-I2_INCAPACITY_NATURE:{msg:'What was the nature of your incapacity?',type:'buttons',options:[opt('Illness','I3_INCAPACITY_DURATION','Illness'),opt('Injury','I3_INCAPACITY_DURATION','Injury'),opt('Disability','I3_INCAPACITY_DURATION','Disability'),opt('Mental health','I3_INCAPACITY_DURATION','Mental health')],saveAs:'incapacity_nature'},
-I3_INCAPACITY_DURATION:{msg:'Was your incapacity temporary or permanent at the time of dismissal?',type:'buttons',options:[opt('Temporary','I4_CONSULTATION','Temporary'),opt('Permanent','I4_CONSULTATION','Permanent'),opt('Uncertain','I4_CONSULTATION','Uncertain')],saveAs:'incapacity_duration'},
-I4_CONSULTATION:{msg:'Did your employer formally consult with you to investigate the extent of your illness or injury?',type:'buttons',options:[opt('Yes','I5_MEDICAL_REPORTS',true),opt('No','I5_MEDICAL_REPORTS',false),opt('Brief meeting only','I5_MEDICAL_REPORTS','Brief meeting only')],saveAs:'proc_consultation'},
-I5_MEDICAL_REPORTS:{msg:'Did the employer review medical reports or speak to your medical practitioner?',type:'buttons',options:[opt('Yes','I6_ALTERNATIVES',true),opt('No','I6_ALTERNATIVES',false),opt('I was not asked to provide medical evidence','I6_ALTERNATIVES','I was not asked to provide medical evidence')],saveAs:'medical_review'},
-I6_ALTERNATIVES:{msg:'Did the employer explore alternatives to dismissal, such as adapted duties, an alternative role, reduced hours or a longer recovery period?',type:'buttons',options:[opt('Yes','I7_STATE_CASE',true),opt('No','I7_STATE_CASE',false),opt('Unclear','I7_STATE_CASE','Unclear')],saveAs:'alternatives_explored'},
-I7_STATE_CASE:{msg:'Were you given the opportunity to state your case, with the assistance of a representative if you wished?',type:'buttons',options:[opt('Yes','I8_EMPLOYMENT_LENGTH',true),opt('No','I8_EMPLOYMENT_LENGTH',false)],saveAs:'opportunity_to_state_case'},
-I8_EMPLOYMENT_LENGTH:{msg:'How long had you been employed?',type:'buttons',options:[opt('<6 months','I9_SALARY','<6 months'),opt('6m-2y','I9_SALARY','6m-2y'),opt('2-5y','I9_SALARY','2-5y'),opt('5+y','I9_SALARY','5 years')],saveAs:'length_of_service'},
-I9_SALARY:{msg:'What was your gross monthly salary?',type:'text',next:'I10_INCAPACITY_NARRATIVE',saveAs:'gross_monthly_salary'},
-I10_INCAPACITY_NARRATIVE:{msg:'In your own words, describe the circumstances of your illness or injury and how the dismissal came about.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description'},
-RETRENCHMENT_HOLDING:{msg:'This appears to be a retrenchment or operational requirements matter. The full retrenchment question set is being prepared, so this case will be flagged for attorney review before any merit score or letter is finalised. In your own words, describe the retrenchment process and what happened.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description',forceAttorneyReview:true},
-RESIGN_DATE:{msg:'What was the date you officially resigned?',type:'date',next:'B2_INTOLERABLE_CONDUCT',saveAs:'incident_date'},
-B2_INTOLERABLE_CONDUCT:{msg:'What conduct made your working environment intolerable?',type:'buttons',options:[opt('Demotion','B3_DURATION','demotion'),opt('Salary reduction or non-payment','B3_DURATION','salary reduction or non-payment'),opt('Harassment or bullying','B3_DURATION','harassment or bullying'),opt('Discrimination','B3_DURATION','discrimination'),opt('Unsafe conditions','B3_DURATION','unsafe conditions'),opt('Victimisation after grievance','B3_DURATION','victimisation after grievance'),opt('Unilateral contract change','B3_DURATION','unilateral contract change'),opt('Other','B3_DURATION','other')],saveAs:'intolerable_conduct'},
-B3_DURATION:{msg:'How long were these conditions ongoing before you resigned?',type:'buttons',options:[opt('<1 month','B4_GRIEVANCE','<1 month'),opt('1-3 months','B4_GRIEVANCE','1-3 months'),opt('3-6 months','B4_GRIEVANCE','3-6 months'),opt('6+ months','B4_GRIEVANCE','6+ months')],saveAs:'intolerable_duration'},
-B4_GRIEVANCE:{msg:'Did you formally raise your grievance with your employer before resigning?',type:'buttons',options:[opt('Yes, in writing','B6_EMPLOYER_ACTION','Yes, in writing'),opt('Yes, verbally','B6_EMPLOYER_ACTION','Yes, verbally'),opt('No','B5_NO_GRIEVANCE_REASON','No')],saveAs:'grievance_raised'},
-B5_NO_GRIEVANCE_REASON:{msg:'If you did not raise a grievance, why not?',type:'buttons',options:[opt('Did not know I could','B6_EMPLOYER_ACTION','Did not know I could'),opt('Feared retaliation','B6_EMPLOYER_ACTION','Feared retaliation'),opt('Conduct was so severe (e.g., assault) that grievance was futile','B6_EMPLOYER_ACTION','Conduct was so severe that grievance was futile'),opt('Employer is the alleged perpetrator','B6_EMPLOYER_ACTION','Employer is the alleged perpetrator'),opt('Other','B6_EMPLOYER_ACTION','Other')],saveAs:'no_grievance_reason'},
-B6_EMPLOYER_ACTION:{msg:'Did the employer take any action to address your concerns?',type:'buttons',options:[opt('No action','B7_WAIT_PERIOD','No action'),opt('Partial','B7_WAIT_PERIOD','Partial'),opt('Full resolution','B7_WAIT_PERIOD','Full resolution')],saveAs:'employer_response'},
-B7_WAIT_PERIOD:{msg:'How long after raising the grievance did you wait before resigning?',type:'buttons',options:[opt('Did not raise','B8_COLLEAGUES','Did not raise'),opt('<2 weeks','B8_COLLEAGUES','<2 weeks'),opt('2-4 weeks','B8_COLLEAGUES','2-4 weeks'),opt('1-3 months','B8_COLLEAGUES','1-3 months'),opt('3+ months','B8_COLLEAGUES','3+ months')],saveAs:'wait_after_grievance'},
-B8_COLLEAGUES:{msg:'Did colleagues witness or experience similar treatment?',type:'buttons',options:[opt('Yes','B9_SALARY','Yes'),opt('No','B9_SALARY','No'),opt('Unsure','B9_SALARY','Unsure')],saveAs:'colleagues_witnessed'},
-B9_SALARY:{msg:'What was your gross monthly salary?',type:'text',next:'B10_CD_NARRATIVE',saveAs:'gross_monthly_salary'},
-B10_CD_NARRATIVE:{msg:'In your own words, describe what made your working conditions intolerable.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description',minWords:50},
-DISC_STATUS:{msg:'Are you still employed, or have you been dismissed or resigned?',type:'buttons',options:[opt('Still employed','C2_PROTECTED_GROUND','Still employed'),opt('Dismissed','C2_PROTECTED_GROUND','Dismissed'),opt('Resigned','RESIGN_DATE','Resigned')],saveAs:'disc_status'},
-C2_PROTECTED_GROUND:{msg:'Which protected ground do you believe is the basis of your treatment?',type:'buttons',options:['Race','Gender','Pregnancy','Sexual orientation','Disability','HIV status','Religion','Age','Political opinion','Union activity','Whistleblowing','Other'].map(x=>opt(x,'C3_COMPARATOR',x.toLowerCase())),saveAs:'protected_ground'},
-C3_COMPARATOR:{msg:'Can you identify another employee in a similar role who was treated differently?',type:'buttons',options:[opt('Yes','C4_REPORT','Yes'),opt('No','C4_REPORT','No'),opt('Unsure','C4_REPORT','Unsure')],saveAs:'protected_ground_comparator'},
-C4_REPORT:{msg:'Did you formally report the discrimination or unfair treatment?',type:'buttons',options:[opt('Yes, in writing','C5_WORSENED','Yes, in writing'),opt('Yes, verbally','C5_WORSENED','Yes, verbally'),opt('No','C5_WORSENED','No')],saveAs:'protected_ground_reported'},
-C5_WORSENED:{msg:"Did the employer's response worsen your situation after you reported it?",type:'buttons',options:[opt('Yes','C6_LENGTH','Yes'),opt('No','C6_LENGTH','No'),opt('No response','C6_LENGTH','No response')],saveAs:'employer_response_worsened'},
-C6_LENGTH:{msg:'How long have you worked for this employer?',type:'buttons',options:[opt('<6 months','C7_SALARY','<6 months'),opt('6m-2y','C7_SALARY','6m-2y'),opt('2-5y','C7_SALARY','2-5y'),opt('5+y','C7_SALARY','5 years')],saveAs:'length_of_service'},
-C7_SALARY:{msg:'What was (or is) your gross monthly salary?',type:'text',next:'C8_NARRATIVE',saveAs:'gross_monthly_salary'},
-C8_NARRATIVE:{msg:'Describe what happened, including specific incidents with dates and any named individuals.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description',minWords:75},
-ADV_ISSUE:{msg:'What do you need help with right now?',type:'buttons',options:[opt('Hearing Prep','ADV_DESC','Hearing Prep'),opt('Challenging a Warning','ADV_DESC','Warning'),opt('Lodging a Grievance','ADV_DESC','Grievance'),opt('Pay / Contract Issue','ADV_DESC','Pay Issue')],saveAs:'advisory_topic'},
-ADV_DESC:{msg:'Briefly explain the situation you are dealing with.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description'},
-UIF_DESC:{msg:'Briefly describe your UIF query and how you need help.',type:'text',next:'COMPANY_NAME',saveAs:'incident_description'},
-DEFLECT_CONTRACTOR:{msg:'Based on your answer, this may fall outside the ordinary employee protections of the LRA and BCEA. The correct next step is to get civil contract advice before a labour-law merits assessment is done.',type:'end',triageOutcome:'CONTRACTOR'},
-DEFLECT_CROSS_BORDER:{msg:'This may require international or cross-border advice before a South African labour-law merits assessment is done.',type:'end',triageOutcome:'CROSS_BORDER'},
-DEFLECT_PUBLIC_SERVICE:{msg:'This matter should be triaged to the correct public-sector forum, which may include the PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures. A blanket rejection should not be applied.',type:'end',triageOutcome:'PUBLIC_SERVICE'},
-DEFLECT_SOE_UNCLEAR:{msg:'This matter should be flagged for attorney review before proceeding, so that CCMA eligibility or the correct bargaining council or forum can be confirmed.',type:'end',triageOutcome:'SOE_UNCLEAR'},
-COMPANY_NAME:{msg:'What is the exact name of the company you work(ed) for?',type:'text',next:'COMPANY_CONTACT',saveAs:'employer_name'},
-COMPANY_CONTACT:{msg:"Please provide an email address or phone number for the company's HR department or your manager.",type:'text',next:'CLIENT_NAME',saveAs:'employer_contact_details'},
-CLIENT_NAME:{msg:'Almost done! What is your full name?',type:'text',next:'CLIENT_PHONE',saveAs:'client_name'},
-CLIENT_PHONE:{msg:'And finally, what is the best cell phone number to reach you on?',type:'text',next:'HANDOFF',saveAs:'contact_info'},
-HANDOFF:{action:'evaluate'}
-};
-let currentState='JUR_EMPLOYEE';
-function scrollToBottom(){setTimeout(()=>historyEl.scrollTop=historyEl.scrollHeight,50)}
-function escapeHtml(v){return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
-function appendMessage(text,sender){const row=document.createElement('div');row.className=`chat-row ${sender}-row`;row.innerHTML=sender==='bot'?`<img src="justine-avatar.png" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"><div class="message">${escapeHtml(text)}</div>`:`<div class="message">${escapeHtml(text)}</div>`;historyEl.appendChild(row);scrollToBottom()}
-function renderState(){let step=scriptFlow[currentState];if(!step){appendMessage('An error occurred in the intake flow. Please refresh and try again.','bot');console.error('Unknown state',currentState);return}while(step&&step.saveAs&&collectedFacts[step.saveAs]!==undefined&&!step.minWords&&!step.forceAttorneyReview){let nextState=step.next;if(step.type==='buttons'&&step.options){const m=step.options.find(o=>o.val===collectedFacts[step.saveAs]);if(m&&m.next)nextState=m.next}if(!nextState)break;currentState=nextState;step=scriptFlow[currentState]}textContainer.style.display='none';buttonContainer.style.display='none';if(step.action==='evaluate'){appendMessage('Thank you! Give me just a moment to review your details against South African Labour Law...','bot');triggerAIEvaluation();return}if(step.type==='end'){setTimeout(async()=>{if(step.triageOutcome)await triggerJurisdictionTriage(step.triageOutcome);appendMessage(step.msg,'bot')},500);return}setTimeout(()=>{appendMessage(step.msg,'bot');if(step.type==='buttons'){buttonContainer.innerHTML='';step.options.forEach(o=>{const b=document.createElement('button');b.className='action-btn';b.innerText=o.label;b.onclick=()=>handleUserInput(o.val,o.label,step.saveAs,o.next);buttonContainer.appendChild(b)});buttonContainer.style.display='flex'}else{inputEl.type=step.type==='date'?'date':'text';inputEl.value='';textContainer.style.display='flex';inputEl.focus()}scrollToBottom()},500)}
-textContainer.onsubmit=async e=>{e.preventDefault();const val=inputEl.value.trim();if(!val)return;const step=scriptFlow[currentState];if(step&&step.minWords&&val.split(/\s+/).filter(Boolean).length<step.minWords){appendMessage(val,'user');appendMessage(`Please add a little more detail. This answer needs at least ${step.minWords} words.`,'bot');inputEl.value=val;textContainer.style.display='flex';inputEl.focus();return}if(step.action==='classify'){textContainer.style.display='none';appendMessage(val,'user');collectedFacts.initial_query=val;showLoading();try{const res=await fetch('/.netlify/functions/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'classify',text:val})});const data=await res.json();hideLoading();if(data.error){appendMessage('Backend Error: '+data.error,'bot');currentState='START_FALLBACK';renderState();return}let c=(data.category||'ambiguous').toLowerCase(),final='Ambiguous';if(c.includes('dismiss')||c.includes('fire')||c.includes('retrench'))final='Dismissed';else if(c.includes('resign')||c.includes('quit')||c.includes('constructive'))final='Resigned';else if(c.includes('discriminat')||c.includes('harass')||c.includes('racism'))final='Discrimination';else if(c.includes('advis')||c.includes('warn')||c.includes('grievance'))final='Advisory';else if(c.includes('uif'))final='UIF';if(final==='Ambiguous')currentState='START_FALLBACK';else{collectedFacts.employment_status=final;if(data.dismissal_reason_type)collectedFacts.dismissal_reason_type=data.dismissal_reason_type;if(data.advisory_topic)collectedFacts.advisory_topic=data.advisory_topic;currentState={Dismissed:'FIRED_DATE',Resigned:'RESIGN_DATE',Discrimination:'DISC_STATUS',Advisory:'ADV_ISSUE',UIF:'UIF_DESC'}[final]||'START_FALLBACK'}renderState()}catch(err){hideLoading();console.error(err);currentState='START_FALLBACK';renderState()}return}handleUserInput(val,val,step.saveAs,step.next)};
-function handleUserInput(actualValue,displayValue,saveKey,nextStateKey){textContainer.style.display='none';buttonContainer.style.display='none';appendMessage(displayValue,'user');if(saveKey)collectedFacts[saveKey]=actualValue;if(saveKey==='worker_status')collectedFacts.contract_type=actualValue==='Contractor'?'Contractor':actualValue;if(saveKey==='length_of_service')collectedFacts.tenure=actualValue;if(saveKey==='gross_monthly_salary')collectedFacts.salary=actualValue;if(saveKey==='incapacity_duration')collectedFacts.incapacity_status=actualValue;if(saveKey==='medical_review')collectedFacts.proc_medical_review=actualValue;if(saveKey==='alternatives_explored')collectedFacts.proc_alternatives_explored=actualValue;if(saveKey==='opportunity_to_state_case')collectedFacts.proc_opportunity_to_state_case=actualValue;if(saveKey==='pip_duration')collectedFacts.performance_improvement_period=actualValue;if(saveKey==='team_meeting_standards')collectedFacts.performance_comparator=actualValue;if(saveKey==='performance_control')collectedFacts.performance_external_factors=actualValue;if(saveKey==='prior_performance_warnings')collectedFacts.performance_warnings=actualValue;if(saveKey==='intolerable_conduct')collectedFacts.constructive_dismissal=true;if(saveKey==='grievance_raised')collectedFacts.constructive_grievance_raised=actualValue;if(saveKey==='protected_ground')collectedFacts.protected_ground=actualValue;if(saveKey==='disc_status')collectedFacts.protected_ground_status=actualValue;if(scriptFlow[currentState]&&scriptFlow[currentState].forceAttorneyReview){collectedFacts.attorney_review_flag=true;collectedFacts.scoring_hold='RETRENCHMENT_PENDING_R_NODES';collectedFacts.wp_eligible=false}currentState=nextStateKey;renderState()}
-async function triggerJurisdictionTriage(outcome){showLoading();try{const res=await fetch('/.netlify/functions/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'triage',outcome,facts:collectedFacts})});const data=await res.json();hideLoading();if(data.error){console.error(data.error);appendMessage('I could not save the triage record, but I can still give you the correct next step.','bot');return}if(data.caseId)activeCaseId=data.caseId}catch(err){hideLoading();console.error(err);appendMessage('I could not save the triage record, but I can still give you the correct next step.','bot')}}
-async function triggerAIEvaluation(){showLoading();try{const res=await fetch('/.netlify/functions/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'evaluate',facts:collectedFacts})});const data=await res.json();hideLoading();if(data.error){appendMessage('An error occurred: '+data.error,'bot');return}activeCaseId=data.caseId;appendMessage(data.pitch,'bot');buttonContainer.innerHTML='';if(data.hasMerit){const y=document.createElement('button'),n=document.createElement('button');y.className=n.className='action-btn';y.innerText='Yes, please draft the letter.';n.innerText='No thank you.';y.onclick=()=>closeCase(true,false);n.onclick=()=>closeCase(false,false);buttonContainer.appendChild(y);buttonContainer.appendChild(n)}else{const ok=document.createElement('button');ok.className='action-btn';ok.innerText='Okay, thank you.';ok.onclick=()=>closeCase(false,true);buttonContainer.appendChild(ok)}buttonContainer.style.display='flex';scrollToBottom()}catch(err){hideLoading();appendMessage('Sorry, I had trouble connecting to the legal database. Please refresh and try again.','bot');console.error(err)}}
-async function closeCase(wantsLetter,isLowMerit){buttonContainer.style.display='none';appendMessage(isLowMerit?'Okay, thank you.':wantsLetter?'Yes, please draft the letter.':'No thank you.','user');showLoading();try{const res=await fetch('/.netlify/functions/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'close',caseId:activeCaseId,wants_letter:wantsLetter})});const data=await res.json();hideLoading();appendMessage(data.error?'An error occurred: '+data.error:data.closing_message,'bot')}catch(err){hideLoading();appendMessage('An error occurred trying to close the case.','bot');console.error(err)}}
-function showLoading(){const row=document.createElement('div');row.id='loading-row';row.className='chat-row bot-row';row.innerHTML=`<img src="justine-avatar.png" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"><div class="message">Thinking<span class="loading-dots"></span></div>`;historyEl.appendChild(row);scrollToBottom()}
-function hideLoading(){const el=document.getElementById('loading-row');if(el)el.remove()}
-renderState();
+    const historyEl = document.getElementById('chat-history');
+    const textContainer = document.getElementById('text-input-container');
+    const buttonContainer = document.getElementById('button-input-container');
+    const inputEl = document.getElementById('user-input');
+
+    let collectedFacts = {};
+    let activeCaseId = null;
+
+    // --- JUSTINE INTAKE SCRIPT ---
+    // User-facing wording is aligned to the VRS Master Guide where the guide provides exact text.
+    const scriptFlow = {
+        // ==========================================
+        // PHASE 1: JURISDICTIONAL GATE
+        // ==========================================
+        JUR_EMPLOYEE: {
+            msg: "Are you an employee, as opposed to an independent contractor?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "JUR_SA_EMPLOYER", val: "Employee" },
+                { label: "No", next: "JUR_CONTRACTOR_CONTROL", val: "Contractor" },
+                { label: "Unsure", next: "JUR_CONTRACTOR_CONTROL", val: "Unsure" }
+            ],
+            saveAs: "worker_status"
+        },
+
+        JUR_CONTRACTOR_CONTROL: {
+            msg: "Does someone tell you when to start work, when to stop work, and how to do the work?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "JUR_SA_EMPLOYER", val: "yes" },
+                { label: "No", next: "DEFLECT_CONTRACTOR", val: "no" }
+            ],
+            saveAs: "contractor_control_test"
+        },
+
+        JUR_SA_EMPLOYER: {
+            msg: "Is your employer a South African registered entity, or operating in South Africa?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "JUR_PUBLIC_SERVICE", val: "yes" },
+                { label: "No", next: "DEFLECT_CROSS_BORDER", val: "no" },
+                { label: "Unsure", next: "JUR_PUBLIC_SERVICE", val: "unsure" }
+            ],
+            saveAs: "south_african_employer"
+        },
+
+        JUR_PUBLIC_SERVICE: {
+            msg: "Are you employed in the public service under the Public Service Act, or by a government agency such as DOL, DPW, DOH, SAPS, or by the SANDF?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "DEFLECT_PUBLIC_SERVICE", val: "yes" },
+                { label: "No", next: "START", val: "no" },
+                { label: "Unsure", next: "JUR_SOE", val: "unsure" }
+            ],
+            saveAs: "public_service_or_excluded_agency"
+        },
+
+        JUR_SOE: {
+            msg: "Are you a Schedule 2 SOE employee whose dispute remains CCMA-eligible?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "START", val: "yes" },
+                { label: "No", next: "START", val: "no" },
+                { label: "Unclear", next: "DEFLECT_SOE_UNCLEAR", val: "unclear" }
+            ],
+            saveAs: "schedule_2_soe_ccma_eligible"
+        },
+
+        // ==========================================
+        // PHASE 2: CASE CLASSIFICATION AND ROUTING
+        // ==========================================
+        START: {
+            msg: "Hi there. I am Justine, a Labour Law Assistant. Briefly tell me about the work issue you need help with so I can guide you. There is no right or wrong way to describe it. In your own words, what has happened?",
+            type: "text",
+            action: "classify"
+        },
+
+        START_FALLBACK: {
+            msg: "I want to make sure I give you the exact right advice for your situation. Could you click the option below that best describes what happened?",
+            type: "buttons",
+            options: [
+                { label: "I was fired / dismissed", next: "FIRED_DATE", val: "Dismissed" },
+                { label: "I was forced to resign", next: "RESIGN_DATE", val: "Resigned" },
+                { label: "I am facing discrimination", next: "DISC_STATUS", val: "Discrimination" },
+                { label: "I am still employed and need advice", next: "ADV_ISSUE", val: "Advisory" },
+                { label: "I need help with UIF", next: "UIF_DESC", val: "UIF" }
+            ],
+            saveAs: "employment_status"
+        },
+
+        // ==========================================
+        // PATH A: UNFAIR DISMISSAL HUB
+        // ==========================================
+        FIRED_DATE: {
+            msg: "What was the exact date of your dismissal?",
+            type: "date",
+            next: "FIRED_REASON_TYPE",
+            saveAs: "incident_date"
+        },
+
+        FIRED_REASON_TYPE: { 
+            msg: "What was the stated reason given for your dismissal?", 
+            type: "buttons", 
+            options: [
+                { label: "Misconduct", next: "A2_MISCONDUCT_CATEGORY", val: "Misconduct" },
+                { label: "Poor Performance", next: "P2_PERFORMANCE_STANDARDS", val: "Poor Performance" },
+                { label: "Incapacity (illness, injury or inability)", next: "I2_INCAPACITY_NATURE", val: "Incapacity" },
+                { label: "Retrenchment or Operational Requirements", next: "R2_HEADCOUNT", val: "Retrenchment" },
+                { label: "Other", next: "A2_MISCONDUCT_CATEGORY", val: "Other" }
+            ], 
+            saveAs: "dismissal_reason_type" 
+        },
+
+        // ==========================================
+        // TRACK A.1: UNFAIR DISMISSAL — MISCONDUCT
+        // Section 6.1 of the Master Guide.
+        // ==========================================
+        A2_MISCONDUCT_CATEGORY: {
+            msg: "What was the stated reason given for your dismissal?",
+            type: "buttons",
+            options: [
+                { label: "Theft", next: "A3_CONDUCT_ADMISSION", val: "theft" },
+                { label: "Assault", next: "A3_CONDUCT_ADMISSION", val: "assault" },
+                { label: "Dishonesty", next: "A3_CONDUCT_ADMISSION", val: "dishonesty" },
+                { label: "Insubordination", next: "A3_CONDUCT_ADMISSION", val: "insubordination" },
+                { label: "Absenteeism", next: "A3_CONDUCT_ADMISSION", val: "absenteeism" },
+                { label: "Other", next: "A3_CONDUCT_ADMISSION", val: "other" }
+            ],
+            saveAs: "misconduct_category"
+        },
+
+        A3_CONDUCT_ADMISSION: {
+            msg: "Do you admit or dispute the conduct alleged?",
+            type: "buttons",
+            options: [
+                { label: "Admit", next: "A4_HEARING_HELD", val: "Admit" },
+                { label: "Dispute", next: "A4_HEARING_HELD", val: "Dispute" },
+                { label: "Partially admit", next: "A4_HEARING_HELD", val: "Partially admit" }
+            ],
+            saveAs: "conduct_admission"
+        },
+
+        A4_HEARING_HELD: {
+            msg: "Did your employer hold a formal disciplinary hearing before dismissing you?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "A5_NOTICE", val: true },
+                { label: "No", next: "A8_PRIOR_WARNINGS", val: false }
+            ],
+            saveAs: "hearing_held"
+        },
+
+        A5_NOTICE: {
+            msg: "Were you given written notice of the hearing and the charges at least 48 hours before it took place?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "A6_REPRESENTATIVE", val: true },
+                { label: "No", next: "A6_REPRESENTATIVE", val: false },
+                { label: "Unsure", next: "A6_REPRESENTATIVE", val: "unsure" }
+            ],
+            saveAs: "proc_notice"
+        },
+
+        A6_REPRESENTATIVE: {
+            msg: "Were you allowed to have a representative (colleague or trade union representative) present at the hearing?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "A7_CHAIRPERSON", val: true },
+                { label: "No", next: "A7_CHAIRPERSON", val: false }
+            ],
+            saveAs: "proc_rep"
+        },
+
+        A7_CHAIRPERSON: {
+            msg: "Was the chairperson of the hearing independent of the dispute (not your direct manager and not the person who laid the charge)?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "A8_PRIOR_WARNINGS", val: true },
+                { label: "No", next: "A8_PRIOR_WARNINGS", val: false },
+                { label: "Unsure", next: "A8_PRIOR_WARNINGS", val: "unsure" }
+            ],
+            saveAs: "proc_chair"
+        },
+
+        A8_PRIOR_WARNINGS: {
+            msg: "Had you received any prior written warnings for the same or similar conduct before this dismissal?",
+            type: "buttons",
+            options: [
+                { label: "None", next: "A9_EMPLOYMENT_LENGTH", val: "None" },
+                { label: "One", next: "A9_EMPLOYMENT_LENGTH", val: "One" },
+                { label: "Multiple", next: "A9_EMPLOYMENT_LENGTH", val: "Multiple" }
+            ],
+            saveAs: "prior_warnings"
+        },
+
+        A9_EMPLOYMENT_LENGTH: {
+            msg: "How long had you been employed at this company?",
+            type: "buttons",
+            options: [
+                { label: "<6 months", next: "A10_SALARY", val: "<6 months" },
+                { label: "6m-2y", next: "A10_SALARY", val: "6m-2y" },
+                { label: "2-5y", next: "A10_SALARY", val: "2-5y" },
+                { label: "5+y", next: "A10_SALARY", val: "5 years" }
+            ],
+            saveAs: "length_of_service"
+        },
+
+        A10_SALARY: {
+            msg: "What was your gross monthly salary?",
+            type: "text",
+            next: "A11_MISCONDUCT_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        A11_MISCONDUCT_NARRATIVE: {
+            msg: "In your own words, describe what happened leading up to your dismissal.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description",
+            minWords: 50
+        },
+
+        // ==========================================
+        // TRACK A.2: UNFAIR DISMISSAL — POOR PERFORMANCE
+        // Section 6.2 of the Master Guide.
+        // ==========================================
+        P2_PERFORMANCE_STANDARDS: {
+            msg: "Did your employer clearly communicate the performance standards expected of you?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "P3_PIP", val: true },
+                { label: "No", next: "P3_PIP", val: false },
+                { label: "Unclear", next: "P3_PIP", val: "Unclear" }
+            ],
+            saveAs: "performance_standards_communicated"
+        },
+
+        P3_PIP: {
+            msg: "Were you placed on a Performance Improvement Plan or given a formal opportunity to improve?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "P4_PIP_DURATION", val: true },
+                { label: "No", next: "P5_TRAINING", val: false }
+            ],
+            saveAs: "pip_given"
+        },
+
+        P4_PIP_DURATION: {
+            msg: "How long was the improvement period?",
+            type: "buttons",
+            options: [
+                { label: "<2 weeks", next: "P5_TRAINING", val: "<2 weeks" },
+                { label: "2-4 weeks", next: "P5_TRAINING", val: "2-4 weeks" },
+                { label: "1-3 months", next: "P5_TRAINING", val: "1-3 months" },
+                { label: "3+ months", next: "P5_TRAINING", val: "3+ months" }
+            ],
+            saveAs: "pip_duration"
+        },
+
+        P5_TRAINING: {
+            msg: "Did the employer provide training, instruction or guidance to help you improve?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "P6_COMPARATORS", val: true },
+                { label: "No", next: "P6_COMPARATORS", val: false },
+                { label: "Inadequate", next: "P6_COMPARATORS", val: "Inadequate" }
+            ],
+            saveAs: "training_provided"
+        },
+
+        P6_COMPARATORS: {
+            msg: "Were others on your team meeting the performance standards you were measured against?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "P7_CONTROL", val: "Yes" },
+                { label: "No", next: "P7_CONTROL", val: "No" },
+                { label: "Unsure", next: "P7_CONTROL", val: "Unsure" },
+                { label: "Unable to compare", next: "P7_CONTROL", val: "Unable to compare" }
+            ],
+            saveAs: "team_meeting_standards"
+        },
+
+        P7_CONTROL: {
+            msg: "Were the performance targets within your control, or did external factors (broken equipment, support team failures, market conditions) affect them?",
+            type: "buttons",
+            options: [
+                { label: "Within my control", next: "P8_PERFORMANCE_WARNINGS", val: "Within my control" },
+                { label: "External factors", next: "P8_PERFORMANCE_WARNINGS", val: "External factors" },
+                { label: "Both", next: "P8_PERFORMANCE_WARNINGS", val: "Both" }
+            ],
+            saveAs: "performance_control"
+        },
+
+        P8_PERFORMANCE_WARNINGS: {
+            msg: "Had you received any prior performance warnings before this dismissal?",
+            type: "buttons",
+            options: [
+                { label: "None", next: "P9_EMPLOYMENT_LENGTH", val: "None" },
+                { label: "One", next: "P9_EMPLOYMENT_LENGTH", val: "One" },
+                { label: "Multiple", next: "P9_EMPLOYMENT_LENGTH", val: "Multiple" }
+            ],
+            saveAs: "prior_performance_warnings"
+        },
+
+        P9_EMPLOYMENT_LENGTH: {
+            msg: "How long had you been employed?",
+            type: "buttons",
+            options: [
+                { label: "<6 months", next: "P10_SALARY", val: "<6 months" },
+                { label: "6m-2y", next: "P10_SALARY", val: "6m-2y" },
+                { label: "2-5y", next: "P10_SALARY", val: "2-5y" },
+                { label: "5+y", next: "P10_SALARY", val: "5 years" }
+            ],
+            saveAs: "length_of_service"
+        },
+
+        P10_SALARY: {
+            msg: "What was your gross monthly salary?",
+            type: "text",
+            next: "P11_PERFORMANCE_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        P11_PERFORMANCE_NARRATIVE: {
+            msg: "In your own words, describe the performance issues raised and what happened.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description",
+            minWords: 50
+        },
+
+        // ==========================================
+        // TRACK A.3: UNFAIR DISMISSAL — INCAPACITY
+        // Section 6.3 of the Master Guide.
+        // Critical build note: this path must not use misconduct language.
+        // ==========================================
+        I2_INCAPACITY_NATURE: {
+            msg: "What was the nature of your incapacity?",
+            type: "buttons",
+            options: [
+                { label: "Illness", next: "I3_INCAPACITY_DURATION", val: "Illness" },
+                { label: "Injury", next: "I3_INCAPACITY_DURATION", val: "Injury" },
+                { label: "Disability", next: "I3_INCAPACITY_DURATION", val: "Disability" },
+                { label: "Mental health", next: "I3_INCAPACITY_DURATION", val: "Mental health" }
+            ],
+            saveAs: "incapacity_nature"
+        },
+
+        I3_INCAPACITY_DURATION: {
+            msg: "Was your incapacity temporary or permanent at the time of dismissal?",
+            type: "buttons",
+            options: [
+                { label: "Temporary", next: "I4_CONSULTATION", val: "Temporary" },
+                { label: "Permanent", next: "I4_CONSULTATION", val: "Permanent" },
+                { label: "Uncertain", next: "I4_CONSULTATION", val: "Uncertain" }
+            ],
+            saveAs: "incapacity_duration"
+        },
+
+        I4_CONSULTATION: {
+            msg: "Did your employer formally consult with you to investigate the extent of your illness or injury?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I5_MEDICAL_REPORTS", val: true },
+                { label: "No", next: "I5_MEDICAL_REPORTS", val: false },
+                { label: "Brief meeting only", next: "I5_MEDICAL_REPORTS", val: "Brief meeting only" }
+            ],
+            saveAs: "proc_consultation"
+        },
+
+        I5_MEDICAL_REPORTS: {
+            msg: "Did the employer review medical reports or speak to your medical practitioner?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I6_ALTERNATIVES", val: true },
+                { label: "No", next: "I6_ALTERNATIVES", val: false },
+                { label: "I was not asked to provide medical evidence", next: "I6_ALTERNATIVES", val: "I was not asked to provide medical evidence" }
+            ],
+            saveAs: "medical_review"
+        },
+
+        I6_ALTERNATIVES: {
+            msg: "Did the employer explore alternatives to dismissal, such as adapted duties, an alternative role, reduced hours or a longer recovery period?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I7_STATE_CASE", val: true },
+                { label: "No", next: "I7_STATE_CASE", val: false },
+                { label: "Unclear", next: "I7_STATE_CASE", val: "Unclear" }
+            ],
+            saveAs: "alternatives_explored"
+        },
+
+        I7_STATE_CASE: {
+            msg: "Were you given the opportunity to state your case, with the assistance of a representative if you wished?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "I8_EMPLOYMENT_LENGTH", val: true },
+                { label: "No", next: "I8_EMPLOYMENT_LENGTH", val: false }
+            ],
+            saveAs: "opportunity_to_state_case"
+        },
+
+        I8_EMPLOYMENT_LENGTH: {
+            msg: "How long had you been employed?",
+            type: "buttons",
+            options: [
+                { label: "<6 months", next: "I9_SALARY", val: "<6 months" },
+                { label: "6m-2y", next: "I9_SALARY", val: "6m-2y" },
+                { label: "2-5y", next: "I9_SALARY", val: "2-5y" },
+                { label: "5+y", next: "I9_SALARY", val: "5 years" }
+            ],
+            saveAs: "length_of_service"
+        },
+
+        I9_SALARY: {
+            msg: "What was your gross monthly salary?",
+            type: "text",
+            next: "I10_INCAPACITY_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        I10_INCAPACITY_NARRATIVE: {
+            msg: "In your own words, describe the circumstances of your illness or injury and how the dismissal came about.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description"
+        },
+
+
+        // ==========================================
+        // TRACK A.4: UNFAIR DISMISSAL — RETRENCHMENT
+        // Section 6.4 of the Master Guide.
+        // R1 is captured by FIRED_DATE as incident_date.
+        // ==========================================
+        R2_HEADCOUNT: {
+            msg: "How many other employees were retrenched at the same time?",
+            type: "buttons",
+            options: [
+                { label: "Just me", next: "R3_S189_NOTICE", val: "Just me" },
+                { label: "2-9", next: "R3_S189_NOTICE", val: "2-9" },
+                { label: "10+", next: "R3_S189_NOTICE", val: "10+" },
+                { label: "Unsure", next: "R3_S189_NOTICE", val: "Unsure" }
+            ],
+            saveAs: "retrenchment_headcount"
+        },
+
+        R3_S189_NOTICE: {
+            msg: "Did the employer issue a written s189(3) notice setting out the reasons, the criteria, the proposed alternatives and the severance?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "R4_CONSULTATION", val: true },
+                { label: "No", next: "R4_CONSULTATION", val: false },
+                { label: "Unsure", next: "R4_CONSULTATION", val: "Unsure" }
+            ],
+            saveAs: "s189_notice"
+        },
+
+        R4_CONSULTATION: {
+            msg: "Did the employer engage in a meaningful consultation process before making the final decision?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "R5_SELECTION_CRITERIA", val: "Yes" },
+                { label: "Brief", next: "R5_SELECTION_CRITERIA", val: "Brief" },
+                { label: "No consultation", next: "R5_SELECTION_CRITERIA", val: "No consultation" }
+            ],
+            saveAs: "retrenchment_consultation"
+        },
+
+        R5_SELECTION_CRITERIA: {
+            msg: "Were the selection criteria objective and disclosed in writing?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "R6_ALTERNATIVES", val: true },
+                { label: "No", next: "R6_ALTERNATIVES", val: false },
+                { label: "Unclear", next: "R6_ALTERNATIVES", val: "Unclear" }
+            ],
+            saveAs: "selection_criteria_objective"
+        },
+
+        R6_ALTERNATIVES: {
+            msg: "Did the employer offer alternatives such as redeployment or short time before retrenching?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "R7_SEVERANCE", val: true },
+                { label: "No", next: "R7_SEVERANCE", val: false }
+            ],
+            saveAs: "retrenchment_alternatives"
+        },
+
+        R7_SEVERANCE: {
+            msg: "Were you offered severance pay calculated at one week per completed year of service?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "R8_OPERATIONAL_REASON", val: "Yes" },
+                { label: "Less", next: "R8_OPERATIONAL_REASON", val: "Less" },
+                { label: "No", next: "R8_OPERATIONAL_REASON", val: "No" }
+            ],
+            saveAs: "severance_pay"
+        },
+
+        R8_OPERATIONAL_REASON: {
+            msg: "Was the genuine operational reason given for the retrenchment plausible based on the company's circumstances?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "R9_ROLE_REFILLED", val: "Yes" },
+                { label: "I doubt it", next: "R9_ROLE_REFILLED", val: "I doubt it" },
+                { label: "I have no way to know", next: "R9_ROLE_REFILLED", val: "I have no way to know" }
+            ],
+            saveAs: "operational_reason_plausible"
+        },
+
+        R9_ROLE_REFILLED: {
+            msg: "Have you been re-employed in your role or a similar role by the same employer or a related company since?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "R10_SALARY_DURATION", val: "Yes" },
+                { label: "No", next: "R10_SALARY_DURATION", val: "No" },
+                { label: "I do not know", next: "R10_SALARY_DURATION", val: "I do not know" }
+            ],
+            saveAs: "role_refilled"
+        },
+
+        R10_SALARY_DURATION: {
+            msg: "What was your gross monthly salary, and how long were you employed?",
+            type: "text",
+            next: "R11_RETRENCHMENT_NARRATIVE",
+            saveAs: "gross_monthly_salary_and_duration"
+        },
+
+        R11_RETRENCHMENT_NARRATIVE: {
+            msg: "In your own words, describe the retrenchment process.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description",
+            minWords: 50
+        },
+
+        // ==========================================
+        // TEMPORARY EXISTING FLOWS FOR OTHER TRACKS
+        // These remain in place until each track is replaced with the exact Master Guide question set.
+        // ==========================================
+        PROC_NOTICE: {
+            msg: "Did you receive at least 48 hours' written notice before your disciplinary hearing?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "PROC_REP", val: true },
+                { label: "No", next: "PROC_REP", val: false },
+                { label: "No hearing was held at all", next: "FIRED_DESC", val: "none" }
+            ],
+            saveAs: "proc_notice"
+        },
+        PROC_REP: {
+            msg: "Were you allowed to have a representative (a union member or colleague) present?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "PROC_CHAIR", val: true },
+                { label: "No", next: "PROC_CHAIR", val: false }
+            ],
+            saveAs: "proc_rep"
+        },
+        PROC_CHAIR: {
+            msg: "Was the chairperson of the hearing an independent, unbiased person?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "FIRED_DESC", val: true },
+                { label: "No", next: "FIRED_DESC", val: false }
+            ],
+            saveAs: "proc_chair"
+        },
+
+        INC_CONSULT: {
+            msg: "Did the employer properly consult with you and genuinely look for alternatives before dismissing you?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "FIRED_DESC", val: true },
+                { label: "No", next: "FIRED_DESC", val: false }
+            ],
+            saveAs: "proc_consultation"
+        },
+
+        FIRED_DESC: {
+            msg: "In a few short sentences, describe exactly what happened.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description"
+        },
+
+        // ==========================================
+        // TRACK B: CONSTRUCTIVE DISMISSAL
+        // Section 6.5 of the Master Guide.
+        // ==========================================
+        RESIGN_DATE: {
+            msg: "What was the date you officially resigned?",
+            type: "date",
+            next: "B2_INTOLERABLE_CONDUCT",
+            saveAs: "incident_date"
+        },
+
+        B2_INTOLERABLE_CONDUCT: {
+            msg: "What conduct made your working environment intolerable?",
+            type: "buttons",
+            options: [
+                { label: "Demotion", next: "B3_DURATION", val: "demotion" },
+                { label: "Salary reduction or non-payment", next: "B3_DURATION", val: "salary reduction or non-payment" },
+                { label: "Harassment or bullying", next: "B3_DURATION", val: "harassment or bullying" },
+                { label: "Discrimination", next: "B3_DURATION", val: "discrimination" },
+                { label: "Unsafe conditions", next: "B3_DURATION", val: "unsafe conditions" },
+                { label: "Victimisation after grievance", next: "B3_DURATION", val: "victimisation after grievance" },
+                { label: "Unilateral contract change", next: "B3_DURATION", val: "unilateral contract change" },
+                { label: "Other", next: "B3_DURATION", val: "other" }
+            ],
+            saveAs: "intolerable_conduct"
+        },
+
+        B3_DURATION: {
+            msg: "How long were these conditions ongoing before you resigned?",
+            type: "buttons",
+            options: [
+                { label: "<1 month", next: "B4_GRIEVANCE", val: "<1 month" },
+                { label: "1-3 months", next: "B4_GRIEVANCE", val: "1-3 months" },
+                { label: "3-6 months", next: "B4_GRIEVANCE", val: "3-6 months" },
+                { label: "6+ months", next: "B4_GRIEVANCE", val: "6+ months" }
+            ],
+            saveAs: "intolerable_duration"
+        },
+
+        B4_GRIEVANCE: {
+            msg: "Did you formally raise your grievance with your employer before resigning?",
+            type: "buttons",
+            options: [
+                { label: "Yes, in writing", next: "B6_EMPLOYER_ACTION", val: "Yes, in writing" },
+                { label: "Yes, verbally", next: "B6_EMPLOYER_ACTION", val: "Yes, verbally" },
+                { label: "No", next: "B5_NO_GRIEVANCE_REASON", val: "No" }
+            ],
+            saveAs: "grievance_raised"
+        },
+
+        B5_NO_GRIEVANCE_REASON: {
+            msg: "If you did not raise a grievance, why not?",
+            type: "buttons",
+            options: [
+                { label: "Did not know I could", next: "B6_EMPLOYER_ACTION", val: "Did not know I could" },
+                { label: "Feared retaliation", next: "B6_EMPLOYER_ACTION", val: "Feared retaliation" },
+                { label: "Conduct was so severe (e.g., assault) that grievance was futile", next: "B6_EMPLOYER_ACTION", val: "Conduct was so severe that grievance was futile" },
+                { label: "Employer is the alleged perpetrator", next: "B6_EMPLOYER_ACTION", val: "Employer is the alleged perpetrator" },
+                { label: "Other", next: "B6_EMPLOYER_ACTION", val: "Other" }
+            ],
+            saveAs: "no_grievance_reason"
+        },
+
+        B6_EMPLOYER_ACTION: {
+            msg: "Did the employer take any action to address your concerns?",
+            type: "buttons",
+            options: [
+                { label: "No action", next: "B7_WAIT_PERIOD", val: "No action" },
+                { label: "Partial", next: "B7_WAIT_PERIOD", val: "Partial" },
+                { label: "Full resolution", next: "B7_WAIT_PERIOD", val: "Full resolution" }
+            ],
+            saveAs: "employer_response"
+        },
+
+        B7_WAIT_PERIOD: {
+            msg: "How long after raising the grievance did you wait before resigning?",
+            type: "buttons",
+            options: [
+                { label: "Did not raise", next: "B8_COLLEAGUES", val: "Did not raise" },
+                { label: "<2 weeks", next: "B8_COLLEAGUES", val: "<2 weeks" },
+                { label: "2-4 weeks", next: "B8_COLLEAGUES", val: "2-4 weeks" },
+                { label: "1-3 months", next: "B8_COLLEAGUES", val: "1-3 months" },
+                { label: "3+ months", next: "B8_COLLEAGUES", val: "3+ months" }
+            ],
+            saveAs: "wait_after_grievance"
+        },
+
+        B8_COLLEAGUES: {
+            msg: "Did colleagues witness or experience similar treatment?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "B9_SALARY", val: "Yes" },
+                { label: "No", next: "B9_SALARY", val: "No" },
+                { label: "Unsure", next: "B9_SALARY", val: "Unsure" }
+            ],
+            saveAs: "colleagues_witnessed"
+        },
+
+        B9_SALARY: {
+            msg: "What was your gross monthly salary?",
+            type: "text",
+            next: "B10_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        B10_NARRATIVE: {
+            msg: "In your own words, describe what made your working conditions intolerable.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description",
+            minWords: 50
+        },
+
+        // ==========================================
+        // TRACK C: AUTOMATICALLY UNFAIR DISMISSAL AND UNFAIR LABOUR PRACTICE
+        // Section 6.6 of the Master Guide.
+        // ==========================================
+        DISC_STATUS: {
+            msg: "Are you still employed, or have you been dismissed or resigned?",
+            type: "buttons",
+            options: [
+                { label: "Still employed", next: "C2_PROTECTED_GROUND", val: "Still employed" },
+                { label: "Dismissed", next: "C2_PROTECTED_GROUND", val: "Dismissed" },
+                { label: "Resigned", next: "RESIGN_DATE", val: "Resigned" }
+            ],
+            saveAs: "disc_status"
+        },
+
+        C2_PROTECTED_GROUND: {
+            msg: "Which protected ground do you believe is the basis of your treatment?",
+            type: "buttons",
+            options: [
+                { label: "Race", next: "C3_COMPARATOR", val: "race" },
+                { label: "Gender", next: "C3_COMPARATOR", val: "gender" },
+                { label: "Pregnancy", next: "C3_COMPARATOR", val: "pregnancy" },
+                { label: "Sexual orientation", next: "C3_COMPARATOR", val: "sexual orientation" },
+                { label: "Disability", next: "C3_COMPARATOR", val: "disability" },
+                { label: "HIV status", next: "C3_COMPARATOR", val: "HIV status" },
+                { label: "Religion", next: "C3_COMPARATOR", val: "religion" },
+                { label: "Age", next: "C3_COMPARATOR", val: "age" },
+                { label: "Political opinion", next: "C3_COMPARATOR", val: "political opinion" },
+                { label: "Union activity", next: "C3_COMPARATOR", val: "union activity" },
+                { label: "Whistleblowing", next: "C3_COMPARATOR", val: "whistleblowing" },
+                { label: "Other", next: "C3_COMPARATOR", val: "other" }
+            ],
+            saveAs: "protected_ground"
+        },
+
+        C3_COMPARATOR: {
+            msg: "Can you identify another employee in a similar role who was treated differently?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "C4_REPORTED", val: "Yes" },
+                { label: "No", next: "C4_REPORTED", val: "No" },
+                { label: "Unsure", next: "C4_REPORTED", val: "Unsure" }
+            ],
+            saveAs: "protected_ground_comparator"
+        },
+
+        C4_REPORTED: {
+            msg: "Did you formally report the discrimination or unfair treatment?",
+            type: "buttons",
+            options: [
+                { label: "Yes, in writing", next: "C5_WORSENED", val: "Yes, in writing" },
+                { label: "Yes, verbally", next: "C5_WORSENED", val: "Yes, verbally" },
+                { label: "No", next: "C5_WORSENED", val: "No" }
+            ],
+            saveAs: "protected_ground_reported"
+        },
+
+        C5_WORSENED: {
+            msg: "Did the employer's response worsen your situation after you reported it?",
+            type: "buttons",
+            options: [
+                { label: "Yes", next: "C6_LENGTH", val: "Yes" },
+                { label: "No", next: "C6_LENGTH", val: "No" },
+                { label: "No response", next: "C6_LENGTH", val: "No response" }
+            ],
+            saveAs: "employer_response_worsened"
+        },
+
+        C6_LENGTH: {
+            msg: "How long have you worked for this employer?",
+            type: "text",
+            next: "C7_SALARY",
+            saveAs: "length_of_service"
+        },
+
+        C7_SALARY: {
+            msg: "What was (or is) your gross monthly salary?",
+            type: "text",
+            next: "C8_NARRATIVE",
+            saveAs: "gross_monthly_salary"
+        },
+
+        C8_NARRATIVE: {
+            msg: "Describe what happened, including specific incidents with dates and any named individuals.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description",
+            minWords: 75
+        },
+
+        // ==========================================
+        // PATH D: ADVISORY HUB
+        // ==========================================
+        ADV_ISSUE: { 
+            msg: "What do you need help with right now?", 
+            type: "buttons", 
+            options: [
+                { label: "Hearing Prep", next: "ADV_DESC", val: "Hearing Prep" },
+                { label: "Challenging a Warning", next: "ADV_DESC", val: "Warning" },
+                { label: "Lodging a Grievance", next: "ADV_DESC", val: "Grievance" },
+                { label: "Pay / Contract Issue", next: "ADV_DESC", val: "Pay Issue" }
+            ], 
+            saveAs: "advisory_topic" 
+        },
+        ADV_DESC: {
+            msg: "Briefly explain the situation you are dealing with.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description"
+        },
+
+        // ==========================================
+        // PATH E: UIF
+        // ==========================================
+        UIF_DESC: {
+            msg: "Briefly describe your UIF query and how you need help.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "incident_description"
+        },
+
+        // ==========================================
+        // LEGACY CONTEXT QUESTIONS
+        // These are retained only for compatibility if an old route still reaches them.
+        // ==========================================
+        CONTRACT_TYPE: {
+            msg: "To help me check the specific labour laws that apply to you, what type of employment contract do you have?",
+            type: "buttons",
+            options: [
+                { label: "Permanent", next: "SECTOR", val: "Permanent" },
+                { label: "Fixed Term Contract", next: "SECTOR", val: "Fixed Term" },
+                { label: "Independent Contractor", next: "SECTOR", val: "Contractor" }
+            ],
+            saveAs: "contract_type"
+        },
+
+        SECTOR: { 
+            msg: "What industry or sector do you work in?", 
+            type: "buttons", 
+            options: [
+                { label: "Retail", next: "COMPANY_NAME", val: "Retail" }, 
+                { label: "Mining", next: "COMPANY_NAME", val: "Mining" }, 
+                { label: "Security", next: "COMPANY_NAME", val: "Security" }, 
+                { label: "Metal & Engineering", next: "COMPANY_NAME", val: "Metal & Engineering" }, 
+                { label: "Domestic", next: "COMPANY_NAME", val: "Domestic" }, 
+                { label: "Government / SOE (Police, Military, Teachers)", next: "COMPANY_NAME", val: "Government / SOE" },
+                { label: "Other", next: "COMPANY_NAME", val: "Other" }
+            ], 
+            saveAs: "sector" 
+        },
+
+        // ==========================================
+        // JURISDICTIONAL GATE OFF-RAMPS
+        // ==========================================
+        DEFLECT_CONTRACTOR: {
+            msg: "Based on your answer, this may fall outside the ordinary employee protections of the LRA and BCEA. The correct next step is to get civil contract advice before a labour-law merits assessment is done.",
+            type: "end",
+            triageOutcome: "CONTRACTOR"
+        },
+        DEFLECT_CROSS_BORDER: {
+            msg: "This may require international or cross-border advice before a South African labour-law merits assessment is done.",
+            type: "end",
+            triageOutcome: "CROSS_BORDER"
+        },
+        DEFLECT_PUBLIC_SERVICE: {
+            msg: "This matter should be triaged to the correct public-sector forum, which may include the PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures. A blanket rejection should not be applied.",
+            type: "end",
+            triageOutcome: "PUBLIC_SERVICE"
+        },
+
+        DEFLECT_GOV: {
+            msg: "This matter should be triaged to the correct public-sector forum, which may include the PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures. A blanket rejection should not be applied.",
+            type: "end",
+            triageOutcome: "PUBLIC_SERVICE"
+        },
+
+        DEFLECT_SOE_UNCLEAR: {
+            msg: "This matter should be flagged for attorney review before proceeding, so that CCMA eligibility or the correct bargaining council or forum can be confirmed.",
+            type: "end",
+            triageOutcome: "SOE_UNCLEAR"
+        },
+
+        // ==========================================
+        // LOGISTICS
+        // ==========================================
+        COMPANY_NAME: {
+            msg: "What is the exact name of the company you work(ed) for?",
+            type: "text",
+            next: "COMPANY_CONTACT",
+            saveAs: "employer_name"
+        },
+        COMPANY_CONTACT: {
+            msg: "Please provide an email address or phone number for the company's HR department or your manager.",
+            type: "text",
+            next: "CLIENT_NAME",
+            saveAs: "employer_contact_details"
+        },
+        CLIENT_NAME: {
+            msg: "Almost done! What is your full name?",
+            type: "text",
+            next: "CLIENT_PHONE",
+            saveAs: "client_name"
+        },
+        CLIENT_PHONE: {
+            msg: "And finally, what is the best cell phone number to reach you on?",
+            type: "text",
+            next: "HANDOFF",
+            saveAs: "contact_info"
+        },
+
+        HANDOFF: { action: "evaluate" }
+    };
+
+    let currentState = "JUR_EMPLOYEE";
+
+    function scrollToBottom() {
+        setTimeout(() => {
+            historyEl.scrollTop = historyEl.scrollHeight;
+        }, 50);
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function appendMessage(text, sender) {
+        const row = document.createElement('div');
+        row.className = `chat-row ${sender}-row`;
+        if (sender === 'bot') {
+            row.innerHTML = `<img src="justine-avatar.png" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"> <div class="message">${escapeHtml(text)}</div>`;
+        } else {
+            row.innerHTML = `<div class="message">${escapeHtml(text)}</div>`;
+        }
+        historyEl.appendChild(row);
+        scrollToBottom();
+    }
+
+    function renderState() {
+        let step = scriptFlow[currentState];
+
+        if (!step) {
+            appendMessage("An error occurred in the intake flow. Please refresh and try again.", "bot");
+            console.error("Unknown state:", currentState);
+            return;
+        }
+
+        // Smart Skipper:
+        // If the classifier already extracted a structured answer, skip that question silently.
+        // It will not skip minimum-word narrative questions, because those must be asked directly.
+        while (step && step.saveAs && collectedFacts[step.saveAs] !== undefined && !step.minWords) {
+            const knownVal = collectedFacts[step.saveAs];
+            let nextState = step.next;
+
+            if (step.type === "buttons" && step.options) {
+                const matchedOption = step.options.find(opt => opt.val === knownVal);
+                if (matchedOption && matchedOption.next) {
+                    nextState = matchedOption.next;
+                }
+            }
+
+            if (!nextState) break;
+            currentState = nextState;
+            step = scriptFlow[currentState];
+        }
+
+        textContainer.style.display = 'none';
+        buttonContainer.style.display = 'none';
+
+        if (step.action === "evaluate") {
+            appendMessage("Thank you! Give me just a moment to review your details against South African Labour Law...", "bot");
+            triggerAIEvaluation();
+            return;
+        }
+
+        if (step.type === "end") {
+            setTimeout(async () => {
+                if (step.triageOutcome) {
+                    await triggerJurisdictionTriage(step.triageOutcome);
+                }
+                appendMessage(step.msg, "bot");
+                scrollToBottom();
+            }, 500);
+            return;
+        }
+
+        setTimeout(() => {
+            appendMessage(step.msg, "bot");
+
+            if (step.type === "buttons") {
+                buttonContainer.innerHTML = '';
+                step.options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'action-btn';
+                    btn.innerText = opt.label;
+                    btn.onclick = () => handleUserInput(opt.val, opt.label, step.saveAs, opt.next);
+                    buttonContainer.appendChild(btn);
+                });
+                buttonContainer.style.display = 'flex';
+            } else {
+                inputEl.type = step.type === "date" ? "date" : "text";
+                inputEl.value = "";
+                textContainer.style.display = 'flex';
+                inputEl.focus();
+            }
+            scrollToBottom();
+        }, 500);
+    }
+
+    textContainer.onsubmit = async (e) => {
+        e.preventDefault();
+        const val = inputEl.value.trim();
+        if (!val) return;
+        const step = scriptFlow[currentState];
+
+        if (step && step.minWords) {
+            const wordCount = val.split(/\s+/).filter(Boolean).length;
+            if (wordCount < step.minWords) {
+                appendMessage(val, "user");
+                appendMessage(`Please add a little more detail. This answer needs at least ${step.minWords} words.`, "bot");
+                inputEl.value = val;
+                textContainer.style.display = 'flex';
+                inputEl.focus();
+                return;
+            }
+        }
+
+        // Invisible LLM Classification & Smart Extraction Intercept
+        if (step.action === "classify") {
+            textContainer.style.display = 'none';
+            appendMessage(val, "user");
+            collectedFacts["initial_query"] = val;
+
+            showLoading();
+            try {
+                const res = await fetch('/.netlify/functions/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "classify", text: val })
+                });
+                const data = await res.json();
+                hideLoading();
+
+                if (data.error) {
+                    appendMessage("Backend Error: " + data.error, "bot");
+                    console.error("Ask.js Error:", data.error);
+                    currentState = "START_FALLBACK";
+                    renderState();
+                    return;
+                }
+
+                let aiCategory = data.category ? data.category.toLowerCase() : "ambiguous";
+                let finalCategory = "Ambiguous";
+
+                if (aiCategory.includes("dismiss") || aiCategory.includes("fire") || aiCategory.includes("retrench")) {
+                    finalCategory = "Dismissed";
+                } else if (aiCategory.includes("resign") || aiCategory.includes("quit") || aiCategory.includes("constructive")) {
+                    finalCategory = "Resigned";
+                } else if (aiCategory.includes("discriminat") || aiCategory.includes("harass") || aiCategory.includes("racism")) {
+                    finalCategory = "Discrimination";
+                } else if (aiCategory.includes("advis") || aiCategory.includes("warn") || aiCategory.includes("grievance")) {
+                    finalCategory = "Advisory";
+                } else if (aiCategory.includes("uif")) {
+                    finalCategory = "UIF";
+                }
+
+                if (finalCategory === "Ambiguous") {
+                    currentState = "START_FALLBACK";
+                } else {
+                    collectedFacts["employment_status"] = finalCategory;
+
+                    if (data.dismissal_reason_type) collectedFacts["dismissal_reason_type"] = data.dismissal_reason_type;
+                    if (data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
+
+                    const routeMap = {
+                        "Dismissed": "FIRED_DATE",
+                        "Resigned": "RESIGN_DATE",
+                        "Discrimination": "DISC_STATUS",
+                        "Advisory": "ADV_ISSUE",
+                        "UIF": "UIF_DESC"
+                    };
+                    currentState = routeMap[finalCategory] || "START_FALLBACK";
+                }
+                renderState();
+            } catch(error) {
+                hideLoading();
+                console.error("Classification error:", error);
+                currentState = "START_FALLBACK";
+                renderState();
+            }
+            return;
+        }
+
+        handleUserInput(val, val, step.saveAs, step.next);
+    };
+
+    function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
+        textContainer.style.display = 'none';
+        buttonContainer.style.display = 'none';
+
+        appendMessage(displayValue, "user");
+        if (saveKey) collectedFacts[saveKey] = actualValue;
+
+        // Keep compatibility with the backend scorer while using Master Guide field names in the UI flow.
+        if (saveKey === "worker_status") {
+            collectedFacts["contract_type"] = actualValue === "Contractor" ? "Contractor" : actualValue;
+        }
+        if (saveKey === "length_of_service") {
+            collectedFacts["tenure"] = actualValue;
+        }
+        if (saveKey === "gross_monthly_salary") {
+            collectedFacts["salary"] = actualValue;
+        }
+        if (saveKey === "incapacity_duration") {
+            collectedFacts["incapacity_status"] = actualValue;
+        }
+        if (saveKey === "medical_review") {
+            collectedFacts["proc_medical_review"] = actualValue;
+        }
+        if (saveKey === "alternatives_explored") {
+            collectedFacts["proc_alternatives_explored"] = actualValue;
+        }
+        if (saveKey === "opportunity_to_state_case") {
+            collectedFacts["proc_opportunity_to_state_case"] = actualValue;
+        }
+        if (saveKey === "pip_duration") {
+            collectedFacts["performance_improvement_period"] = actualValue;
+        }
+        if (saveKey === "team_meeting_standards") {
+            collectedFacts["performance_comparator"] = actualValue;
+        }
+        if (saveKey === "performance_control") {
+            collectedFacts["performance_external_factors"] = actualValue;
+        }
+        if (saveKey === "prior_performance_warnings") {
+            collectedFacts["performance_warnings"] = actualValue;
+        }
+        if (saveKey === "intolerable_conduct") {
+            collectedFacts["constructive_dismissal"] = true;
+        }
+        if (saveKey === "grievance_raised") {
+            collectedFacts["constructive_grievance_raised"] = actualValue;
+        }
+        if (saveKey === "protected_ground") {
+            collectedFacts["protected_ground"] = actualValue;
+        }
+        if (saveKey === "disc_status") {
+            collectedFacts["protected_ground_status"] = actualValue;
+        }
+        if (saveKey === "gross_monthly_salary_and_duration") {
+            collectedFacts["salary_and_duration"] = actualValue;
+            collectedFacts["gross_monthly_salary"] = actualValue;
+        }
+        if (saveKey === "retrenchment_consultation") {
+            collectedFacts["proc_consultation"] = actualValue;
+        }
+        if (saveKey === "retrenchment_alternatives") {
+            collectedFacts["retrenchment_alternatives_offered"] = actualValue;
+        }
+
+        currentState = nextStateKey;
+        renderState();
+    }
+
+    async function triggerJurisdictionTriage(outcome) {
+        showLoading();
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "triage",
+                    outcome,
+                    facts: collectedFacts
+                })
+            });
+
+            const data = await res.json();
+            hideLoading();
+
+            if (data.error) {
+                console.error("Triage save error:", data.error);
+                appendMessage("I could not save the triage record, but I can still give you the correct next step.", "bot");
+                return;
+            }
+
+            if (data.caseId) {
+                activeCaseId = data.caseId;
+                console.log("Jurisdiction triage captured:", data.caseId);
+            }
+        } catch (error) {
+            hideLoading();
+            console.error("Triage save failed:", error);
+            appendMessage("I could not save the triage record, but I can still give you the correct next step.", "bot");
+        }
+    }
+
+    async function triggerAIEvaluation() {
+        showLoading();
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "evaluate", facts: collectedFacts })
+            });
+            const data = await res.json();
+            hideLoading();
+
+            if (data.error) {
+                appendMessage("An error occurred: " + data.error, "bot");
+                return;
+            }
+
+            activeCaseId = data.caseId;
+            appendMessage(data.pitch, "bot");
+
+            buttonContainer.innerHTML = '';
+            if (data.hasMerit) {
+                const btnYes = document.createElement('button');
+                btnYes.className = 'action-btn';
+                btnYes.innerText = "Yes, please draft the letter.";
+                btnYes.onclick = () => closeCase(true, false);
+
+                const btnNo = document.createElement('button');
+                btnNo.className = 'action-btn';
+                btnNo.innerText = "No thank you.";
+                btnNo.onclick = () => closeCase(false, false);
+
+                buttonContainer.appendChild(btnYes);
+                buttonContainer.appendChild(btnNo);
+            } else {
+                const btnOk = document.createElement('button');
+                btnOk.className = 'action-btn';
+                btnOk.innerText = "Okay, thank you.";
+                btnOk.onclick = () => closeCase(false, true);
+                buttonContainer.appendChild(btnOk);
+            }
+            buttonContainer.style.display = 'flex';
+            scrollToBottom();
+
+        } catch (e) {
+            hideLoading();
+            appendMessage("Sorry, I had trouble connecting to the legal database. Please refresh and try again.", "bot");
+            console.error(e);
+        }
+    }
+
+    async function closeCase(wantsLetter, isLowMerit) {
+        buttonContainer.style.display = 'none';
+
+        let userMsg = wantsLetter ? "Yes, please draft the letter." : "No thank you.";
+        if (isLowMerit) userMsg = "Okay, thank you.";
+
+        appendMessage(userMsg, "user");
+        showLoading();
+
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter })
+            });
+            const data = await res.json();
+            hideLoading();
+
+            if (data.error) {
+                appendMessage("An error occurred: " + data.error, "bot");
+            } else {
+                appendMessage(data.closing_message, "bot");
+            }
+        } catch(e) { 
+            hideLoading(); 
+            appendMessage("An error occurred trying to close the case.", "bot");
+            console.error(e);
+        }
+    }
+
+    function showLoading() {
+        const row = document.createElement('div');
+        row.id = "loading-row";
+        row.className = "chat-row bot-row";
+        row.innerHTML = `<img src="justine-avatar.png" class="chat-avatar" onerror="this.src='https://ui-avatars.com/api/?name=Justine&background=random'"> <div class="message">Thinking<span class="loading-dots"></span></div>`;
+        historyEl.appendChild(row); 
+        scrollToBottom();
+    }
+
+    function hideLoading() {
+        const el = document.getElementById('loading-row');
+        if(el) el.remove();
+    }
+
+    renderState();
 </script>
+
 </body>
 </html>
