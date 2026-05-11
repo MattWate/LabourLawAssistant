@@ -1,3 +1,5 @@
+const { enhanceStructuredScore } = require('./structuredScoreEnhancer');
+
 const TRACK_CITATIONS = {
   AUD: ['LRA s187', 'EEA s6', 'LRA s194(3)'],
   CD: ['LRA s186(1)(e)'],
@@ -124,6 +126,8 @@ function replaceLegalBasisAndFlags(advisory, scorecard) {
 }
 
 function applyOverridePostProcessing(facts = {}, fullStory = '', scorecard = {}) {
+  scorecard = enhanceStructuredScore(facts, scorecard);
+
   const overrideFlags = detectOverrideFlags(facts, fullStory);
   const secondaryTrack = inferSecondaryTrack(scorecard.track, overrideFlags);
 
