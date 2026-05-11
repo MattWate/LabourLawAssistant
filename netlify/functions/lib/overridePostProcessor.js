@@ -32,6 +32,45 @@ const clean = value => String(value || '').toLowerCase();
 const hasAny = (value, terms) => terms.some(term => clean(value).includes(term));
 const dedupe = values => [...new Set((values || []).filter(Boolean))];
 
+function hasProtectedGroundDiscrimination(text) {
+  const t = clean(text);
+
+  const explicitPhrases = [
+    'my accent',
+    'about my accent',
+    'when i am going home',
+    'go home',
+    'going home',
+    'from zimbabwe',
+    'zimbabwean',
+    'national origin',
+    'ethnic origin',
+    'xenophobia',
+    'xenophobic',
+    'racist',
+    'racism',
+    'because of my race',
+    'because of my gender',
+    'because of my age',
+    'because of my disability',
+    'because of my religion',
+    'because of my sexual orientation',
+    'because of my political opinion',
+    'discriminated against me',
+    'discrimination against me'
+  ];
+
+  if (hasAny(t, explicitPhrases)) return true;
+
+  const protectedGroundField = clean(text.protected_ground || '');
+  if (protectedGroundField && hasAny(protectedGroundField, [
+    'race', 'gender', 'ethnic origin', 'national origin', 'sexual orientation',
+    'disability', 'religion', 'age', 'political opinion'
+  ])) return true;
+
+  return false;
+}
+
 function detectOverrideFlags(facts = {}, fullStory = '') {
   const text = clean(`${facts.initial_query || ''} ${fullStory} ${facts.protected_ground || ''} ${facts.dismissal_reason_type || ''}`);
   const flags = [];
@@ -51,7 +90,7 @@ function detectOverrideFlags(facts = {}, fullStory = '') {
   if (hasAny(text, ['two months salary', 'salary arrears', 'unpaid salary', 'non-payment of salary', 'not paid for two'])) flags.push('SUSTAINED_NON_PAYMENT');
   if (hasAny(text, ['hiv', 'lawful sick leave', 'dismissed on sick leave'])) flags.push('HIV_OR_SICK_LEAVE');
 
-  if (hasAny(text, ['accent', 'go home', 'when i am going home', 'from zimbabwe', 'national origin', 'xenophobia', 'race', 'gender', 'sexual orientation', 'disability', 'religion', 'age', 'political opinion'])) {
+  if (hasProtectedGroundDiscrimination(`${facts.initial_query || ''} ${fullStory}`) || hasProtectedGroundDiscrimination({ protected_ground: facts.protected_ground })) {
     flags.push('PROTECTED_GROUND_DISCRIMINATION');
   }
 
