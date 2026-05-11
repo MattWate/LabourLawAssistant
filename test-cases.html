@@ -11,7 +11,18 @@
     button { display: block; padding: 12px 14px; cursor: pointer; border: 1px solid #2563eb; border-radius: 8px; background: white; color: #2563eb; font-weight: 700; text-align: left; }
     button:hover { background: #2563eb; color: white; }
     .note { background: #fff7ed; border: 1px solid #fed7aa; padding: 12px 14px; border-radius: 8px; margin-bottom: 20px; }
+    .status { margin: 18px 0; padding: 16px; border-radius: 10px; font-weight: 800; display: none; }
+    .status.pass { display: block; background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .status.fail { display: block; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .status.running { display: block; background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+    .checks { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 18px; display: none; }
+    .checks h3 { margin: 0 0 10px; font-size: 1rem; }
+    .check { padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: .95rem; }
+    .check:last-child { border-bottom: 0; }
+    .ok { color: #166534; font-weight: 800; }
+    .bad { color: #991b1b; font-weight: 800; }
     pre { background: #111827; color: #e5e7eb; padding: 16px; white-space: pre-wrap; border-radius: 8px; min-height: 320px; overflow-x: auto; }
+    code { background: #e2e8f0; padding: 2px 5px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -29,11 +40,16 @@
     <button onclick="runTest('audPregnancy')">Test 9: AUD — pregnancy dismissal</button>
   </div>
 
-  <h2>Result</h2>
+  <div id="status" class="status">Choose a test...</div>
+  <div id="checks" class="checks"></div>
+
+  <h2>Raw Result</h2>
   <pre id="output">Choose a test...</pre>
 
   <script>
     const output = document.getElementById("output");
+    const statusEl = document.getElementById("status");
+    const checksEl = document.getElementById("checks");
 
     function recentDate(daysAgo = 2) {
       const date = new Date();
@@ -168,7 +184,85 @@
       }
     };
 
+    const sc = d => d.scorecard || {};
+    const legal = d => sc(d).legal_basis || [];
+    const flags = d => sc(d).override_flags || [];
+    const breakdown = d => sc(d).scoring_breakdown || [];
+    const advisory = d => String(d.pitch || sc(d).advisory_note || '');
+    const hasBreakdownLabel = (d, fragment) => breakdown(d).some(x => String(x.label || '').toLowerCase().includes(fragment.toLowerCase()));
+
+    const expectations = {
+      misconduct: [
+        ['Primary track is Misconduct', d => sc(d).track === 'UD-MISCONDUCT'],
+        ['Substantive score is capped at or below 5 because misconduct is admitted', d => Number(sc(d).substantive_score) <= 5],
+        ['Procedural score is strong because notice/rep/chair defects are present', d => Number(sc(d).procedural_score) >= 8],
+        ['WP is eligible', d => sc(d).wp_eligible === true],
+        ['WP type is procedural-only or equivalent', d => ['PROCEDURAL_ONLY', 'FULL'].includes(sc(d).wp_type)],
+        ['Legal basis includes LRA s188', d => legal(d).includes('LRA s188')]
+      ],
+      incapacity: [
+        ['Primary track is Incapacity', d => sc(d).track === 'UD-INCAPACITY'],
+        ['Substantive score is high', d => Number(sc(d).substantive_score) >= 8],
+        ['Procedural score is high', d => Number(sc(d).procedural_score) >= 8],
+        ['WP is eligible', d => sc(d).wp_eligible === true],
+        ['Legal basis includes Schedule 8 Items 10 and 11', d => legal(d).includes('Schedule 8 Items 10 and 11')],
+        ['Breakdown includes alternatives/accommodation issue', d => hasBreakdownLabel(d, 'Alternatives') || hasBreakdownLabel(d, 'accommodation')]
+      ],
+      poorPerformance: [
+        ['Primary track is Poor Performance', d => sc(d).track === 'UD-POOR_PERFORMANCE'],
+        ['Legal basis includes Schedule 8 Item 9', d => legal(d).includes('Schedule 8 Item 9')],
+        ['Breakdown includes comparator evidence', d => hasBreakdownLabel(d, 'Comparator')],
+        ['Breakdown includes external factors', d => hasBreakdownLabel(d, 'External factors')],
+        ['Scoring returns a valid merit band', d => Boolean(sc(d).merit_band)],
+        ['Attorney review output exists', d => advisory(d).includes('Attorney review tag')]
+      ],
+      ancillaryWarning: [
+        ['Primary track is Ancillary', d => sc(d).track === 'ANC'],
+        ['WP is disabled', d => sc(d).wp_eligible === false],
+        ['WP type is null', d => sc(d).wp_type === null || sc(d).wp_type === undefined],
+        ['Output is a Preparation Pack for warning challenge', d => advisory(d).includes('Warning Challenge') && advisory(d).includes('PREPARATION PACK')],
+        ['Advisory says WP is not applicable', d => advisory(d).includes('Without Prejudice letter status: NOT APPLICABLE')]
+      ],
+      constructiveDismissal: [
+        ['Primary track is Constructive Dismissal', d => sc(d).track === 'CD'],
+        ['Substantive score is strong', d => Number(sc(d).substantive_score) >= 7],
+        ['Procedural score reflects employee conduct and is strong', d => Number(sc(d).procedural_score) >= 7],
+        ['WP is eligible', d => sc(d).wp_eligible === true],
+        ['Legal basis includes LRA s186(1)(e)', d => legal(d).includes('LRA s186(1)(e)')],
+        ['Breakdown includes written grievance or employee escalation', d => hasBreakdownLabel(d, 'written grievance') || hasBreakdownLabel(d, 'raised')]
+      ],
+      audPregnancy: [
+        ['Primary track is AUD', d => sc(d).track === 'AUD'],
+        ['Override includes pregnancy', d => flags(d).includes('PREGNANCY') || Boolean(sc(d).merit_bonus_trigger)],
+        ['Merit band is HIGH', d => sc(d).merit_band === 'HIGH'],
+        ['WP is eligible', d => sc(d).wp_eligible === true],
+        ['Legal basis includes LRA s187(1)(e)', d => legal(d).includes('LRA s187(1)(e)')],
+        ['Legal basis includes BCEA s25', d => legal(d).includes('BCEA s25')]
+      ]
+    };
+
+    function evaluate(name, data) {
+      const results = (expectations[name] || []).map(([label, fn]) => {
+        let passed = false;
+        try { passed = Boolean(fn(data)); } catch (_) { passed = false; }
+        return { label, passed };
+      });
+      return { passed: results.length > 0 && results.every(x => x.passed), results };
+    }
+
+    function renderStatus(name, evaluation) {
+      statusEl.className = `status ${evaluation.passed ? 'pass' : 'fail'}`;
+      statusEl.textContent = `${evaluation.passed ? '✅ PASS' : '❌ FAIL'} — ${name}`;
+      checksEl.style.display = 'block';
+      checksEl.innerHTML = '<h3>Checks</h3>' + evaluation.results.map(r =>
+        `<div class="check"><span class="${r.passed ? 'ok' : 'bad'}">${r.passed ? '✅' : '❌'}</span> ${r.label}</div>`
+      ).join('');
+    }
+
     async function runTest(name) {
+      statusEl.className = 'status running';
+      statusEl.textContent = `Running ${name}...`;
+      checksEl.style.display = 'none';
       output.textContent = `Running ${name}...`;
       try {
         const res = await fetch("/.netlify/functions/ask", {
@@ -177,23 +271,32 @@
           body: JSON.stringify({ action: "evaluate", facts: cases[name] })
         });
         const data = await res.json();
+        const evaluation = evaluate(name, data);
+        renderStatus(name, evaluation);
         output.textContent = JSON.stringify({
+          pass: evaluation.passed,
+          checks: evaluation.results,
           httpStatus: res.status,
           caseId: data.caseId,
           hasMerit: data.hasMerit,
-          track: data.scorecard && data.scorecard.track,
-          trackLabel: data.scorecard && data.scorecard.track_label,
-          substantiveScore: data.scorecard && data.scorecard.substantive_score,
-          proceduralScore: data.scorecard && data.scorecard.procedural_score,
-          meritBand: data.scorecard && data.scorecard.merit_band,
-          wpEligible: data.scorecard && data.scorecard.wp_eligible,
-          wpType: data.scorecard && data.scorecard.wp_type,
-          recommendedNextStep: data.scorecard && data.scorecard.recommended_next_step,
-          scoringBreakdown: data.scorecard && data.scorecard.scoring_breakdown,
+          track: sc(data).track,
+          secondaryTrack: sc(data).secondary_track,
+          overrideFlags: sc(data).override_flags,
+          trackLabel: sc(data).track_label,
+          substantiveScore: sc(data).substantive_score,
+          proceduralScore: sc(data).procedural_score,
+          meritBand: sc(data).merit_band,
+          wpEligible: sc(data).wp_eligible,
+          wpType: sc(data).wp_type,
+          legalBasis: sc(data).legal_basis,
+          recommendedNextStep: sc(data).recommended_next_step,
+          scoringBreakdown: sc(data).scoring_breakdown,
           advisoryNote: data.pitch,
           raw: data
         }, null, 2);
       } catch (err) {
+        statusEl.className = 'status fail';
+        statusEl.textContent = `❌ ERROR — ${name}`;
         output.textContent = err.stack || err.message;
       }
     }
