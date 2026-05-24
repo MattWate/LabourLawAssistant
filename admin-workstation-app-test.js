@@ -1,1 +1,0 @@
-console.log('admin workstation app loaded');
