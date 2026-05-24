@@ -193,10 +193,10 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    const SUPABASE_URL = window.JUSTINE_SUPABASE_URL || 'https://pdjhgszpndwykeqlusho.supabase.co';
-    const SUPABASE_ANON_KEY = window.JUSTINE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
+    const SUPABASE_URL = window.JUSTINE_SUPABASE_URL || 'REPLACE_WITH_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = window.JUSTINE_SUPABASE_ANON_KEY || 'REPLACE_WITH_SUPABASE_ANON_KEY';
 
-   const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentToken = null;
     let casesData = [];
     let currentView = 'dashboard';
@@ -342,7 +342,7 @@
         metric('WP Eligible', s.wp, 'Effective WP path') +
         metric('High Merit', s.high, 'High priority') +
         '</div>' +
-        '<div class="panel"><div class="panel-title"><h3>Shortcuts</h3><button class="btn ghost" onclick="setView(\\'workstation\\')">Open Workstation</button></div><div class="shortcuts">' +
+        '<div class="panel"><div class="panel-title"><h3>Shortcuts</h3><button class="btn ghost" onclick="setView(\'workstation\')">Open Workstation</button></div><div class="shortcuts">' +
         shortcut('Create New Case','Capture a manual matter.','openNewCaseModal()') +
         shortcut('Attorney Review','Open flagged matters.',"setQueueFilter('review');setView('workstation')") +
         shortcut('Needs Info','Review client questions.',"setQueueFilter('info');setView('workstation')") +
@@ -396,7 +396,7 @@
     }
 
     function chip(f, l) {
-      return '<button class="chip ' + (currentQueueFilter === f ? 'active' : '') + '" onclick="setQueueFilter(\\'' + f + '\\')">' + l + '</button>';
+      return '<button class="chip ' + (currentQueueFilter === f ? 'active' : '') + '" onclick="setQueueFilter(\'' + f + '\')">' + l + '</button>';
     }
 
     function caseCard(c, active = false) {
@@ -405,7 +405,7 @@
       const st = statusOf(c);
       const name = f.client_name || c.client_name || 'Anonymous Client';
       const sum = f.incident_description || c.issue_summary || ed.recommended_next_step || 'No summary captured yet.';
-      return '<div class="case-card ' + (active ? 'active' : '') + '" onclick="selectCase(\\'' + c.id + '\\')"><div class="case-row"><div class="case-name">' + esc(name) + '</div>' + statusBadge(st) + '</div><div class="case-summary">' + esc(sum.slice(0, 120)) + (sum.length > 120 ? '...' : '') + '</div><div class="badges"><span class="badge blue">' + esc(ed.track || 'track?') + '</span><span class="badge ' + meritClass(ed.merit_band) + '">' + esc(ed.merit_band || 'review') + '</span>' + (bool(ed.wp_eligible) ? '<span class="badge green">WP</span>' : '') + (f.admin_override?.overridden ? '<span class="badge purple">override</span>' : '') + '</div></div>';
+      return '<div class="case-card ' + (active ? 'active' : '') + '" onclick="selectCase(\'' + c.id + '\')"><div class="case-row"><div class="case-name">' + esc(name) + '</div>' + statusBadge(st) + '</div><div class="case-summary">' + esc(sum.slice(0, 120)) + (sum.length > 120 ? '...' : '') + '</div><div class="badges"><span class="badge blue">' + esc(ed.track || 'track?') + '</span><span class="badge ' + meritClass(ed.merit_band) + '">' + esc(ed.merit_band || 'review') + '</span>' + (bool(ed.wp_eligible) ? '<span class="badge green">WP</span>' : '') + (f.admin_override?.overridden ? '<span class="badge purple">override</span>' : '') + '</div></div>';
     }
 
     function selectCase(id) { selectedCaseId = id; renderWorkstation(); }
@@ -427,9 +427,9 @@
     function selectedHtml(c) {
       const f = facts(c);
       const ed = effective(c);
-      return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id">Case ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions"><button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\\'' + c.id + '\\')">Save Facts</button></div></div><div class="fact-grid">' +
+      return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id">Case ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions"><button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\'' + c.id + '\')">Save Facts</button></div></div><div class="fact-grid">' +
         fact('Employer', f.employer_name) + fact('Contact', f.contact_info || c.contact_info) + fact('Incident Date', f.incident_date) + fact('Employment Status', f.employment_status) + fact('Incident Description', f.incident_description || c.issue_summary, true) +
-        '</div></div><div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\\'' + c.id + '\\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\\'' + c.id + '\\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
+        '</div></div><div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\'' + c.id + '\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\'' + c.id + '\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
     }
 
     function fact(label, value, wide = false) {
@@ -463,8 +463,8 @@
 
     function letterCard(c) {
       const f = facts(c);
-      if (c.draft_letter) return '<div class="card"><h3>Drafted Letter</h3><textarea id="letter-editor" class="letter">' + esc(c.draft_letter) + '</textarea><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn ghost" onclick="saveLetter(\\'' + c.id + '\\',\\'pending_review\\')">Save Draft</button><button class="btn success" onclick="saveLetter(\\'' + c.id + '\\',\\'approved\\')">Approve</button></div></div>';
-      if (f.wants_letter) return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted);line-height:1.5">This matter is marked as requiring a letter. Save corrected facts first, then generate a draft.</p><button id="btn-generate-' + c.id + '" class="btn warn" onclick="generateDraft(\\'' + c.id + '\\')">Generate Draft Letter</button></div>';
+      if (c.draft_letter) return '<div class="card"><h3>Drafted Letter</h3><textarea id="letter-editor" class="letter">' + esc(c.draft_letter) + '</textarea><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn ghost" onclick="saveLetter(\'' + c.id + '\',\'pending_review\')">Save Draft</button><button class="btn success" onclick="saveLetter(\'' + c.id + '\',\'approved\')">Approve</button></div></div>';
+      if (f.wants_letter) return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted);line-height:1.5">This matter is marked as requiring a letter. Save corrected facts first, then generate a draft.</p><button id="btn-generate-' + c.id + '" class="btn warn" onclick="generateDraft(\'' + c.id + '\')">Generate Draft Letter</button></div>';
       return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted)">No letter requested at this stage.</p></div>';
     }
 
