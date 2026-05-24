@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Justine Admin Workstation</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{
+      --bg:#020617;--panel:rgba(255,255,255,.11);--panel2:rgba(255,255,255,.17);--border:rgba(255,255,255,.18);
+      --text:#f8fafc;--muted:#cbd5e1;--muted2:#94a3b8;--blue:#38bdf8;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#a78bfa;
+      --shadow:0 24px 80px rgba(0,0,0,.35)
+    }
+    *{box-sizing:border-box}
+    body{margin:0;height:100vh;overflow:hidden;background:radial-gradient(circle at top left,rgba(56,189,248,.22),transparent 35%),radial-gradient(circle at bottom right,rgba(167,139,250,.18),transparent 35%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    button,input,textarea,select{font:inherit}
+    .glass{background:linear-gradient(145deg,rgba(255,255,255,.16),rgba(255,255,255,.07));border:1px solid var(--border);box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+    .login{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(2,6,23,.78)}
+    .login-card{width:420px;max-width:100%;border-radius:28px;padding:34px}
+    .kicker{color:#67e8f9;text-transform:uppercase;letter-spacing:.16em;font-size:.72rem;font-weight:900}
+    h1,h2,h3{margin-top:0}p{color:var(--muted);line-height:1.5}
+    .field,.textarea,.select{width:100%;border:1px solid var(--border);background:rgba(15,23,42,.55);color:var(--text);border-radius:14px;padding:12px 14px;outline:none}
+    .field::placeholder,.textarea::placeholder{color:rgba(203,213,225,.7)}
+    .textarea{min-height:100px;resize:vertical}.select option{background:#0f172a}
+    .field:focus,.textarea:focus,.select:focus{border-color:rgba(56,189,248,.72);box-shadow:0 0 0 4px rgba(56,189,248,.13)}
+    .btn{border:1px solid transparent;border-radius:14px;padding:10px 14px;color:var(--text);background:rgba(255,255,255,.12);font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+    .btn:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28)}
+    .btn.primary{background:linear-gradient(135deg,#2563eb,#06b6d4)}.btn.success{background:linear-gradient(135deg,#16a34a,#22c55e)}
+    .btn.warn{background:linear-gradient(135deg,#d97706,#f59e0b)}.btn.danger{background:linear-gradient(135deg,#dc2626,#ef4444)}
+    .btn.ghost{background:rgba(255,255,255,.08);border-color:var(--border)}.btn.full{width:100%;padding:13px 16px}.btn:disabled{opacity:.6;cursor:not-allowed}
+    .error{display:none;color:#fecaca;background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.32);padding:10px 12px;border-radius:14px;margin-bottom:14px}
+    .shell{height:100vh;padding:18px;display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px}
+    .sidebar{border-radius:28px;padding:18px;display:flex;flex-direction:column;overflow:hidden}
+    .brand{padding:12px 10px 18px;border-bottom:1px solid var(--border)}
+    .brand h1{margin:7px 0 6px;font-size:1.3rem;letter-spacing:-.04em}.brand p{margin:0;color:var(--muted);font-size:.88rem;line-height:1.45}
+    .nav{display:grid;gap:8px;padding:18px 0}.nav button{justify-content:flex-start;width:100%;color:var(--muted)}
+    .nav button.active{color:#fff;background:rgba(56,189,248,.18);border-color:rgba(56,189,248,.32)}
+    .side-foot{margin-top:auto;display:grid;gap:10px;padding-top:18px;border-top:1px solid var(--border)}
+    .content{min-width:0;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:18px}
+    .topbar{border-radius:28px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .topbar h2{margin:0;font-size:1.28rem;letter-spacing:-.035em}.topbar p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.main{min-height:0;overflow:auto;border-radius:28px;padding:18px}
+    .dashboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+    .metric,.panel,.case-card,.card{border:1px solid var(--border);background:rgba(255,255,255,.1);border-radius:20px;box-shadow:0 14px 40px rgba(0,0,0,.16);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+    .metric{padding:18px;min-height:112px;display:flex;flex-direction:column;justify-content:space-between}
+    .metric-label{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.11em;font-weight:900}
+    .metric-value{font-size:2rem;line-height:1;font-weight:950;letter-spacing:-.06em}.metric-note{color:var(--muted2);font-size:.82rem;margin-top:8px}
+    .panel,.card{padding:18px}.panel-title{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px}
+    .panel-title h3,.card h3{margin:0;font-size:.82rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+    .shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .shortcut{min-height:92px;padding:14px;border-radius:18px;border:1px solid var(--border);background:rgba(255,255,255,.08);color:var(--text);text-align:left;cursor:pointer}
+    .shortcut strong{display:block;margin-bottom:6px}.shortcut span{color:var(--muted);font-size:.84rem;line-height:1.35}
+    .workstation{min-height:100%;display:grid;grid-template-columns:360px minmax(0,1fr) 330px;gap:14px}
+    .queue{min-height:0;display:flex;flex-direction:column;overflow:hidden}.queue-controls{display:grid;gap:10px;padding:14px;border-bottom:1px solid var(--border)}
+    .filters{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.chip{border:1px solid var(--border);background:rgba(255,255,255,.08);color:var(--muted);border-radius:999px;padding:7px 10px;white-space:nowrap;font-size:.74rem;font-weight:900;cursor:pointer}
+    .chip.active{color:#fff;background:rgba(56,189,248,.2);border-color:rgba(56,189,248,.42)}
+    .case-list{min-height:0;overflow:auto;padding:12px}.case-card{padding:14px;margin-bottom:10px;cursor:pointer}.case-card:hover,.case-card.active{background:rgba(56,189,248,.13);border-color:rgba(56,189,248,.42)}
+    .case-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}.case-name{font-weight:900;letter-spacing:-.02em}
+    .case-summary{color:var(--muted);line-height:1.38;font-size:.86rem;margin-bottom:11px}.badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;font-weight:950;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.12);color:var(--muted)}
+    .badge.green{background:rgba(34,197,94,.16);color:#bbf7d0;border-color:rgba(34,197,94,.3)}.badge.amber{background:rgba(245,158,11,.17);color:#fde68a;border-color:rgba(245,158,11,.3)}
+    .badge.red{background:rgba(239,68,68,.16);color:#fecaca;border-color:rgba(239,68,68,.3)}.badge.blue{background:rgba(56,189,248,.16);color:#bae6fd;border-color:rgba(56,189,248,.3)}.badge.purple{background:rgba(167,139,250,.16);color:#ddd6fe;border-color:rgba(167,139,250,.3)}
+    .centre,.right{min-height:0;overflow:auto;display:grid;align-content:start;gap:14px}
+    .case-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}.case-head h2{margin:0 0 7px;font-size:1.55rem;letter-spacing:-.05em}.case-id{color:var(--muted2);font-size:.82rem;word-break:break-all}
+    .mini-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .fact-grid,.edit-grid,.decision-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+    .fact{border:1px solid var(--border);border-radius:16px;padding:12px;background:rgba(255,255,255,.07)}.fact.wide,.block.wide{grid-column:1/-1}
+    .fact .label,.block label{display:block;color:var(--muted2);font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;font-weight:950;margin-bottom:7px}
+    .fact .value{white-space:pre-wrap;word-break:break-word;line-height:1.42}
+    .decision{border:1px solid var(--border);border-radius:18px;padding:14px;background:rgba(255,255,255,.07)}.decision h4{margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-size:.75rem}
+    .score-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.score{border-radius:18px;background:rgba(255,255,255,.08);border:1px solid var(--border);padding:13px;text-align:center}
+    .score span{display:block;color:var(--muted2);text-transform:uppercase;letter-spacing:.1em;font-weight:900;font-size:.66rem;margin-bottom:6px}.score strong{font-size:1.5rem}
+    .letter{width:100%;min-height:380px;border:1px solid rgba(15,23,42,.12);border-radius:18px;background:rgba(255,255,255,.92);color:#0f172a;padding:18px;line-height:1.6;font-family:Georgia,"Times New Roman",serif;font-size:1.02rem;resize:vertical;outline:none;margin-top:14px}
+    .timeline{display:grid;gap:10px;margin-top:12px}.timeline-item{border-left:3px solid rgba(56,189,248,.55);padding:3px 0 3px 12px;color:var(--muted);line-height:1.38;font-size:.88rem}.timeline-item strong{display:block;color:var(--text);margin-bottom:2px}
+    .raw{margin:12px 0 0;background:rgba(2,6,23,.7);color:#e2e8f0;padding:14px;border-radius:16px;border:1px solid var(--border);overflow:auto;white-space:pre-wrap;font-size:.82rem}
+    .empty{min-height:520px;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;line-height:1.5;padding:32px}.loader{color:var(--muted);padding:20px;text-align:center}
+    .modal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(2,6,23,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .modal.open{display:flex}.modal-card{width:860px;max-width:100%;max-height:92vh;overflow:auto;border-radius:28px;padding:24px}.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:18px}
+    .section{border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.07);padding:16px;margin-bottom:14px}.section h3{margin:0 0 14px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:.76rem}
+    .modal-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px}.toast{position:fixed;z-index:30;right:24px;bottom:24px;width:min(420px,calc(100vw - 48px));display:none;border-radius:18px;padding:14px 16px;background:rgba(15,23,42,.9);border:1px solid rgba(255,255,255,.28);box-shadow:var(--shadow)}.toast.show{display:block}
+    @media(max-width:1280px){.dashboard,.shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.workstation{grid-template-columns:340px minmax(0,1fr)}.right{grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:900px){body{overflow:auto}.shell{height:auto;min-height:100vh;grid-template-columns:1fr}.workstation{grid-template-columns:1fr}.right{grid-template-columns:1fr}.fact-grid,.edit-grid,.decision-grid{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}.actions{justify-content:flex-start}}
+  </style>
+</head>
+<body>
+  <section id="login" class="login">
+    <div class="login-card glass">
+      <div class="kicker">Justine Legal OS</div>
+      <h1>Admin Workstation</h1>
+      <p>Review leads, override decisions, request missing information and move matters through delivery.</p>
+      <div id="login-error" class="error"></div>
+      <div style="display:grid;gap:12px">
+        <input class="field" id="auth-email" type="email" placeholder="Admin email"/>
+        <input class="field" id="auth-password" type="password" placeholder="Password"/>
+        <button id="auth-btn" class="btn primary full" onclick="handleLogin()">Secure Login</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="shell">
+    <aside class="sidebar glass">
+      <div class="brand">
+        <div class="kicker">Legal OS</div>
+        <h1>Justine Workstation</h1>
+        <p>Case delivery, review and operational control for the firm.</p>
+      </div>
+      <nav class="nav">
+        <button id="nav-dashboard" class="btn ghost active" onclick="setView('dashboard')">Dashboard</button>
+        <button id="nav-workstation" class="btn ghost" onclick="setView('workstation')">Case Workstation</button>
+        <button class="btn ghost" onclick="setQueueFilter('review');setView('workstation')">Attorney Review</button>
+        <button class="btn ghost" onclick="setQueueFilter('info');setView('workstation')">Needs More Info</button>
+        <button class="btn ghost" onclick="setQueueFilter('drafting');setView('workstation')">Drafting Queue</button>
+      </nav>
+      <div class="side-foot">
+        <button class="btn primary" onclick="openNewCaseModal()">Create New Case</button>
+        <button class="btn ghost" onclick="fetchCases(true)">Refresh Cases</button>
+        <button class="btn danger" onclick="handleLogout()">Logout</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar glass">
+        <div>
+          <h2 id="view-title">Dashboard</h2>
+          <p id="view-subtitle">Operational view of active matters and delivery bottlenecks.</p>
+        </div>
+        <div class="actions">
+          <button class="btn primary" onclick="openNewCaseModal()">New Case</button>
+          <button class="btn warn" onclick="openRequestInfoModal()">Request Info</button>
+          <button class="btn ghost" onclick="fetchCases(true)">Refresh</button>
+        </div>
+      </header>
+      <section id="main" class="main glass"><div class="loader">Loading workstation...</div></section>
+    </main>
+  </div>
+
+  <div id="new-case-modal" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><div><h2>Create New Case</h2><p>Capture a manual matter without the chatbot.</p></div><button class="btn ghost" onclick="closeModal('new-case-modal')">Close</button></div>
+      <div class="section"><h3>Client Details</h3><div class="edit-grid">
+        <div class="block"><label>Client Name</label><input class="field" id="new-client-name"/></div>
+        <div class="block"><label>Contact Info</label><input class="field" id="new-contact-info"/></div>
+        <div class="block"><label>Source</label><select class="select" id="new-source"><option>manual</option><option>phone</option><option>email</option><option>referral</option><option>walk-in</option><option>whatsapp</option></select></div>
+        <div class="block"><label>Urgency</label><select class="select" id="new-urgency"><option>normal</option><option>urgent</option><option>deadline risk</option></select></div>
+      </div></div>
+      <div class="section"><h3>Employer and Matter</h3><div class="edit-grid">
+        <div class="block"><label>Employer Name</label><input class="field" id="new-employer-name"/></div>
+        <div class="block"><label>Employer Contact</label><input class="field" id="new-employer-contact"/></div>
+        <div class="block"><label>Employment Status</label><input class="field" id="new-employment-status"/></div>
+        <div class="block"><label>Incident Date</label><input class="field" id="new-incident-date"/></div>
+        <div class="block"><label>Dismissal Reason</label><input class="field" id="new-dismissal-reason"/></div>
+        <div class="block"><label>Wants Letter?</label><select class="select" id="new-wants-letter"><option value="true">Yes</option><option value="false">No</option></select></div>
+        <div class="block wide"><label>Incident Description</label><textarea class="textarea" id="new-incident-description"></textarea></div>
+      </div></div>
+      <div class="section"><h3>Initial Admin Assessment</h3><div class="edit-grid">
+        <div class="block"><label>Track</label><select class="select" id="new-track"><option value="MANUAL_REVIEW">Manual Review</option><option value="UD-CONDUCT">Unfair Dismissal - Conduct</option><option value="UD-RETRENCHMENT">Unfair Dismissal - Retrenchment</option><option value="AUD">Automatically Unfair Dismissal</option><option value="CD">Constructive Dismissal</option><option value="JURISDICTION_TRIAGE">Jurisdiction Triage</option></select></div>
+        <div class="block"><label>Merit Band</label><select class="select" id="new-merit"><option>REQUIRES REVIEW</option><option>HIGH</option><option>MEDIUM-HIGH</option><option>MEDIUM</option><option>LOW</option><option>NO MERIT</option></select></div>
+        <div class="block"><label>WP Eligible?</label><select class="select" id="new-wp"><option value="false">No</option><option value="true">Yes</option></select></div>
+        <div class="block"><label>Attorney Review?</label><select class="select" id="new-attorney-review"><option value="true">Yes</option><option value="false">No</option></select></div>
+        <div class="block wide"><label>Recommended Next Step</label><input class="field" id="new-next-step" placeholder="Attorney to review and confirm next action"/></div>
+      </div></div>
+      <div class="modal-actions"><button class="btn ghost" onclick="closeModal('new-case-modal')">Cancel</button><button id="create-case-btn" class="btn primary" onclick="createManualCase()">Create Case</button></div>
+    </div>
+  </div>
+
+  <div id="override-modal" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><div><h2>Override Justine Decision</h2><p>Preserve the original assessment while setting the effective firm decision.</p></div><button class="btn ghost" onclick="closeModal('override-modal')">Close</button></div>
+      <div class="section"><h3>Admin Override</h3><div class="edit-grid">
+        <div class="block"><label>Track</label><select class="select" id="ov-track"><option value="AUD">AUD</option><option value="CD">CD</option><option value="UD-CONDUCT">UD-CONDUCT</option><option value="UD-RETRENCHMENT">UD-RETRENCHMENT</option><option value="JURISDICTION_TRIAGE">JURISDICTION_TRIAGE</option><option value="MANUAL_REVIEW">MANUAL_REVIEW</option></select></div>
+        <div class="block"><label>Merit Band</label><select class="select" id="ov-merit"><option>HIGH</option><option>MEDIUM-HIGH</option><option>MEDIUM</option><option>LOW</option><option>NO MERIT</option><option>REQUIRES REVIEW</option></select></div>
+        <div class="block"><label>WP Eligible?</label><select class="select" id="ov-wp"><option value="true">Yes</option><option value="false">No</option></select></div>
+        <div class="block"><label>WP Type</label><select class="select" id="ov-wp-type"><option value="FULL">FULL</option><option value="LIMITED">LIMITED</option><option value="N/A">N/A</option></select></div>
+        <div class="block wide"><label>Recommended Next Step</label><input class="field" id="ov-next-step"/></div>
+        <div class="block wide"><label>Override Reason</label><textarea class="textarea" id="ov-reason"></textarea></div>
+      </div></div>
+      <div class="modal-actions"><button class="btn ghost" onclick="closeModal('override-modal')">Cancel</button><button class="btn primary" onclick="saveDecisionOverride()">Save Override</button></div>
+    </div>
+  </div>
+
+  <div id="request-info-modal" class="modal">
+    <div class="modal-card glass">
+      <div class="modal-head"><div><h2>Request More Information</h2><p>Prepare questions for the client. WhatsApp can plug into this later.</p></div><button class="btn ghost" onclick="closeModal('request-info-modal')">Close</button></div>
+      <div class="section"><h3>Question</h3><div class="edit-grid">
+        <div class="block"><label>Channel</label><select class="select" id="q-channel"><option>whatsapp</option><option>email</option><option>phone</option><option>manual</option></select></div>
+        <div class="block"><label>Answer Type</label><select class="select" id="q-type"><option>text</option><option>yes-no</option><option>date</option><option>document</option></select></div>
+        <div class="block wide"><label>Question to Client</label><textarea class="textarea" id="q-text"></textarea></div>
+      </div></div>
+      <div class="modal-actions"><button class="btn ghost" onclick="closeModal('request-info-modal')">Cancel</button><button class="btn warn" onclick="saveInfoRequest()">Save Question</button></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const SUPABASE_URL = window.JUSTINE_SUPABASE_URL || 'REPLACE_WITH_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = window.JUSTINE_SUPABASE_ANON_KEY || 'REPLACE_WITH_SUPABASE_ANON_KEY';
+
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentToken = null;
+    let casesData = [];
+    let currentView = 'dashboard';
+    let currentQueueFilter = 'all';
+    let selectedCaseId = null;
+
+    checkAuth();
+
+    async function checkAuth() {
+      const { data: { session } } = await db.auth.getSession();
+      if (session) {
+        currentToken = session.access_token;
+        document.getElementById('login').style.display = 'none';
+        await fetchCases();
+      }
+    }
+
+    async function handleLogin() {
+      const email = $('auth-email').value.trim();
+      const password = $('auth-password').value;
+      const btn = $('auth-btn');
+      const err = $('login-error');
+      err.style.display = 'none';
+      btn.textContent = 'Authenticating...';
+      btn.disabled = true;
+      try {
+        const { data, error } = await db.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        currentToken = data.session.access_token;
+        $('login').style.display = 'none';
+        await fetchCases();
+      } catch (e) {
+        err.textContent = e.message || 'Login failed.';
+        err.style.display = 'block';
+      } finally {
+        btn.textContent = 'Secure Login';
+        btn.disabled = false;
+      }
+    }
+
+    async function handleLogout() {
+      await db.auth.signOut();
+      currentToken = null;
+      selectedCaseId = null;
+      $('login').style.display = 'flex';
+    }
+
+    function headers() {
+      return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken };
+    }
+
+    async function fetchCases(show = false) {
+      try {
+        const res = await fetch('/.netlify/functions/get_cases', { headers: headers() });
+        if (!res.ok) throw new Error('Could not load cases. Please log in again.');
+        casesData = await res.json();
+        if (!selectedCaseId && casesData.length) selectedCaseId = casesData[0].id;
+        render();
+        if (show) toast('Cases refreshed.');
+      } catch (e) {
+        $('main').innerHTML = '<div class="loader">' + esc(e.message) + '</div>';
+      }
+    }
+
+    function setView(v) {
+      currentView = v;
+      document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+      const nav = $('nav-' + v);
+      if (nav) nav.classList.add('active');
+      render();
+    }
+
+    function setQueueFilter(f) {
+      currentQueueFilter = f;
+      render();
+    }
+
+    function facts(c) { return c && c.case_facts ? c.case_facts : {}; }
+    function txt(v, fallback = '—') { return v === null || v === undefined || v === '' ? fallback : String(v); }
+    function bool(v) { return v === true || String(v).toLowerCase() === 'true'; }
+    function date(v) { return v ? new Date(v).toLocaleString('en-ZA') : 'Unknown'; }
+
+    function effective(c) {
+      const f = facts(c);
+      if (f.effective_decision) return f.effective_decision;
+      if (f.admin_override && f.admin_override.overridden) return { source: 'admin_override', ...f.admin_override };
+      return {
+        source: f.justine_decision ? 'justine' : 'case_facts',
+        track: f.track || 'UNCLASSIFIED',
+        merit_band: f.merit_band || f.overall_viability || 'REQUIRES REVIEW',
+        wp_eligible: bool(f.wp_eligible),
+        wp_type: f.wp_type || 'N/A',
+        recommended_next_step: f.recommended_next_step || f.overall_viability || 'Review matter',
+        substantive_score: f.substantive_score,
+        procedural_score: f.procedural_score,
+        legal_basis: f.legal_basis || []
+      };
+    }
+
+    function statusOf(c) {
+      const f = facts(c);
+      const q = (f.client_questions || []).filter(x => x.status === 'pending').length;
+      if (c.status === 'archived') return 'archived';
+      if (q) return 'needs_info';
+      if (f.attorney_review_flag || c.status === 'requires_attorney') return 'attorney_review';
+      if (c.letter_status === 'pending_review') return 'pending_review';
+      if (c.letter_status === 'approved') return 'approved';
+      if (c.letter_status === 'needs_drafting' || (f.wants_letter === true && !c.draft_letter)) return 'needs_drafting';
+      return c.status || 'new';
+    }
+
+    function stats() {
+      const active = casesData.filter(c => c.status !== 'archived');
+      return {
+        active: active.length,
+        review: active.filter(c => statusOf(c) === 'attorney_review').length,
+        info: active.filter(c => statusOf(c) === 'needs_info').length,
+        drafting: active.filter(c => statusOf(c) === 'needs_drafting').length,
+        pending: active.filter(c => c.letter_status === 'pending_review').length,
+        approved: active.filter(c => c.letter_status === 'approved').length,
+        wp: active.filter(c => bool(effective(c).wp_eligible)).length,
+        high: active.filter(c => ['HIGH','MEDIUM-HIGH'].includes(String(effective(c).merit_band || '').toUpperCase())).length
+      };
+    }
+
+    function render() {
+      currentView === 'dashboard' ? renderDashboard() : renderWorkstation();
+    }
+
+    function renderDashboard() {
+      $('view-title').textContent = 'Dashboard';
+      $('view-subtitle').textContent = 'Operational view of active matters and delivery bottlenecks.';
+      const s = stats();
+      const recent = casesData.slice(0, 6);
+      $('main').innerHTML =
+        '<div class="dashboard">' +
+        metric('Active Cases', s.active, 'Open matters') +
+        metric('Attorney Review', s.review, 'Needs legal judgement') +
+        metric('Needs More Info', s.info, 'Waiting on client') +
+        metric('Drafting Queue', s.drafting, 'Ready for letter') +
+        metric('Pending Review', s.pending, 'Drafts awaiting approval') +
+        metric('Approved', s.approved, 'Ready for delivery') +
+        metric('WP Eligible', s.wp, 'Effective WP path') +
+        metric('High Merit', s.high, 'High priority') +
+        '</div>' +
+        '<div class="panel"><div class="panel-title"><h3>Shortcuts</h3><button class="btn ghost" onclick="setView(\\'workstation\\')">Open Workstation</button></div><div class="shortcuts">' +
+        shortcut('Create New Case','Capture a manual matter.','openNewCaseModal()') +
+        shortcut('Attorney Review','Open flagged matters.',"setQueueFilter('review');setView('workstation')") +
+        shortcut('Needs Info','Review client questions.',"setQueueFilter('info');setView('workstation')") +
+        shortcut('Draft Letters','Move matters to drafting.',"setQueueFilter('drafting');setView('workstation')") +
+        '</div></div>' +
+        '<div class="panel" style="margin-top:14px"><div class="panel-title"><h3>Recent Matters</h3><span class="badge blue">' + casesData.length + ' total</span></div><div class="case-list" style="padding:0;max-height:420px">' +
+        (recent.length ? recent.map(c => caseCard(c)).join('') : '<div class="loader">No cases loaded.</div>') +
+        '</div></div>';
+    }
+
+    function metric(label, value, note) {
+      return '<div class="metric"><div><div class="metric-label">' + esc(label) + '</div><div class="metric-note">' + esc(note) + '</div></div><div class="metric-value">' + value + '</div></div>';
+    }
+
+    function shortcut(title, desc, action) {
+      return '<button class="shortcut" onclick="' + action + '"><strong>' + esc(title) + '</strong><span>' + esc(desc) + '</span></button>';
+    }
+
+    function filteredCases() {
+      const search = ($('case-search')?.value || '').toLowerCase().trim();
+      return casesData.filter(c => {
+        const f = facts(c);
+        const ed = effective(c);
+        if (currentQueueFilter === 'active' && c.status === 'archived') return false;
+        if (currentQueueFilter === 'review' && statusOf(c) !== 'attorney_review') return false;
+        if (currentQueueFilter === 'info' && statusOf(c) !== 'needs_info') return false;
+        if (currentQueueFilter === 'drafting' && statusOf(c) !== 'needs_drafting') return false;
+        if (currentQueueFilter === 'approved' && c.letter_status !== 'approved') return false;
+        if (currentQueueFilter === 'wp' && !bool(ed.wp_eligible)) return false;
+        if (!search) return true;
+        return [f.client_name,c.client_name,f.employer_name,f.incident_description,c.issue_summary,ed.track,ed.merit_band].join(' ').toLowerCase().includes(search);
+      });
+    }
+
+    function renderWorkstation() {
+      $('view-title').textContent = 'Case Workstation';
+      $('view-subtitle').textContent = 'Review, override, request information and progress matters quickly.';
+      const rows = filteredCases();
+      const selected = casesData.find(c => c.id === selectedCaseId) || rows[0] || null;
+      if (selected) selectedCaseId = selected.id;
+      $('main').innerHTML =
+        '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search cases..." oninput="renderWorkstation()"/><div class="filters">' +
+        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') +
+        '</div></div><div class="case-list">' +
+        (rows.length ? rows.map(c => caseCard(c, c.id === selectedCaseId)).join('') : '<div class="loader">No cases match this queue.</div>') +
+        '</div></section><section class="centre">' +
+        (selected ? selectedHtml(selected) : '<div class="card empty">Select or create a case to begin.</div>') +
+        '</section><aside class="right">' +
+        (selected ? sideHtml(selected) : '') +
+        '</aside></div>';
+    }
+
+    function chip(f, l) {
+      return '<button class="chip ' + (currentQueueFilter === f ? 'active' : '') + '" onclick="setQueueFilter(\\'' + f + '\\')">' + l + '</button>';
+    }
+
+    function caseCard(c, active = false) {
+      const f = facts(c);
+      const ed = effective(c);
+      const st = statusOf(c);
+      const name = f.client_name || c.client_name || 'Anonymous Client';
+      const sum = f.incident_description || c.issue_summary || ed.recommended_next_step || 'No summary captured yet.';
+      return '<div class="case-card ' + (active ? 'active' : '') + '" onclick="selectCase(\\'' + c.id + '\\')"><div class="case-row"><div class="case-name">' + esc(name) + '</div>' + statusBadge(st) + '</div><div class="case-summary">' + esc(sum.slice(0, 120)) + (sum.length > 120 ? '...' : '') + '</div><div class="badges"><span class="badge blue">' + esc(ed.track || 'track?') + '</span><span class="badge ' + meritClass(ed.merit_band) + '">' + esc(ed.merit_band || 'review') + '</span>' + (bool(ed.wp_eligible) ? '<span class="badge green">WP</span>' : '') + (f.admin_override?.overridden ? '<span class="badge purple">override</span>' : '') + '</div></div>';
+    }
+
+    function selectCase(id) { selectedCaseId = id; renderWorkstation(); }
+
+    function statusBadge(s) {
+      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
+      const item = map[s] || [s, 'blue'];
+      return '<span class="badge ' + item[1] + '">' + esc(item[0]) + '</span>';
+    }
+
+    function meritClass(b) {
+      b = String(b || '').toUpperCase();
+      if (b.includes('HIGH')) return 'green';
+      if (b.includes('MEDIUM')) return 'amber';
+      if (b.includes('LOW') || b.includes('NO')) return 'red';
+      return 'blue';
+    }
+
+    function selectedHtml(c) {
+      const f = facts(c);
+      const ed = effective(c);
+      return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id">Case ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions"><button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\\'' + c.id + '\\')">Save Facts</button></div></div><div class="fact-grid">' +
+        fact('Employer', f.employer_name) + fact('Contact', f.contact_info || c.contact_info) + fact('Incident Date', f.incident_date) + fact('Employment Status', f.employment_status) + fact('Incident Description', f.incident_description || c.issue_summary, true) +
+        '</div></div><div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\\'' + c.id + '\\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\\'' + c.id + '\\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
+    }
+
+    function fact(label, value, wide = false) {
+      return '<div class="fact ' + (wide ? 'wide' : '') + '"><span class="label">' + esc(label) + '</span><div class="value">' + esc(txt(value)) + '</div></div>';
+    }
+
+    function editableFacts(c) {
+      const f = facts(c);
+      const keys = ['client_name','contact_info','employer_name','employer_contact_details','incident_date','employment_status','dismissal_reason_type','contract_type','sector','hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter','incident_description'];
+      return '<div class="edit-grid">' + keys.map(k => editField(k, f[k])).join('') + '</div>';
+    }
+
+    function editField(k, v) {
+      const labels = {
+        client_name:'Client Name',contact_info:'Client Contact',employer_name:'Employer Name',employer_contact_details:'Employer Contact',incident_date:'Incident Date',employment_status:'Employment Status',dismissal_reason_type:'Dismissal Reason',contract_type:'Contract Type',sector:'Sector',
+        hearing_held:'Hearing Held?',proc_notice:'48h Notice Given?',proc_rep:'Representation Allowed?',proc_chair:'Independent Chair?',proc_consultation:'Consultation Held?',paid_suspension:'Paid Suspension?',constructive_dismissal:'Constructive Dismissal?',wants_letter:'Wants Letter?',incident_description:'Incident Description'
+      };
+      const bools = ['hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter'];
+      const wide = k === 'incident_description';
+      if (bools.includes(k)) {
+        const selected = v === true ? 'true' : v === false ? 'false' : 'null';
+        return '<div class="block"><label>' + labels[k] + '</label><select class="select fact-input" data-key="' + k + '"><option value="null" ' + (selected === 'null' ? 'selected' : '') + '>Pending</option><option value="true" ' + (selected === 'true' ? 'selected' : '') + '>Yes</option><option value="false" ' + (selected === 'false' ? 'selected' : '') + '>No</option></select></div>';
+      }
+      if (wide) return '<div class="block wide"><label>' + labels[k] + '</label><textarea class="textarea fact-input" data-key="' + k + '">' + esc(txt(v, '')) + '</textarea></div>';
+      return '<div class="block"><label>' + labels[k] + '</label><input class="field fact-input" data-key="' + k + '" value="' + attr(txt(v, '')) + '"/></div>';
+    }
+
+    function decisionSummary(d) {
+      return '<div class="badges" style="margin-bottom:12px"><span class="badge blue">' + esc(d.track || 'UNCLASSIFIED') + '</span><span class="badge ' + meritClass(d.merit_band) + '">' + esc(d.merit_band || d.overall_viability || 'REVIEW') + '</span>' + (bool(d.wp_eligible) ? '<span class="badge green">WP ELIGIBLE</span>' : '<span class="badge">WP N/A</span>') + '</div><div class="score-grid"><div class="score"><span>Substantive</span><strong>' + esc(txt(d.substantive_score)) + '</strong></div><div class="score"><span>Procedural</span><strong>' + esc(txt(d.procedural_score)) + '</strong></div></div><div class="timeline-item" style="margin-top:12px"><strong>Next step</strong>' + esc(txt(d.recommended_next_step || d.overall_viability, 'Review matter')) + '</div>';
+    }
+
+    function letterCard(c) {
+      const f = facts(c);
+      if (c.draft_letter) return '<div class="card"><h3>Drafted Letter</h3><textarea id="letter-editor" class="letter">' + esc(c.draft_letter) + '</textarea><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn ghost" onclick="saveLetter(\\'' + c.id + '\\',\\'pending_review\\')">Save Draft</button><button class="btn success" onclick="saveLetter(\\'' + c.id + '\\',\\'approved\\')">Approve</button></div></div>';
+      if (f.wants_letter) return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted);line-height:1.5">This matter is marked as requiring a letter. Save corrected facts first, then generate a draft.</p><button id="btn-generate-' + c.id + '" class="btn warn" onclick="generateDraft(\\'' + c.id + '\\')">Generate Draft Letter</button></div>';
+      return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted)">No letter requested at this stage.</p></div>';
+    }
+
+    function sideHtml(c) {
+      const f = facts(c);
+      const ed = effective(c);
+      const questions = f.client_questions || [];
+      const legal = ed.legal_basis || f.legal_basis || [];
+      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div><div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
+    }
+
+    async function updateCase(payload) {
+      const res = await fetch('/.netlify/functions/update_case', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+      if (!res.ok) {
+        let message = 'Update failed.';
+        try { message = (await res.json()).error || message; } catch(e) {}
+        throw new Error(message);
+      }
+      return res.json();
+    }
+
+    async function saveCaseFacts(id) {
+      const c = casesData.find(x => x.id === id);
+      if (!c) return;
+      const f = { ...(c.case_facts || {}) };
+      document.querySelectorAll('.fact-input').forEach(el => {
+        const k = el.dataset.key;
+        if (!k) return;
+        let v = el.value;
+        if (el.tagName === 'SELECT') v = v === 'true' ? true : v === 'false' ? false : null;
+        else v = v.trim() === '' ? null : v;
+        f[k] = v;
+      });
+      await updateCase({ id, case_facts: f, client_name: f.client_name, issue_summary: f.incident_description });
+      toast('Case facts saved.');
+      await fetchCases();
+    }
+
+    function openNewCaseModal() { openModal('new-case-modal'); }
+
+    function openRequestInfoModal() {
+      if (!selectedCaseId) return toast('Select a case first.');
+      openModal('request-info-modal');
+    }
+
+    function openOverrideModal() {
+      const c = casesData.find(x => x.id === selectedCaseId);
+      if (!c) return toast('Select a case first.');
+      const ed = effective(c);
+      $('ov-track').value = ed.track || 'MANUAL_REVIEW';
+      $('ov-merit').value = ed.merit_band || 'REQUIRES REVIEW';
+      $('ov-wp').value = bool(ed.wp_eligible) ? 'true' : 'false';
+      $('ov-wp-type').value = ed.wp_type || 'N/A';
+      $('ov-next-step').value = ed.recommended_next_step || '';
+      $('ov-reason').value = facts(c).admin_override?.reason || '';
+      openModal('override-modal');
+    }
+
+    async function saveDecisionOverride() {
+      const c = casesData.find(x => x.id === selectedCaseId);
+      if (!c) return;
+      const f = { ...(c.case_facts || {}) };
+      if (!f.justine_decision) {
+        f.justine_decision = {
+          track: f.track,
+          merit_band: f.merit_band,
+          wp_eligible: f.wp_eligible,
+          wp_type: f.wp_type,
+          recommended_next_step: f.recommended_next_step,
+          substantive_score: f.substantive_score,
+          procedural_score: f.procedural_score,
+          legal_basis: f.legal_basis || [],
+          captured_at: new Date().toISOString()
+        };
+      }
+      const override = {
+        overridden: true,
+        overridden_at: new Date().toISOString(),
+        track: $('ov-track').value,
+        merit_band: $('ov-merit').value,
+        wp_eligible: $('ov-wp').value === 'true',
+        wp_type: $('ov-wp-type').value,
+        recommended_next_step: $('ov-next-step').value,
+        reason: $('ov-reason').value
+      };
+      f.admin_override = override;
+      f.effective_decision = { source: 'admin_override', ...override };
+      f.track = override.track;
+      f.merit_band = override.merit_band;
+      f.wp_eligible = override.wp_eligible;
+      f.wp_type = override.wp_type;
+      f.recommended_next_step = override.recommended_next_step;
+      f.attorney_review_flag = true;
+      await updateCase({ id: c.id, case_facts: f, status: 'requires_attorney' });
+      closeModal('override-modal');
+      toast('Decision override saved.');
+      await fetchCases();
+    }
+
+    async function saveInfoRequest() {
+      const c = casesData.find(x => x.id === selectedCaseId);
+      if (!c) return;
+      const question = $('q-text').value.trim();
+      if (!question) return toast('Add a question first.');
+      const f = { ...(c.case_facts || {}) };
+      const questions = Array.isArray(f.client_questions) ? [...f.client_questions] : [];
+      questions.push({
+        question,
+        channel: $('q-channel').value,
+        answer_type: $('q-type').value,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        answered_at: null,
+        answer: null
+      });
+      f.client_questions = questions;
+      await updateCase({ id: c.id, case_facts: f, status: 'needs_more_info' });
+      $('q-text').value = '';
+      closeModal('request-info-modal');
+      toast('Client question saved.');
+      await fetchCases();
+    }
+
+    async function createManualCase() {
+      const btn = $('create-case-btn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+      try {
+        const res = await fetch('/.netlify/functions/create_case', { method: 'POST', headers: headers() });
+        if (!res.ok) throw new Error('Could not create base case.');
+        const created = await res.json();
+        const id = created.case.id;
+        const wants = $('new-wants-letter').value === 'true';
+        const wp = $('new-wp').value === 'true';
+        const review = $('new-attorney-review').value === 'true';
+        const f = {
+          client_name: $('new-client-name').value || 'New Manual Client',
+          contact_info: $('new-contact-info').value || '',
+          source: $('new-source').value,
+          urgency: $('new-urgency').value,
+          employer_name: $('new-employer-name').value || '',
+          employer_contact_details: $('new-employer-contact').value || '',
+          employment_status: $('new-employment-status').value || '',
+          incident_date: $('new-incident-date').value || '',
+          dismissal_reason_type: $('new-dismissal-reason').value || '',
+          incident_description: $('new-incident-description').value || '',
+          wants_letter: wants,
+          track: $('new-track').value,
+          merit_band: $('new-merit').value,
+          wp_eligible: wp,
+          wp_type: wp ? 'FULL' : 'N/A',
+          attorney_review_flag: review,
+          recommended_next_step: $('new-next-step').value || 'Attorney to review and confirm next action',
+          substantive_score: 0,
+          procedural_score: 0
+        };
+        f.admin_override = {
+          overridden: true,
+          overridden_at: new Date().toISOString(),
+          track: f.track,
+          merit_band: f.merit_band,
+          wp_eligible: f.wp_eligible,
+          wp_type: f.wp_type,
+          recommended_next_step: f.recommended_next_step,
+          reason: 'Manual case created by admin.'
+        };
+        f.effective_decision = { source: 'manual_admin_creation', ...f.admin_override };
+        await updateCase({
+          id,
+          case_facts: f,
+          client_name: f.client_name,
+          issue_summary: f.incident_description || 'Manual case created by admin.',
+          status: review ? 'requires_attorney' : 'manual_case',
+          letter_status: wants ? 'needs_drafting' : 'not_drafted'
+        });
+        selectedCaseId = id;
+        closeModal('new-case-modal');
+        currentQueueFilter = 'all';
+        currentView = 'workstation';
+        toast('Manual case created.');
+        await fetchCases();
+      } catch (e) {
+        toast(e.message || 'Could not create case.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Case';
+      }
+    }
+
+    async function saveLetter(id, status) {
+      const draft = $('letter-editor').value;
+      await updateCase({ id, draft_letter: draft, letter_status: status });
+      toast(status === 'approved' ? 'Letter approved.' : 'Draft saved.');
+      await fetchCases();
+    }
+
+    async function generateDraft(id) {
+      const btn = $('btn-generate-' + id);
+      btn.disabled = true;
+      btn.textContent = 'Drafting...';
+      try {
+        const res = await fetch('/.netlify/functions/generate_letter', { method: 'POST', headers: headers(), body: JSON.stringify({ caseId: id }) });
+        if (!res.ok) throw new Error('Draft generation failed.');
+        toast('Draft generated.');
+        await fetchCases();
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Draft Letter';
+      }
+    }
+
+    async function archiveCase(id) {
+      if (!confirm('Archive this case?')) return;
+      await updateCase({ id, status: 'archived' });
+      toast('Case archived.');
+      await fetchCases();
+    }
+
+    function openModal(id) { $(id).classList.add('open'); }
+    function closeModal(id) { $(id).classList.remove('open'); }
+
+    function toast(message) {
+      const el = $('toast');
+      el.textContent = message;
+      el.classList.add('show');
+      clearTimeout(window.__toast);
+      window.__toast = setTimeout(() => el.classList.remove('show'), 3200);
+    }
+
+    function $(id) { return document.getElementById(id); }
+    function esc(v) { return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+    function attr(v) { return esc(v).replace(/`/g,'&#096;'); }
+  </script>
+</body>
+</html>
