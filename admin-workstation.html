@@ -52,7 +52,7 @@
     .shortcut strong{display:block;margin-bottom:6px}.shortcut span{color:var(--muted);font-size:.84rem;line-height:1.35}
     .workstation{min-height:100%;display:grid;grid-template-columns:360px minmax(0,1fr) 330px;gap:14px}
     .queue{min-height:0;display:flex;flex-direction:column;overflow:hidden}.queue-controls{display:grid;gap:10px;padding:14px;border-bottom:1px solid var(--border)}
-    .filters{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.chip{border:1px solid var(--border);background:rgba(255,255,255,.08);color:var(--muted);border-radius:999px;padding:7px 10px;white-space:nowrap;font-size:.74rem;font-weight:900;cursor:pointer}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;overflow:visible;padding-bottom:0}.chip{border:1px solid var(--border);background:rgba(255,255,255,.08);color:var(--muted);border-radius:999px;padding:7px 10px;white-space:nowrap;font-size:.74rem;font-weight:900;cursor:pointer}
     .chip.active{color:#fff;background:rgba(56,189,248,.2);border-color:rgba(56,189,248,.42)}
     .case-list{min-height:0;overflow:auto;padding:12px}.case-card{padding:14px;margin-bottom:10px;cursor:pointer}.case-card:hover,.case-card.active{background:rgba(56,189,248,.13);border-color:rgba(56,189,248,.42)}
     .case-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}.case-name{font-weight:900;letter-spacing:-.02em}
@@ -378,7 +378,6 @@
       $('view-subtitle').textContent = 'Review, override, request information and progress matters quickly.';
       $('top-actions').innerHTML =
         '<button class="btn primary" onclick="openNewCaseModal()">New Case</button>' +
-        '<button class="btn warn" onclick="openRequestInfoModal()">Request Info</button>' +
         '<button class="btn ghost" onclick="fetchCases(true)">Refresh</button>';
       const rows = filteredCases();
       const selected = casesData.find(c => c.id === selectedCaseId) || rows[0] || null;
