@@ -193,8 +193,8 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    const SUPABASE_URL = window.JUSTINE_SUPABASE_URL || 'REPLACE_WITH_SUPABASE_URL';
-    const SUPABASE_ANON_KEY = window.JUSTINE_SUPABASE_ANON_KEY || 'REPLACE_WITH_SUPABASE_ANON_KEY';
+    const SUPABASE_URL = window.JUSTINE_SUPABASE_URL || 'https://pdjhgszpndwykeqlusho.supabase.co';
+    const SUPABASE_ANON_KEY = window.JUSTINE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
 
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentToken = null;
