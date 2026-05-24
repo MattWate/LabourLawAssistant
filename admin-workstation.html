@@ -42,7 +42,7 @@
     .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.main{min-height:0;overflow:auto;border-radius:28px;padding:18px}
     .dashboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
     .metric,.panel,.case-card,.card{border:1px solid var(--border);background:rgba(255,255,255,.1);border-radius:20px;box-shadow:0 14px 40px rgba(0,0,0,.16);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-    .metric{padding:18px;min-height:112px;display:flex;flex-direction:column;justify-content:space-between}
+    .metric{padding:18px;min-height:112px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;transition:transform .15s ease,border-color .15s ease,background .15s ease}.metric:hover{transform:translateY(-2px);border-color:rgba(56,189,248,.45);background:rgba(56,189,248,.12)}
     .metric-label{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.11em;font-weight:900}
     .metric-value{font-size:2rem;line-height:1;font-weight:950;letter-spacing:-.06em}.metric-note{color:var(--muted2);font-size:.82rem;margin-top:8px}
     .panel,.card{padding:18px}.panel-title{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px}
@@ -124,11 +124,7 @@
           <h2 id="view-title">Dashboard</h2>
           <p id="view-subtitle">Operational view of active matters and delivery bottlenecks.</p>
         </div>
-        <div class="actions">
-          <button class="btn primary" onclick="openNewCaseModal()">New Case</button>
-          <button class="btn warn" onclick="openRequestInfoModal()">Request Info</button>
-          <button class="btn ghost" onclick="fetchCases(true)">Refresh</button>
-        </div>
+        <div id="top-actions" class="actions"></div>
       </header>
       <section id="main" class="main glass"><div class="loader">Loading workstation...</div></section>
     </main>
@@ -328,33 +324,32 @@
 
     function renderDashboard() {
       $('view-title').textContent = 'Dashboard';
-      $('view-subtitle').textContent = 'Operational view of active matters and delivery bottlenecks.';
+      $('view-subtitle').textContent = 'Click a card to open the relevant case queue.';
+      $('top-actions').innerHTML =
+        '<button class="btn primary" onclick="openNewCaseModal()">New Case</button>' +
+        '<button class="btn ghost" onclick="fetchCases(true)">Refresh</button>';
+
       const s = stats();
-      const recent = casesData.slice(0, 6);
+      const recent = casesData.slice(0, 8);
+
       $('main').innerHTML =
         '<div class="dashboard">' +
-        metric('Active Cases', s.active, 'Open matters') +
-        metric('Attorney Review', s.review, 'Needs legal judgement') +
-        metric('Needs More Info', s.info, 'Waiting on client') +
-        metric('Drafting Queue', s.drafting, 'Ready for letter') +
-        metric('Pending Review', s.pending, 'Drafts awaiting approval') +
-        metric('Approved', s.approved, 'Ready for delivery') +
-        metric('WP Eligible', s.wp, 'Effective WP path') +
-        metric('High Merit', s.high, 'High priority') +
+        metric('Active Cases', s.active, 'Open matters', "setQueueFilter('active');setView('workstation')") +
+        metric('Attorney Review', s.review, 'Needs legal judgement', "setQueueFilter('review');setView('workstation')") +
+        metric('Needs More Info', s.info, 'Waiting on client', "setQueueFilter('info');setView('workstation')") +
+        metric('Drafting Queue', s.drafting, 'Ready for letter', "setQueueFilter('drafting');setView('workstation')") +
+        metric('Pending Review', s.pending, 'Drafts awaiting approval', "setQueueFilter('approved');setView('workstation')") +
+        metric('Approved', s.approved, 'Ready for delivery', "setQueueFilter('approved');setView('workstation')") +
+        metric('WP Eligible', s.wp, 'Effective WP path', "setQueueFilter('wp');setView('workstation')") +
+        metric('High Merit', s.high, 'High priority', "setQueueFilter('high');setView('workstation')") +
         '</div>' +
-        '<div class="panel"><div class="panel-title"><h3>Shortcuts</h3><button class="btn ghost" onclick="setView(\'workstation\')">Open Workstation</button></div><div class="shortcuts">' +
-        shortcut('Create New Case','Capture a manual matter.','openNewCaseModal()') +
-        shortcut('Attorney Review','Open flagged matters.',"setQueueFilter('review');setView('workstation')") +
-        shortcut('Needs Info','Review client questions.',"setQueueFilter('info');setView('workstation')") +
-        shortcut('Draft Letters','Move matters to drafting.',"setQueueFilter('drafting');setView('workstation')") +
-        '</div></div>' +
-        '<div class="panel" style="margin-top:14px"><div class="panel-title"><h3>Recent Matters</h3><span class="badge blue">' + casesData.length + ' total</span></div><div class="case-list" style="padding:0;max-height:420px">' +
+        '<div class="panel" style="margin-top:14px"><div class="panel-title"><h3>Recent Matters</h3><button class="btn ghost" onclick="setView(\'workstation\')">Open Workstation</button></div><div class="case-list" style="padding:0;max-height:560px">' +
         (recent.length ? recent.map(c => caseCard(c)).join('') : '<div class="loader">No cases loaded.</div>') +
         '</div></div>';
     }
 
-    function metric(label, value, note) {
-      return '<div class="metric"><div><div class="metric-label">' + esc(label) + '</div><div class="metric-note">' + esc(note) + '</div></div><div class="metric-value">' + value + '</div></div>';
+    function metric(label, value, note, action) {
+      return '<div class="metric" onclick="' + action + '"><div><div class="metric-label">' + esc(label) + '</div><div class="metric-note">' + esc(note) + '</div></div><div class="metric-value">' + value + '</div></div>';
     }
 
     function shortcut(title, desc, action) {
@@ -372,6 +367,7 @@
         if (currentQueueFilter === 'drafting' && statusOf(c) !== 'needs_drafting') return false;
         if (currentQueueFilter === 'approved' && c.letter_status !== 'approved') return false;
         if (currentQueueFilter === 'wp' && !bool(ed.wp_eligible)) return false;
+        if (currentQueueFilter === 'high' && !['HIGH','MEDIUM-HIGH'].includes(String(ed.merit_band || '').toUpperCase())) return false;
         if (!search) return true;
         return [f.client_name,c.client_name,f.employer_name,f.incident_description,c.issue_summary,ed.track,ed.merit_band].join(' ').toLowerCase().includes(search);
       });
@@ -380,12 +376,16 @@
     function renderWorkstation() {
       $('view-title').textContent = 'Case Workstation';
       $('view-subtitle').textContent = 'Review, override, request information and progress matters quickly.';
+      $('top-actions').innerHTML =
+        '<button class="btn primary" onclick="openNewCaseModal()">New Case</button>' +
+        '<button class="btn warn" onclick="openRequestInfoModal()">Request Info</button>' +
+        '<button class="btn ghost" onclick="fetchCases(true)">Refresh</button>';
       const rows = filteredCases();
       const selected = casesData.find(c => c.id === selectedCaseId) || rows[0] || null;
       if (selected) selectedCaseId = selected.id;
       $('main').innerHTML =
         '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search cases..." oninput="renderWorkstation()"/><div class="filters">' +
-        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') +
+        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
         '</div></div><div class="case-list">' +
         (rows.length ? rows.map(c => caseCard(c, c.id === selectedCaseId)).join('') : '<div class="loader">No cases match this queue.</div>') +
         '</div></section><section class="centre">' +
