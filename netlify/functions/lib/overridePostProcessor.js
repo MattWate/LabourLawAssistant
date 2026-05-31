@@ -3,6 +3,8 @@ const { enhanceStructuredScore } = require('./structuredScoreEnhancer');
 const TRACK_CITATIONS = {
   AUD: ['LRA s187', 'EEA s6', 'LRA s194(3)'],
   CD: ['LRA s186(1)(e)'],
+  ULP: ['LRA s186(2)'],
+  PDA: ['LRA Schedule 8 Item 4', 'LRA s186(2)(b)'],
   'UD-RETRENCHMENT': ['LRA s189', 'LRA s189A where applicable', 'BCEA s41']
 };
 
@@ -14,6 +16,7 @@ const OVERRIDE_CITATIONS = {
   UNION_ACTIVITY: ['LRA s187(1)(a)', 'LRA s187(1)(c)'],
   SUSTAINED_NON_PAYMENT: ['BCEA s34', 'BCEA s77'],
   HIV_OR_SICK_LEAVE: ['LRA s187(1)(f)', 'EEA s6'],
+  HAZARDOUS_WORK_REFUSAL: ['OHSA s35', 'LRA s187(1)(f)'],
   PROTECTED_GROUND_DISCRIMINATION: ['EEA s6', 'LRA s187(1)(f)'],
   SHAM_RETRENCHMENT: ['LRA s187(1)(e)', 'LRA s187(1)(f)', 'BCEA s41']
 };
@@ -26,13 +29,34 @@ const OVERRIDE_LABELS = {
   UNION_ACTIVITY: 'Dismissal related to union membership, activity or strike participation',
   SUSTAINED_NON_PAYMENT: 'Sustained non-payment of salary across more than one pay period',
   HIV_OR_SICK_LEAVE: 'Dismissal of an employee on lawful sick leave or for HIV status',
+  HAZARDOUS_WORK_REFUSAL: 'Refusal of hazardous work followed by detriment',
   PROTECTED_GROUND_DISCRIMINATION: 'Protected-ground discrimination overlay',
   SHAM_RETRENCHMENT: 'Sham retrenchment indicators'
+};
+
+const FLAG_ALIASES = {
+  WHISTLEBLOWER: 'PROTECTED_DISCLOSURE',
+  PROTECTED_DISCLOSURE: 'PROTECTED_DISCLOSURE',
+  SUSPENSION_WITHOUT_PAY: 'SUSPENSION_WITHOUT_PAY',
+  UNION_ACTIVITY: 'UNION_ACTIVITY',
+  NON_PAYMENT_OF_SALARY: 'SUSTAINED_NON_PAYMENT',
+  SUSTAINED_NON_PAYMENT: 'SUSTAINED_NON_PAYMENT',
+  SICK_LEAVE_OR_HIV: 'HIV_OR_SICK_LEAVE',
+  HIV_OR_SICK_LEAVE: 'HIV_OR_SICK_LEAVE',
+  HAZARDOUS_WORK_REFUSAL: 'HAZARDOUS_WORK_REFUSAL',
+  PROTECTED_GROUND_DISCRIMINATION: 'PROTECTED_GROUND_DISCRIMINATION',
+  SHAM_RETRENCHMENT: 'SHAM_RETRENCHMENT',
+  PREGNANCY: 'PREGNANCY'
 };
 
 const clean = value => String(value || '').toLowerCase();
 const hasAny = (value, terms) => terms.some(term => clean(value).includes(term));
 const dedupe = values => [...new Set((values || []).filter(Boolean))];
+
+function normaliseFlags(flags = []) {
+  if (!Array.isArray(flags)) return [];
+  return dedupe(flags.map(flag => FLAG_ALIASES[String(flag || '').trim().toUpperCase()]).filter(Boolean));
+}
 
 function hasProtectedGroundDiscrimination(text) {
   const t = clean(text);
@@ -75,7 +99,7 @@ function hasProtectedGroundDiscrimination(text) {
 
 function detectOverrideFlags(facts = {}, fullStory = '') {
   const text = clean(`${facts.initial_query || ''} ${fullStory} ${facts.protected_ground || ''} ${facts.dismissal_reason_type || ''}`);
-  const flags = [];
+  const flags = normaliseFlags(facts.override_flags || []);
 
   if (hasAny(text, ['pregnant', 'pregnancy', 'maternity', '14 weeks'])) flags.push('PREGNANCY');
 
@@ -87,10 +111,11 @@ function detectOverrideFlags(facts = {}, fullStory = '') {
   const unlawfulContext = hasAny(text, ['remove complaints', 'compliance register', 'auditor', 'audit', 'falsify', 'fraud', 'unlawful', 'illegal', 'customer complaints']);
   if (refusedInstruction && unlawfulContext) flags.push('UNLAWFUL_INSTRUCTION_REFUSAL');
 
-  if (hasAny(text, ['suspended without pay', 'suspension without pay'])) flags.push('SUSPENSION_WITHOUT_PAY');
+  if (facts.paid_suspension === false || hasAny(text, ['suspended without pay', 'suspension without pay'])) flags.push('SUSPENSION_WITHOUT_PAY');
   if (hasAny(text, ['union activity', 'shop steward', 'trade union', 'union member', 'strike participation'])) flags.push('UNION_ACTIVITY');
   if (hasAny(text, ['two months salary', 'salary arrears', 'unpaid salary', 'non-payment of salary', 'not paid for two'])) flags.push('SUSTAINED_NON_PAYMENT');
   if (hasAny(text, ['hiv', 'lawful sick leave', 'dismissed on sick leave'])) flags.push('HIV_OR_SICK_LEAVE');
+  if (hasAny(text, ['hazardous work', 'unsafe work', 'imminent and serious risk', 'refused unsafe'])) flags.push('HAZARDOUS_WORK_REFUSAL');
 
   if (hasProtectedGroundDiscrimination(`${facts.initial_query || ''} ${fullStory}`) || hasProtectedGroundDiscrimination({ protected_ground: facts.protected_ground })) {
     flags.push('PROTECTED_GROUND_DISCRIMINATION');
@@ -103,10 +128,12 @@ function detectOverrideFlags(facts = {}, fullStory = '') {
   return dedupe(flags);
 }
 
-function inferSecondaryTrack(primaryTrack, overrideFlags = []) {
+function inferSecondaryTrack(primaryTrack, overrideFlags = [], facts = {}) {
+  if (facts.secondary_track) return facts.secondary_track;
   if (!overrideFlags.length) return null;
-  const audFlags = ['PREGNANCY', 'PROTECTED_DISCLOSURE', 'UNLAWFUL_INSTRUCTION_REFUSAL', 'UNION_ACTIVITY', 'HIV_OR_SICK_LEAVE', 'PROTECTED_GROUND_DISCRIMINATION', 'SHAM_RETRENCHMENT'];
+  const audFlags = ['PREGNANCY', 'PROTECTED_DISCLOSURE', 'UNLAWFUL_INSTRUCTION_REFUSAL', 'UNION_ACTIVITY', 'HIV_OR_SICK_LEAVE', 'HAZARDOUS_WORK_REFUSAL', 'PROTECTED_GROUND_DISCRIMINATION', 'SHAM_RETRENCHMENT'];
   if (overrideFlags.some(flag => audFlags.includes(flag))) return primaryTrack === 'AUD' ? null : 'AUD';
+  if (overrideFlags.includes('SUSPENSION_WITHOUT_PAY')) return primaryTrack === 'ULP' ? null : 'ULP';
   return null;
 }
 
@@ -129,7 +156,7 @@ function applyOverridePostProcessing(facts = {}, fullStory = '', scorecard = {})
   scorecard = enhanceStructuredScore(facts, scorecard);
 
   const overrideFlags = detectOverrideFlags(facts, fullStory);
-  const secondaryTrack = inferSecondaryTrack(scorecard.track, overrideFlags);
+  const secondaryTrack = inferSecondaryTrack(scorecard.track, overrideFlags, facts);
 
   const legalBasis = [];
   legalBasis.push(...(scorecard.legal_basis || []));
