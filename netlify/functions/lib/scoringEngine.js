@@ -7,6 +7,7 @@ const TRACK_LABELS = {
   'UD-RETRENCHMENT': 'Unfair Dismissal — Retrenchment',
   CD: 'Constructive Dismissal',
   AUD: 'Automatically Unfair Dismissal / Unfair Labour Practice',
+  ULP: 'Unfair Labour Practice',
   PDA: 'Pre-Dismissal Advisory',
   ANC: 'Ancillary Advisory'
 };
@@ -18,8 +19,9 @@ const LEGAL_BASIS = {
   'UD-RETRENCHMENT': ['LRA s189', 'LRA s189A where applicable', 'BCEA s41'],
   CD: ['LRA s186(1)(e)'],
   AUD: ['LRA s187', 'LRA s186(2)', 'EEA s6', 'Protected Disclosures Act 26 of 2000'],
+  ULP: ['LRA s186(2)', 'LRA s186(2)(b)', 'LRA s186(2)(c)'],
   PDA: ['LRA Schedule 8 Item 4', 'LRA s186(2)(b)'],
-  ANC: ['BCEA', 'LRA s186(2)', 'BCEA s34', 'BCEA s42']
+  ANC: ['LRA s186(2)', 'Schedule 8 Items 3 and 4']
 };
 
 const clean = value => String(value ?? '').trim().toLowerCase();
@@ -27,6 +29,7 @@ const hasAny = (value, terms) => terms.some(term => clean(value).includes(term))
 const clamp = value => Math.max(0, Math.min(10, Math.round((Number(value) || 0) * 10) / 10));
 const isNo = value => value === false || clean(value).includes('false') || clean(value) === 'no';
 const isYes = value => value === true || clean(value).includes('true') || clean(value) === 'yes';
+const dedupe = values => [...new Set((values || []).filter(Boolean))];
 
 function add(breakdown, channel, points, label, legalHook) {
   if (!points) return;
@@ -39,7 +42,8 @@ function inferTrack(facts = {}) {
   const reason = clean(facts.dismissal_reason_type || facts.reason_type || facts.stated_reason);
   const topic = clean(facts.advisory_topic || facts.ancillary_topic);
   const story = clean(`${facts.initial_query || ''} ${facts.incident_description || ''}`);
-  if (status.includes('discrimination') || status.includes('aud') || status.includes('ulp')) return 'AUD';
+  if (status.includes('discrimination') || status.includes('aud')) return 'AUD';
+  if (status.includes('ulp') || topic.includes('suspension') || facts.paid_suspension === false) return 'ULP';
   if (status.includes('resigned') || status.includes('constructive')) return 'CD';
   if (status.includes('advisory') || status.includes('employed')) {
     if (topic.includes('hearing') || story.includes('disciplinary hearing')) return 'PDA';
@@ -52,6 +56,7 @@ function inferTrack(facts = {}) {
     return 'UD-MISCONDUCT';
   }
   if (hasAny(story, ['pregnan', 'union', 'whistle', 'discriminat'])) return 'AUD';
+  if (hasAny(story, ['suspended without pay', 'suspension without pay'])) return 'ULP';
   if (hasAny(story, ['resign', 'intolerable', 'forced to quit'])) return 'CD';
   if (hasAny(story, ['hearing', 'charge sheet']) && !story.includes('dismissed')) return 'PDA';
   return 'ANC';
@@ -93,9 +98,13 @@ function meritBonus(facts = {}) {
 
 function tenurePoint(facts, breakdown) {
   const tenure = clean(facts.tenure || facts.length_of_service || facts.employment_length || facts.incident_description);
-  if (hasAny(tenure, ['5 year', 'five year', '6 year', 'six year', '7 year', '8 year', '9 year', '10 year'])) {
+  if (hasAny(tenure, ['5 year', 'five year', '6 year', 'six year', '7 year', '8 year', '9 year', '10 year', '5+y'])) {
     add(breakdown, 'substantive', 1, 'Long service strengthens proportionality', 'Schedule 8 proportionality');
     return 1;
+  }
+  if (hasAny(tenure, ['2-5', '2 year', '3 year', '4 year'])) {
+    add(breakdown, 'substantive', 0.5, 'Material service history may assist proportionality', 'Schedule 8 proportionality');
+    return 0.5;
   }
   return 0;
 }
@@ -194,6 +203,7 @@ function scoreAudUlp(facts, breakdown, story) {
   const worsened = clean(facts.employer_response_worsened);
   const tenure = tenurePoint(facts, breakdown);
   if (status.includes('resigned')) return scoreConstructiveDismissal(facts, breakdown, story);
+  if (facts.paid_suspension === false || hasAny(story, ['suspended without pay', 'suspension without pay'])) { substantive += 5; procedural += 3; add(breakdown, 'substantive', 5, 'Suspension without pay creates strong unfair labour practice leverage', 'LRA s186(2)(b)'); add(breakdown, 'procedural', 3, 'No hearing before unpaid suspension creates a procedural defect', 'LRA s186(2)(b)'); }
   if (hasAny(ground, ['pregnancy', 'hiv', 'union activity', 'whistleblowing'])) { substantive += 5; add(breakdown, 'substantive', 5, 'Confirmed protected ground triggers high-merit AUD/ULP treatment', 'LRA s187 / EEA s6 / PDA'); }
   else if (hasAny(ground, ['race', 'gender', 'sexual orientation', 'disability', 'religion', 'age', 'political opinion', 'other'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Protected ground indicated', 'LRA s187 / EEA s6'); }
   if (comparator === 'yes') { substantive += 2; add(breakdown, 'substantive', 2, 'Comparator evidence may support the claim', 'EEA s6'); }
@@ -205,13 +215,65 @@ function scoreAudUlp(facts, breakdown, story) {
   return { substantive, procedural };
 }
 
+function scoreAncillary(facts, breakdown, story) {
+  let substantive = 2, procedural = 2;
+  const topic = clean(facts.advisory_topic || facts.ancillary_topic);
+
+  const warningMatter = topic.includes('warning') || topic.includes('e1') || hasAny(story, ['final written warning', 'written warning', 'warning challenge', 'warning unfair']);
+  const suspensionMatter = facts.paid_suspension === false || topic.includes('suspension') || hasAny(story, ['suspended without pay', 'suspension without pay']);
+  const payMatter = topic.includes('pay') || topic.includes('bcea') || hasAny(story, ['unpaid', 'deduction', 'salary arrears', 'non-payment', 'not paid']);
+  const grievanceMatter = topic.includes('grievance') || hasAny(story, ['grievance', 'raised internally', 'emailed hr']);
+
+  if (suspensionMatter) {
+    substantive = 7;
+    procedural = 6;
+    add(breakdown, 'substantive', 5, 'Suspension without pay is treated as strong unfair labour practice leverage', 'LRA s186(2)(b)');
+    if (isNo(facts.hearing_held) || hasAny(story, ['no hearing', 'without a hearing', 'no disciplinary hearing'])) {
+      procedural += 2;
+      add(breakdown, 'procedural', 2, 'No hearing before unpaid suspension strengthens the employee position', 'LRA s186(2)(b)');
+    }
+    return { substantive, procedural };
+  }
+
+  if (warningMatter) {
+    substantive = 4;
+    procedural = 4;
+    if (hasAny(story, ['bereavement', 'death in the family', 'funeral', 'compassionate'])) { substantive += 2; add(breakdown, 'substantive', 2, 'Bereavement or compassionate context may provide a substantive defence to the warning', 'Schedule 8 Item 3'); }
+    if (hasAny(story, ['delegated authority', 'acting manager', 'manager approved', 'authorised', 'permission'])) { substantive += 2; add(breakdown, 'substantive', 2, 'Delegated authority or approval may undermine the misconduct basis for the warning', 'Schedule 8 Item 3'); }
+    if (hasAny(story, ['no hearing', 'not heard', 'no chance to explain', 'without asking me'])) { procedural += 3; add(breakdown, 'procedural', 3, 'No meaningful opportunity to respond before the warning', 'Schedule 8 Item 4'); }
+    if (hasAny(story, ['final written warning', 'final warning'])) { substantive += 1; add(breakdown, 'substantive', 1, 'A final written warning raises proportionality concerns where the underlying facts are disputed', 'Schedule 8 Items 3 and 4'); }
+    if (hasAny(story, ['appealed', 'appeal', 'grievance', 'emailed hr', 'raised internally'])) { procedural += 1; add(breakdown, 'procedural', 1, 'Internal challenge or escalation has been attempted', 'LRA s186(2)(c)'); }
+    substantive += tenurePoint(facts, breakdown);
+    return { substantive, procedural };
+  }
+
+  if (payMatter) {
+    substantive = 5;
+    procedural = 3;
+    add(breakdown, 'substantive', 3, 'Monetary or statutory pay dispute identified', 'BCEA s34 / BCEA s77');
+    if (hasAny(story, ['more than one month', 'two months', 'repeated', 'several months'])) { substantive += 2; add(breakdown, 'substantive', 2, 'Repeated or sustained non-payment strengthens the claim', 'BCEA s77'); }
+    if (grievanceMatter) { procedural += 2; add(breakdown, 'procedural', 2, 'Internal escalation attempt recorded', 'BCEA enforcement / internal process'); }
+    return { substantive, procedural };
+  }
+
+  if (grievanceMatter) {
+    substantive = 3;
+    procedural = 4;
+    add(breakdown, 'procedural', 2, 'Internal grievance or escalation route has been identified', 'Internal process / LRA s186(2) where applicable');
+    return { substantive, procedural };
+  }
+
+  add(breakdown, 'procedural', 1, 'Matter requires structured internal escalation before legal leverage can be confirmed', 'Internal process / LRA s186(2) where applicable');
+  return { substantive, procedural };
+}
+
 function scoreByTrack(track, facts, breakdown) {
   const story = `${facts.initial_query || ''} ${facts.incident_description || ''}`;
   if (track === 'UD-MISCONDUCT') return scoreMisconduct(facts, breakdown, story);
   if (track === 'UD-POOR_PERFORMANCE') return scorePoorPerformance(facts, breakdown, story);
   if (track === 'UD-INCAPACITY') return scoreIncapacity(facts, breakdown, story);
   if (track === 'CD') return scoreConstructiveDismissal(facts, breakdown, story);
-  if (track === 'AUD') return scoreAudUlp(facts, breakdown, story);
+  if (track === 'AUD' || track === 'ULP') return scoreAudUlp(facts, breakdown, story);
 
   let substantive = 3, procedural = 3;
   if (track === 'UD-RETRENCHMENT') {
@@ -226,32 +288,53 @@ function scoreByTrack(track, facts, breakdown) {
     if (facts.paid_suspension === false || hasAny(story, ['suspended without pay'])) { substantive += 5; add(breakdown, 'substantive', 5, 'Suspension without pay creates strong ULP leverage', 'LRA s186(2)(b)'); }
     substantive += tenurePoint(facts, breakdown);
   }
-  if (track === 'ANC') {
-    substantive = 2; procedural = 2;
-    if (hasAny(story, ['unpaid', 'deduction', 'salary', 'leave', 'overtime'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Possible BCEA monetary or leave issue identified', 'BCEA'); }
-    if (hasAny(story, ['raised internally', 'grievance', 'emailed hr', 'appealed', 'written response', 'internal appeal'])) { procedural += 2; add(breakdown, 'procedural', 2, 'Internal escalation attempt recorded', 'Internal process / LRA ULP threshold'); }
-  }
+  if (track === 'ANC') return scoreAncillary(facts, breakdown, story);
   return { substantive, procedural };
 }
 
-function inferAncillaryOutput(facts = {}) {
+function ancillarySubtype(facts = {}) {
   const topic = clean(facts.advisory_topic || facts.ancillary_topic);
   const story = clean(`${facts.initial_query || ''} ${facts.incident_description || ''}`);
-  if (topic.includes('warning') || story.includes('warning')) return {
-    title: 'Ancillary Advisory — Warning Challenge: PREPARATION PACK', outputType: 'Preparation Pack',
-    bullets: ['Prepare a written response setting out your version of events and why the warning is unfair or disproportionate.', 'Check the employer\'s disciplinary code or internal appeal procedure for time limits and the correct person to send the appeal to.', 'Attach evidence that explains the lateness or context, including transport disruption evidence where available.', 'If the warning causes prejudice or is used unfairly later, consider whether the matter reaches the unfair labour practice threshold.'],
-    legalBasis: ['LRA s186(2)', 'Internal disciplinary code or appeal procedure']
+  if (facts.paid_suspension === false || topic.includes('suspension') || hasAny(story, ['suspended without pay', 'suspension without pay'])) return 'SUSPENSION';
+  if (topic.includes('warning') || topic.includes('e1') || hasAny(story, ['final written warning', 'written warning', 'warning challenge'])) return 'WARNING';
+  if (topic.includes('pay') || topic.includes('bcea') || hasAny(story, ['unpaid', 'deduction', 'salary arrears', 'non-payment', 'not paid'])) return 'PAY';
+  if (topic.includes('grievance') || hasAny(story, ['grievance', 'raised internally', 'emailed hr'])) return 'GRIEVANCE';
+  return 'GENERAL';
+}
+
+function ancillaryLegalBasis(facts = {}) {
+  const subtype = ancillarySubtype(facts);
+  if (subtype === 'SUSPENSION') return ['LRA s186(2)(b)', 'LRA s186(2)(c)', 'Schedule 8 Item 4'];
+  if (subtype === 'WARNING') return ['LRA s186(2)(c)', 'Schedule 8 Item 3', 'Schedule 8 Item 4'];
+  if (subtype === 'PAY') return ['BCEA s34', 'BCEA s77'];
+  if (subtype === 'GRIEVANCE') return ['Internal grievance procedure', 'LRA s186(2) where applicable'];
+  return ['LRA s186(2) where applicable', 'Internal disciplinary or grievance procedure'];
+}
+
+function inferAncillaryOutput(facts = {}) {
+  const subtype = ancillarySubtype(facts);
+  if (subtype === 'SUSPENSION') return {
+    title: 'Ancillary Advisory — Suspension Without Pay: ATTORNEY REVIEW', outputType: 'Advisory Note / Priority Review',
+    bullets: ['Record the dates of suspension, the amount withheld and whether any notice or hearing was provided.', 'Preserve payslips, suspension notices, correspondence and proof of non-payment.', 'The matter may cross into unfair labour practice territory and should be reviewed by an attorney before any demand is sent.'],
+    legalBasis: ancillaryLegalBasis(facts)
   };
-  if (topic.includes('grievance') || story.includes('grievance')) return { title: 'Ancillary Advisory — Grievance Lodging: PREPARATION PACK', outputType: 'Preparation Pack', bullets: ['Prepare a written grievance setting out the conduct complained of, dates, people involved and the outcome requested.', 'Submit the grievance through the employer\'s internal procedure and keep proof of submission.', 'Escalate internally if the grievance is ignored or not resolved within the employer\'s stated process.'], legalBasis: ['Internal grievance procedure', 'LRA unfair labour practice framework where applicable'] };
-  if (topic.includes('pay') || story.includes('unpaid') || story.includes('deduction') || story.includes('salary')) return { title: 'Ancillary Advisory — Pay Dispute / BCEA Query: ADVISORY NOTE', outputType: 'Advisory Note', bullets: ['Calculate the amount in dispute and the period it relates to.', 'Send a written demand or query to payroll or HR with proof of the amount owed.', 'Consider Department of Labour, CCMA or other escalation depending on the nature of the pay dispute.'], legalBasis: ['BCEA s34', 'BCEA s77'] };
-  return { title: 'Ancillary Advisory: PREPARATION PACK', outputType: 'Preparation Pack', bullets: ['Prepare a short written summary of the issue, dates, people involved and the outcome you want.', 'Use the employer\'s internal process first where appropriate.', 'Keep copies of all notices, warnings, emails, payslips and responses.'], legalBasis: ['BCEA', 'LRA s186(2) where applicable'] };
+  if (subtype === 'WARNING') return {
+    title: 'Ancillary Advisory — Warning Challenge: PREPARATION PACK', outputType: 'Preparation Pack',
+    bullets: ['Prepare a written response setting out your version of events and why the warning is unfair or disproportionate.', 'Check the employer\'s disciplinary code or internal appeal procedure for time limits and the correct person to send the appeal to.', 'Attach evidence that explains the absence, lateness or context, including bereavement or delegated-authority evidence where available.', 'If the warning causes prejudice or is used unfairly later, consider whether the matter reaches the unfair labour practice threshold.'],
+    legalBasis: ancillaryLegalBasis(facts)
+  };
+  if (subtype === 'GRIEVANCE') return { title: 'Ancillary Advisory — Grievance Lodging: PREPARATION PACK', outputType: 'Preparation Pack', bullets: ['Prepare a written grievance setting out the conduct complained of, dates, people involved and the outcome requested.', 'Submit the grievance through the employer\'s internal procedure and keep proof of submission.', 'Escalate internally if the grievance is ignored or not resolved within the employer\'s stated process.'], legalBasis: ancillaryLegalBasis(facts) };
+  if (subtype === 'PAY') return { title: 'Ancillary Advisory — Pay Dispute / BCEA Query: ADVISORY NOTE', outputType: 'Advisory Note', bullets: ['Calculate the amount in dispute and the period it relates to.', 'Send a written demand or query to payroll or HR with proof of the amount owed.', 'Consider Department of Labour, CCMA or other escalation depending on the nature of the pay dispute.'], legalBasis: ancillaryLegalBasis(facts) };
+  return { title: 'Ancillary Advisory: PREPARATION PACK', outputType: 'Preparation Pack', bullets: ['Prepare a short written summary of the issue, dates, people involved and the outcome you want.', 'Use the employer\'s internal process first where appropriate.', 'Keep copies of all notices, warnings, emails, payslips and responses.'], legalBasis: ancillaryLegalBasis(facts) };
 }
 
 function buildAncillaryAdvisory(result, facts) {
   const output = inferAncillaryOutput(facts);
-  const legal = output.legalBasis.map(x => `- ${x}`).join('\n');
+  const positives = result.scoring_breakdown.filter(x => x.points > 0).map(x => `- ${x.label} [${x.legalHook}]`).join('\n') || '- More structured facts are needed before the attorney can confirm leverage.';
+  const risks = result.scoring_breakdown.filter(x => x.points < 0).map(x => `- ${x.label} [${x.legalHook}]`).join('\n') || '- No specific negative factor has been captured yet, but attorney review remains required before external action.';
+  const legal = (result.legal_basis || output.legalBasis).map(x => `- ${x}`).join('\n');
   const steps = output.bullets.map(x => `- ${x}`).join('\n');
-  return `${output.title}\n\nThis is not a dismissal claim and the Without Prejudice demand letter pathway is hard disabled for this track.\n\nOutput type: ${output.outputType}\n\nRecommended next step:\n${steps}\n\nWithout Prejudice letter status: NOT APPLICABLE\n\nLegal basis:\n${legal}\n\nAttorney review tag: PENDING`;
+  return `${output.title}\n\nSubstantive Score: ${result.substantive_score} / 10\nThis score reflects the current strength of the employee's position on the substance of the warning, suspension, pay issue or advisory matter.\n\nProcedural Score: ${result.procedural_score} / 10\nThis score reflects the current strength of the employee's position on the process followed by the employer.\n\nFactors in your favour:\n${positives}\n\nRisks or weaknesses:\n${risks}\n\nOutput type: ${output.outputType}\n\nRecommended next step:\n${steps}\n\nWithout Prejudice letter status: NOT APPLICABLE unless attorney review confirms a Strategic Engagement Matrix exception or override trigger.\n\nLegal basis:\n${legal}\n\nAttorney review tag: PENDING`;
 }
 
 function buildAdvisory(result, facts) {
@@ -275,8 +358,10 @@ function scoreCase(facts = {}) {
   let substantive = clamp(raw.substantive), procedural = clamp(raw.procedural);
   if (hard) { substantive = 0; procedural = 0; }
   else if (bonus) { substantive = Math.max(substantive, 8); procedural = Math.max(procedural, 7); }
-  const recommendation = hard ? { band: 'NO MERIT', wpEligible: false, wpType: null, recommendation: 'Advisory note only. No WP letter until the hard disqualifier is resolved.' } : determineRecommendation(substantive, procedural, { track: track === 'ANC' ? 'ANC' : track });
-  const result = { track, track_label: TRACK_LABELS[track] || track, substantive_score: substantive, procedural_score: procedural, merit_band: recommendation.band, recommended_next_step: recommendation.recommendation, wp_eligible: recommendation.wpEligible, wp_type: recommendation.wpType, ccma_deadline_status: deadline, hard_disqualifier: hard, merit_bonus_trigger: bonus, scoring_breakdown: breakdown, legal_basis: LEGAL_BASIS[track] || [], attorney_review_flag: true };
+  const matrixTrack = track === 'ANC' && bonus ? 'ULP' : (track === 'ANC' ? 'ANC' : track);
+  const recommendation = hard ? { band: 'NO MERIT', wpEligible: false, wpType: null, recommendation: 'Advisory note only. No WP letter until the hard disqualifier is resolved.' } : determineRecommendation(substantive, procedural, { track: matrixTrack });
+  const legalBasis = track === 'ANC' ? ancillaryLegalBasis(facts) : (LEGAL_BASIS[track] || []);
+  const result = { track, track_label: TRACK_LABELS[track] || track, substantive_score: substantive, procedural_score: procedural, merit_band: recommendation.band, recommended_next_step: recommendation.recommendation, wp_eligible: recommendation.wpEligible, wp_type: recommendation.wpType, ccma_deadline_status: deadline, hard_disqualifier: hard, merit_bonus_trigger: bonus, scoring_breakdown: breakdown, legal_basis: dedupe(legalBasis), attorney_review_flag: true };
   result.advisory_note = buildAdvisory(result, facts);
   return result;
 }
