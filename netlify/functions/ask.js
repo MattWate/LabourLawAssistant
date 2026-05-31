@@ -3,6 +3,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
 const { scoreCase } = require('./lib/scoringEngine');
 const { applyOverridePostProcessing } = require('./lib/overridePostProcessor');
+const { classifyAndHydrateMatter, mergeGovernanceFacts } = require('./lib/llmGovernance');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -18,11 +19,24 @@ async function getActiveLLM() {
 }
 
 async function classifyText(text = '') {
+  const governance = await classifyAndHydrateMatter({ narrative: text, existingFacts: { initial_query: text } });
+
+  if (governance.ok) {
+    return {
+      ...governance.compatibility,
+      governance,
+      hydrated_facts: governance.hydrated_facts,
+      primary_track: governance.primary_track,
+      secondary_track: governance.secondary_track,
+      override_flags: governance.override_flags
+    };
+  }
+
   const prompt = `Classify this South African labour-law intake into JSON only.
 Text: ${text}
 Return: {"category":"Dismissed|Resigned|Discrimination|Advisory|UIF|Ambiguous","dismissal_reason_type":"Misconduct|Poor Performance|Incapacity|Retrenchment|null","advisory_topic":"Hearing Prep|Warning|Grievance|Pay Issue|null","confidence":0.0}`;
 
-  const fallback = { category: 'Ambiguous', dismissal_reason_type: null, advisory_topic: null, confidence: 0 };
+  const fallback = { category: 'Ambiguous', dismissal_reason_type: null, advisory_topic: null, confidence: 0, governance };
   try {
     const activeLLM = await getActiveLLM();
     if (activeLLM === 'openai' && openai) {
@@ -34,7 +48,7 @@ Return: {"category":"Dismissed|Resigned|Discrimination|Advisory|UIF|Ambiguous","
         ],
         response_format: { type: 'json_object' }
       });
-      return JSON.parse(completion.choices[0].message.content);
+      return { ...JSON.parse(completion.choices[0].message.content), governance };
     }
 
     const model = genAI.getGenerativeModel({
@@ -42,7 +56,7 @@ Return: {"category":"Dismissed|Resigned|Discrimination|Advisory|UIF|Ambiguous","
       generationConfig: { responseMimeType: 'application/json' }
     });
     const result = await model.generateContent(prompt);
-    return JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim());
+    return { ...JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim()), governance };
   } catch (error) {
     console.warn('Classification failed:', error.message);
     return fallback;
@@ -56,10 +70,12 @@ function buildLegalKeywords(facts = {}, story = '') {
   if (facts.employment_status === 'Resigned') parts.push('constructive dismissal section 186(1)(e)');
   if (facts.employment_status === 'Discrimination') parts.push('employment equity automatically unfair dismissal section 187');
   if (facts.hearing_held === false) parts.push('no hearing procedural fairness');
+  if (facts.paid_suspension === false) parts.push('suspension without pay unfair labour practice section 186(2)(b)');
   if (facts.proc_notice === false) parts.push('no 48 hours notice');
   if (facts.proc_rep === false) parts.push('denied representation');
   if (facts.proc_chair === false) parts.push('biased chairperson');
   if (facts.proc_consultation === false) parts.push('failure to consult');
+  if (Array.isArray(facts.override_flags)) parts.push(facts.override_flags.join(' '));
   return parts.filter(Boolean).join(' ');
 }
 
@@ -94,6 +110,7 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     employment_status: facts.employment_status || null,
     dismissal_reason_type: facts.dismissal_reason_type || null,
     advisory_topic: facts.advisory_topic || null,
+    ancillary_topic: facts.ancillary_topic || null,
     hearing_held: facts.hearing_held ?? null,
     proc_notice: facts.proc_notice ?? null,
     proc_rep: facts.proc_rep ?? null,
@@ -123,7 +140,9 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     scoring_breakdown: scorecard.scoring_breakdown || [],
     legal_basis: scorecard.legal_basis || [],
     attorney_review_flag: true,
-    legal_context_snapshot: contextText
+    legal_context_snapshot: contextText,
+    llm_governance: facts.llm_governance || null,
+    llm_call_logs: facts.llm_call_logs || []
   };
 }
 
@@ -158,6 +177,16 @@ function buildTriageFacts(facts = {}, outcome = 'UNKNOWN') {
   };
 }
 
+function dedupeStory(text = '') {
+  const value = String(text || '').trim();
+  if (!value) return '';
+  const midpoint = Math.floor(value.length / 2);
+  const first = value.slice(0, midpoint).trim();
+  const second = value.slice(midpoint).trim();
+  if (first && second && first === second) return first;
+  return value;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
@@ -185,11 +214,15 @@ exports.handler = async (event) => {
     }
 
     if (action === 'evaluate') {
-      const facts = body.facts || {};
-      const fullStory = `${facts.initial_query ? `${facts.initial_query} ` : ''}${facts.incident_description || ''}`.trim();
+      const originalFacts = body.facts || {};
+      const initialStory = dedupeStory(`${originalFacts.initial_query ? `${originalFacts.initial_query} ` : ''}${originalFacts.incident_description || ''}`.trim());
+      const governance = await classifyAndHydrateMatter({ narrative: initialStory, existingFacts: originalFacts });
+      const facts = mergeGovernanceFacts(originalFacts, governance);
+      const fullStory = dedupeStory(`${facts.initial_query ? `${facts.initial_query} ` : ''}${facts.incident_description || ''}`.trim());
       const contextText = await searchLegalContext(buildLegalKeywords(facts, fullStory));
-      const baseScorecard = scoreCase({ ...facts, incident_description: fullStory });
-      const scorecard = applyOverridePostProcessing(facts, fullStory, baseScorecard);
+      const scoringInput = { ...facts, incident_description: fullStory };
+      const baseScorecard = scoreCase(scoringInput);
+      const scorecard = applyOverridePostProcessing(scoringInput, fullStory, baseScorecard);
       const caseFacts = buildCoreFacts(facts, fullStory, scorecard, contextText);
 
       const { data, error } = await supabase.from('cases').insert({
@@ -202,7 +235,7 @@ exports.handler = async (event) => {
       }).select().single();
       if (error) throw error;
 
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, scorecard }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, scorecard, governance: caseFacts.llm_governance }) };
     }
 
     if (action === 'close') {
