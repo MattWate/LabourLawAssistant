@@ -1,21 +1,33 @@
 const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const OpenAI = require('openai');
+const { loadWpSkillSet, buildProtectedPromptContext } = require('./lib/skillRegistry');
+const { buildCaseBrief, callClaudeForWpDraft } = require('./lib/claudeDrafting');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 function canGenerateWpLetter(facts = {}) {
   if (facts.wp_eligible !== true) return false;
-  if (facts.track === 'ANC') return false;
   if (facts.hard_disqualifier) return false;
   return true;
+}
+
+function blockedReason(facts = {}) {
+  if (facts.hard_disqualifier) return 'The case has a hard disqualifier and cannot generate a Without Prejudice letter until reviewed.';
+  if (facts.wp_eligible !== true) return 'The Strategic Engagement Matrix did not recommend a Without Prejudice letter.';
+  return 'This case is not eligible for a Without Prejudice demand letter under the current scoring matrix.';
+}
+
+function normaliseSenderVariant(value = '') {
+  const text = String(value || '').trim().toLowerCase();
+  if (['client', 'client_sent', 'client-sent', 'own_name', 'own-name', 'self'].includes(text)) return 'CLIENT_SENT';
+  return 'VRS';
+}
+
+function normaliseClientSide(value = '') {
+  const text = String(value || '').trim().toLowerCase();
+  return text === 'employer' ? 'employer' : 'employee';
 }
 
 exports.handler = async (event) => {
@@ -27,8 +39,12 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { caseId } = JSON.parse(event.body || '{}');
+    const request = JSON.parse(event.body || '{}');
+    const { caseId } = request;
     if (!caseId) return { statusCode: 400, body: JSON.stringify({ error: 'Case ID required' }) };
+
+    const senderVariant = normaliseSenderVariant(request.sender_variant || request.senderVariant || 'VRS');
+    const clientSide = normaliseClientSide(request.client_side || request.clientSide || 'employee');
 
     const { data: caseData, error: caseErr } = await supabase
       .from('cases')
@@ -48,9 +64,7 @@ exports.handler = async (event) => {
           case_facts: {
             ...facts,
             wp_letter_status: 'NOT_APPLICABLE',
-            wp_generation_blocked_reason: facts.track === 'ANC'
-              ? 'Ancillary matters do not generate Without Prejudice demand letters.'
-              : 'The Strategic Engagement Matrix did not recommend a Without Prejudice letter.'
+            wp_generation_blocked_reason: blockedReason(facts)
           }
         })
         .eq('id', caseId);
@@ -61,84 +75,42 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           success: false,
           blocked: true,
-          message: 'This case is not eligible for a Without Prejudice demand letter under the current scoring matrix.'
+          message: blockedReason(facts)
         })
       };
     }
 
-    const { data: settingData } = await supabase.from('system_settings').select('*');
-    const settings = {};
-    if (settingData) settingData.forEach(row => { settings[row.setting_name] = row.setting_value; });
+    const skillSet = await loadWpSkillSet(supabase, { side: clientSide });
+    const skillContext = buildProtectedPromptContext(skillSet);
+    const caseBrief = buildCaseBrief({ facts, senderVariant, clientSide });
+    const { draft, log } = await callClaudeForWpDraft({ skillContext, caseBrief, skillSet });
 
-    const activeLLM = settings.active_llm || 'gemini';
-    const firmName = settings.firm_name || 'Legal Consultants';
-    const firmAddress = settings.firm_address || '123 Legal Way, South Africa';
-    const firmContact = settings.firm_contact || 'info@legalconsultants.co.za';
+    const partA = String(draft.part_a_letter || '').trim();
+    const partB = draft.part_b_supervisory_assessment || {};
+    if (!partA) throw new Error('Claude did not return a Part A letter');
 
-    const prompt = `
-You are a Senior South African Labour Lawyer working for a firm named "${firmName}".
-
-Write a formal, professional "Without Prejudice" demand letter based ONLY on the structured case facts below.
-
-Do not invent legal citations. Use only the legal basis listed in the case facts.
-Do not change the merit band, scores, WP type, or recommendation.
-Do not tell the client the letter has been sent. This is a draft awaiting attorney release.
-
---- FIRM LETTERHEAD INFO ---
-Firm Name: ${firmName}
-Firm Address: ${firmAddress}
-Firm Contact: ${firmContact}
-----------------------------
-
-CLIENT NAME: ${facts.client_name || 'N/A'}
-EMPLOYER NAME: ${facts.employer_name || 'N/A'}
-EMPLOYER CONTACT: ${facts.employer_contact_details || 'N/A'}
-TRACK: ${facts.track_label || facts.track || 'N/A'}
-WP TYPE: ${facts.wp_type || 'N/A'}
-MERIT BAND: ${facts.merit_band || 'N/A'}
-SUBSTANTIVE SCORE: ${facts.substantive_score || 'N/A'} / 10
-PROCEDURAL SCORE: ${facts.procedural_score || 'N/A'} / 10
-DATE OF INCIDENT: ${facts.incident_date || 'N/A'}
-INCIDENT SUMMARY: ${facts.incident_description || 'N/A'}
-LEGAL BASIS: ${(facts.legal_basis || []).join('; ') || 'N/A'}
-SCORING BREAKDOWN: ${JSON.stringify(facts.scoring_breakdown || [])}
-RECOMMENDED NEXT STEP: ${facts.recommended_next_step || facts.overall_viability || 'N/A'}
-
-REQUIREMENTS:
-1. Start with the firm letterhead info at the top, formatted professionally.
-2. Include the current date.
-3. Include "WITHOUT PREJUDICE" clearly near the top.
-4. Address the employer formally.
-5. State the dispute accurately based on the track and facts.
-6. If WP TYPE is PROCEDURAL_ONLY, focus on procedural defects and do not overstate substantive merit.
-7. If WP TYPE is SUBSTANTIVE_ONLY, focus on substantive unfairness and avoid claiming procedural defects unless captured in the scoring breakdown.
-8. Make a settlement-orientated demand aligned to South African labour law.
-9. State that the draft is subject to attorney review and release.
-10. Return ONLY the letter text. Do not include markdown blocks, intro, or outro text.
-`;
-
-    let letterText = '';
-    if (activeLLM === 'openai' && openai) {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: prompt }]
-      });
-      letterText = completion.choices[0].message.content.trim();
-    } else {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      const result = await model.generateContent(prompt);
-      letterText = result.response.text().trim();
-    }
+    const existingLogs = Array.isArray(facts.llm_call_logs) ? facts.llm_call_logs : [];
+    const updatedFacts = {
+      ...facts,
+      wp_letter_status: 'GENERATED_PENDING',
+      wp_generation_mode: 'VRS_PROTECTED_SKILL_SET',
+      wp_client_side: clientSide,
+      wp_sender_variant: senderVariant,
+      wp_skill_version: skillSet.version,
+      wp_skill_hash: skillSet.skill_hash,
+      wp_skill_manifest: skillSet.manifest,
+      wp_supervisory_assessment: partB,
+      wp_template_required: draft.metadata?.template_required || (senderVariant === 'CLIENT_SENT' ? 'VRS_WP_Template_ClientSent.docx' : 'VRS_WP_Template_Master.docx'),
+      llm_call_logs: [...existingLogs, log]
+    };
 
     await supabase
       .from('cases')
       .update({
-        draft_letter: letterText,
+        draft_letter: partA,
+        supervisory_assessment: partB,
         letter_status: 'pending_review',
-        case_facts: {
-          ...facts,
-          wp_letter_status: 'GENERATED_PENDING'
-        }
+        case_facts: updatedFacts
       })
       .eq('id', caseId);
 
@@ -147,8 +119,16 @@ REQUIREMENTS:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         success: true,
-        letter: letterText,
-        message: 'Draft generated and held pending attorney review.'
+        letter: partA,
+        supervisory_assessment: partB,
+        metadata: {
+          client_side: clientSide,
+          sender_variant: senderVariant,
+          skill_version: skillSet.version,
+          skill_hash: skillSet.skill_hash,
+          template_required: updatedFacts.wp_template_required
+        },
+        message: 'Draft generated using the protected VRS skill set and held pending attorney review.'
       })
     };
   } catch (error) {
