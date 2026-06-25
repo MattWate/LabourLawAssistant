@@ -1,8 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
+const { sendWhatsAppText } = require('./lib/whatsapp');
 
-const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_KEY
-  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY)
-  : null;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -76,21 +77,53 @@ function extractMessages(payload = {}) {
   return messages;
 }
 
-async function persistWebhookEvent(payload, extracted) {
-  if (!supabase) return;
+async function persistWebhookEvent(payload, extracted, processing = {}) {
+  if (!supabase) return null;
 
   try {
-    await supabase.from('whatsapp_webhook_events').insert({
+    const { data, error } = await supabase.from('whatsapp_webhook_events').insert({
       event_type: extracted.length ? extracted.map(item => item.type).join(',') : 'unknown',
       from_number: extracted.find(item => item.from_number)?.from_number || null,
       phone_number_id: extracted.find(item => item.phone_number_id)?.phone_number_id || null,
       payload,
       extracted_messages: extracted,
-      processed: false
-    });
+      processed: processing.processed || false,
+      processing_result: processing
+    }).select().single();
+    if (error) throw error;
+    return data;
   } catch (error) {
     console.warn('WhatsApp webhook logging skipped:', error.message);
+    return null;
   }
+}
+
+function justineReply(message = {}) {
+  const text = String(message.text_body || '').trim();
+  if (!text) return 'Thanks for contacting VRS. I can currently receive text messages only. Please send a short description of the labour-law issue you need help with.';
+
+  return 'Hi, I am Justine, the VRS Labour Law Assistant. I have received your message. Please reply with a short summary of what happened, including whether you were dismissed, resigned or are still employed. A VRS team member will be able to review the intake from the dashboard.';
+}
+
+async function replyToIncomingMessages(messages = []) {
+  const results = [];
+  const incoming = messages.filter(item => item.type === 'message' && item.from_number && item.message_type === 'text');
+
+  for (const message of incoming) {
+    try {
+      const result = await sendWhatsAppText({
+        to: message.from_number,
+        phoneNumberId: message.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID,
+        body: justineReply(message)
+      });
+      results.push({ to: message.from_number, ok: true, result });
+    } catch (error) {
+      console.warn('WhatsApp reply failed:', error.message);
+      results.push({ to: message.from_number, ok: false, error: error.message });
+    }
+  }
+
+  return results;
 }
 
 exports.handler = async (event) => {
@@ -120,15 +153,21 @@ exports.handler = async (event) => {
     if (!payload) return response(400, { ok: false, error: 'Invalid JSON payload' });
 
     const extracted = extractMessages(payload);
-    await persistWebhookEvent(payload, extracted);
+    const replyResults = process.env.WHATSAPP_AUTO_REPLY === 'false' ? [] : await replyToIncomingMessages(extracted);
+    await persistWebhookEvent(payload, extracted, {
+      processed: true,
+      reply_results: replyResults,
+      auto_reply_enabled: process.env.WHATSAPP_AUTO_REPLY !== 'false'
+    });
 
     console.log('WhatsApp webhook received', {
       object: payload.object,
       eventCount: extracted.length,
-      eventTypes: extracted.map(item => item.type)
+      eventTypes: extracted.map(item => item.type),
+      replies: replyResults.length
     });
 
-    return response(200, { ok: true, received: true, events: extracted.length });
+    return response(200, { ok: true, received: true, events: extracted.length, replies: replyResults.length });
   }
 
   return response(405, { ok: false, error: 'Method Not Allowed' });
