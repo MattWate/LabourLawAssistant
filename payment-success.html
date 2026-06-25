@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Confirmation | Justine</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#f7f8fc;color:#111735;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.card{max-width:620px;background:#fff;border:1px solid #d9e1f2;border-radius:24px;padding:32px;box-shadow:0 20px 70px rgba(0,11,79,.12)}h1{color:#000B4F;margin-top:0}.status{margin-top:18px;padding:14px;border-radius:14px;background:#eef4ff;color:#20368F;font-weight:700}.muted{color:#4f5b78;line-height:1.55}.btn{display:inline-block;margin-top:18px;background:#20368F;color:#fff;text-decoration:none;padding:12px 16px;border-radius:12px;font-weight:700}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Payment received</h1>
+    <p class="muted">Thank you. Payfast has returned you to Justine. We are confirming the payment notification now. Once Payfast confirms the transaction, the matter will move into the drafting and review queue.</p>
+    <div id="status" class="status">Checking payment status...</div>
+    <a class="btn" href="/">Return to Justine</a>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const caseId = params.get('caseId') || params.get('case_id');
+    async function check(){
+      const el = document.getElementById('status');
+      if(!caseId){ el.textContent = 'No case reference was supplied. VRS can still confirm the payment from Payfast.'; return; }
+      try{
+        const res = await fetch('/.netlify/functions/check_payment_status?caseId=' + encodeURIComponent(caseId));
+        const data = await res.json();
+        if(data.payment && data.payment.status === 'paid') el.textContent = 'Payment confirmed. Your case is now queued for drafting and review.';
+        else if(data.payment) el.textContent = 'Payment status: ' + data.payment.status + '. If you have just paid, confirmation can take a short while.';
+        else el.textContent = 'Payment confirmation is still pending. Please check again shortly.';
+      }catch(e){ el.textContent = 'Could not check payment status yet. The payment can still be confirmed from the admin dashboard.'; }
+    }
+    check(); setInterval(check, 10000);
+  </script>
+</body>
+</html>
