@@ -8,8 +8,13 @@ create table if not exists public.whatsapp_webhook_events (
   extracted_messages jsonb default '[]'::jsonb,
   processed boolean not null default false,
   processed_at timestamptz,
-  processing_error text
+  processing_error text,
+  processing_result jsonb default '{}'::jsonb
 );
+
+alter table public.whatsapp_webhook_events add column if not exists processing_result jsonb default '{}'::jsonb;
+alter table public.whatsapp_webhook_events add column if not exists processed_at timestamptz;
+alter table public.whatsapp_webhook_events add column if not exists processing_error text;
 
 create index if not exists whatsapp_webhook_events_created_at_idx
   on public.whatsapp_webhook_events (created_at desc);
