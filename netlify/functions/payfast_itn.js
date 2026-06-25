@@ -14,6 +14,10 @@ function normaliseStatus(status = '') {
   return value ? value.toLowerCase() : 'unknown';
 }
 
+function caseIdFrom(data = {}) {
+  return data.custom_str1 || data.case_id || null;
+}
+
 async function upsertPayment(data, checks) {
   if (!supabase) return null;
 
@@ -22,6 +26,7 @@ async function upsertPayment(data, checks) {
     provider: 'payfast',
     m_payment_id: mPaymentId,
     pf_payment_id: data.pf_payment_id || null,
+    case_id: caseIdFrom(data),
     amount: data.amount_gross ? Number(data.amount_gross) : null,
     item_name: data.item_name || null,
     status: normaliseStatus(data.payment_status),
@@ -42,11 +47,12 @@ async function upsertPayment(data, checks) {
 
   const { data: existing } = await supabase
     .from('payments')
-    .select('id')
+    .select('id, case_id')
     .eq('m_payment_id', mPaymentId)
     .maybeSingle();
 
   if (existing?.id) {
+    if (!payload.case_id && existing.case_id) delete payload.case_id;
     const { data: updated, error } = await supabase
       .from('payments')
       .update(payload)
@@ -65,7 +71,16 @@ async function upsertPayment(data, checks) {
 async function unlockCaseIfPaid(payment, data, checks) {
   if (!supabase || !payment?.case_id) return;
   const isPaid = normaliseStatus(data.payment_status) === 'paid';
-  if (!isPaid || checks.signatureValid !== true || checks.merchantValid !== true) return;
+  const isVerified = checks.signatureValid === true && checks.merchantValid === true;
+  if (!isPaid || !isVerified) return;
+
+  const { data: existing } = await supabase
+    .from('cases')
+    .select('case_facts')
+    .eq('id', payment.case_id)
+    .maybeSingle();
+
+  const facts = existing?.case_facts || {};
 
   await supabase
     .from('cases')
@@ -74,6 +89,14 @@ async function unlockCaseIfPaid(payment, data, checks) {
       paid_at: new Date().toISOString(),
       wp_generation_unlocked: true,
       status: 'paid_pending_draft',
+      case_facts: {
+        ...facts,
+        payment_status: 'paid',
+        paid_at: new Date().toISOString(),
+        wp_generation_unlocked: true,
+        payfast_payment_id: payment.pf_payment_id || data.pf_payment_id || null,
+        payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null
+      },
       updated_at: new Date().toISOString()
     })
     .eq('id', payment.case_id);
@@ -114,6 +137,7 @@ exports.handler = async (event) => {
     console.log('Payfast ITN received', {
       m_payment_id: data.m_payment_id,
       pf_payment_id: data.pf_payment_id,
+      case_id: payment?.case_id,
       payment_status: data.payment_status,
       signatureValid,
       merchantValid,
