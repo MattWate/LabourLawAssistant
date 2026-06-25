@@ -7,6 +7,8 @@ create table if not exists public.payments (
   amount numeric null,
   item_name text null,
   status text not null default 'received',
+  checkout_url text null,
+  checkout_fields jsonb null,
   raw_itn jsonb null,
   signature_valid boolean null,
   merchant_valid boolean null,
@@ -16,6 +18,16 @@ create table if not exists public.payments (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+alter table public.payments add column if not exists checkout_url text null;
+alter table public.payments add column if not exists checkout_fields jsonb null;
+alter table public.payments add column if not exists raw_itn jsonb null;
+alter table public.payments add column if not exists signature_valid boolean null;
+alter table public.payments add column if not exists merchant_valid boolean null;
+alter table public.payments add column if not exists payfast_validation_status text null;
+alter table public.payments add column if not exists payfast_validation_response text null;
+alter table public.payments add column if not exists received_at timestamptz default now();
+alter table public.payments add column if not exists updated_at timestamptz default now();
 
 create unique index if not exists payments_m_payment_id_unique_idx
   on public.payments(m_payment_id)
