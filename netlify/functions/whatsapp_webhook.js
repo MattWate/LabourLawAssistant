@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendWhatsAppText, sendWhatsAppButtons, sendWhatsAppList } = require('./lib/whatsapp');
-const { processIncomingMessage, STEPS } = require('./lib/whatsappConversation');
+const { processIncomingMessage, STEPS } = require('./lib/whatsappProductionConversation');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
