@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VRS Payment Approval</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#111735;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:30px}.wrap{max-width:760px;margin:auto}.card{background:white;border:1px solid #dfe5f1;border-radius:18px;padding:24px;box-shadow:0 18px 50px rgba(0,11,79,.09);margin-bottom:18px}h1{margin-top:0;color:#000B4F}.field{width:100%;padding:12px;border:1px solid #cfd8e8;border-radius:10px;margin:7px 0 14px;font-size:1rem}.btn{border:0;border-radius:10px;padding:12px 16px;background:#20368F;color:white;font-weight:700;cursor:pointer}.btn.secondary{background:#475569}.btn:disabled{opacity:.55;cursor:not-allowed}.status{display:none;margin-top:14px;padding:12px;border-radius:10px;white-space:pre-wrap}.status.ok{display:block;background:#dcfce7;color:#166534}.status.error{display:block;background:#fee2e2;color:#991b1b}.muted{color:#64748b;line-height:1.5}.actions{display:flex;gap:10px;flex-wrap:wrap}.hidden{display:none}a{color:#20368F;word-break:break-all}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="login-card">
+      <h1>VRS Lawyer Approval</h1>
+      <p class="muted">Sign in with the same Supabase account used for the case workstation.</p>
+      <label>Email</label><input class="field" id="email" type="email">
+      <label>Password</label><input class="field" id="password" type="password">
+      <button class="btn" onclick="login()">Sign in</button>
+      <div id="login-status" class="status"></div>
+    </div>
+
+    <div class="card hidden" id="approval-card">
+      <h1>Approve case for payment</h1>
+      <p class="muted">Only use this after reviewing Justine’s decision, confirming the matter has merit, checking the employer and client email addresses, and approving the final letter.</p>
+      <label>Case ID</label><input class="field" id="case-id" placeholder="Paste the case UUID">
+      <label>Amount (optional)</label><input class="field" id="amount" placeholder="Defaults to PAYFAST_WP_LETTER_AMOUNT">
+      <div class="actions">
+        <button class="btn" id="approve-btn" onclick="approve()">Approve and send payment link</button>
+        <button class="btn secondary" onclick="logout()">Sign out</button>
+      </div>
+      <div id="approval-status" class="status"></div>
+    </div>
+  </div>
+<script>
+  const SUPABASE_URL='https://pdjhgszpndwykeqlusho.supabase.co';
+  const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
+  const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  let token=null;
+
+  function status(id,message,ok){const el=document.getElementById(id);el.className='status '+(ok?'ok':'error');el.innerHTML=message}
+  function showApproval(){document.getElementById('login-card').classList.add('hidden');document.getElementById('approval-card').classList.remove('hidden')}
+  async function init(){const {data:{session}}=await db.auth.getSession();if(session){token=session.access_token;showApproval()}}
+  async function login(){
+    const email=document.getElementById('email').value.trim();
+    const password=document.getElementById('password').value;
+    const {data,error}=await db.auth.signInWithPassword({email,password});
+    if(error)return status('login-status',error.message,false);
+    token=data.session.access_token;showApproval();
+  }
+  async function logout(){await db.auth.signOut();location.reload()}
+  async function approve(){
+    const caseId=document.getElementById('case-id').value.trim();
+    const amount=document.getElementById('amount').value.trim();
+    if(!caseId)return status('approval-status','Case ID is required.',false);
+    const btn=document.getElementById('approve-btn');btn.disabled=true;btn.textContent='Creating payment link...';
+    try{
+      const res=await fetch('/.netlify/functions/approve_case_for_payment',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({caseId,...(amount?{amount}:{})})});
+      const body=await res.json();
+      if(!res.ok)throw new Error(body.error||'Approval failed');
+      status('approval-status',`Payment link created and WhatsApp notification ${body.whatsapp_sent?'sent':'not sent'}.\n\nClient: ${body.client_email}\nEmployer: ${body.employer_email}\n\n<a href="${body.payment_url}" target="_blank">Open payment link</a>`,true);
+    }catch(error){status('approval-status',error.message,false)}finally{btn.disabled=false;btn.textContent='Approve and send payment link'}
+  }
+  init();
+</script>
+</body>
+</html>
