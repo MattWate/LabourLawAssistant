@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendWhatsAppText } = require('./lib/whatsapp');
+const { processIncomingMessage } = require('./lib/whatsappConversation');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -88,6 +89,8 @@ async function persistWebhookEvent(payload, extracted, processing = {}) {
       payload,
       extracted_messages: extracted,
       processed: processing.processed || false,
+      processed_at: processing.processed ? new Date().toISOString() : null,
+      processing_error: processing.processing_error || null,
       processing_result: processing
     }).select().single();
     if (error) throw error;
@@ -98,28 +101,48 @@ async function persistWebhookEvent(payload, extracted, processing = {}) {
   }
 }
 
-function justineReply(message = {}) {
-  const text = String(message.text_body || '').trim();
-  if (!text) return 'Thanks for contacting VRS. I can currently receive text messages only. Please send a short description of the labour-law issue you need help with.';
-
-  return 'Hi, I am Justine, the VRS Labour Law Assistant. I have received your message. Please reply with a short summary of what happened, including whether you were dismissed, resigned or are still employed. A VRS team member will be able to review the intake from the dashboard.';
-}
-
 async function replyToIncomingMessages(messages = []) {
   const results = [];
-  const incoming = messages.filter(item => item.type === 'message' && item.from_number && item.message_type === 'text');
+  const incoming = messages.filter(item => item.type === 'message' && item.from_number);
 
   for (const message of incoming) {
     try {
+      let body;
+      if (message.message_type !== 'text') {
+        body = 'I can currently process text messages only. Please type your answer or a short description of your labour-law issue.';
+      } else {
+        body = await processIncomingMessage(message);
+      }
+
+      if (!body) {
+        results.push({ to: message.from_number, ok: true, duplicate: true, skipped: true });
+        continue;
+      }
+
       const result = await sendWhatsAppText({
         to: message.from_number,
         phoneNumberId: message.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID,
-        body: justineReply(message)
+        body
       });
       results.push({ to: message.from_number, ok: true, result });
     } catch (error) {
-      console.warn('WhatsApp reply failed:', error.message);
+      console.error('WhatsApp intake failed:', {
+        to: message.from_number,
+        messageId: message.whatsapp_message_id,
+        error: error.message,
+        stack: error.stack
+      });
       results.push({ to: message.from_number, ok: false, error: error.message });
+
+      try {
+        await sendWhatsAppText({
+          to: message.from_number,
+          phoneNumberId: message.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID,
+          body: 'I am sorry, I could not process that message. Your message has been logged. Please type RESTART to try again or HELP for assistance from the VRS team.'
+        });
+      } catch (sendError) {
+        console.warn('WhatsApp recovery reply failed:', sendError.message);
+      }
     }
   }
 
@@ -154,8 +177,11 @@ exports.handler = async (event) => {
 
     const extracted = extractMessages(payload);
     const replyResults = process.env.WHATSAPP_AUTO_REPLY === 'false' ? [] : await replyToIncomingMessages(extracted);
+    const failed = replyResults.filter(item => !item.ok);
+
     await persistWebhookEvent(payload, extracted, {
-      processed: true,
+      processed: failed.length === 0,
+      processing_error: failed.length ? failed.map(item => item.error).join('; ') : null,
       reply_results: replyResults,
       auto_reply_enabled: process.env.WHATSAPP_AUTO_REPLY !== 'false'
     });
@@ -164,10 +190,17 @@ exports.handler = async (event) => {
       object: payload.object,
       eventCount: extracted.length,
       eventTypes: extracted.map(item => item.type),
-      replies: replyResults.length
+      replies: replyResults.length,
+      failures: failed.length
     });
 
-    return response(200, { ok: true, received: true, events: extracted.length, replies: replyResults.length });
+    return response(200, {
+      ok: failed.length === 0,
+      received: true,
+      events: extracted.length,
+      replies: replyResults.length,
+      failures: failed.length
+    });
   }
 
   return response(405, { ok: false, error: 'Method Not Allowed' });
