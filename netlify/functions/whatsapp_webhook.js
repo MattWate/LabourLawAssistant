@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
-const { sendWhatsAppText } = require('./lib/whatsapp');
-const { processIncomingMessage } = require('./lib/whatsappConversation');
+const { sendWhatsAppText, sendWhatsAppButtons, sendWhatsAppList } = require('./lib/whatsapp');
+const { processIncomingMessage, STEPS } = require('./lib/whatsappConversation');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -29,6 +29,17 @@ function parseJson(body = '{}') {
   }
 }
 
+function extractInteractiveAnswer(message = {}) {
+  const reply = message.interactive?.button_reply || message.interactive?.list_reply;
+  if (!reply) return null;
+
+  const id = String(reply.id || '').trim();
+  const choiceMatch = id.match(/^choice:(\d+)$/i);
+  if (choiceMatch) return choiceMatch[1];
+
+  return reply.title || id || null;
+}
+
 function extractMessages(payload = {}) {
   const messages = [];
   const entries = Array.isArray(payload.entry) ? payload.entry : [];
@@ -53,7 +64,8 @@ function extractMessages(payload = {}) {
           display_phone_number: metadata.display_phone_number || null,
           timestamp: message.timestamp || null,
           message_type: message.type || null,
-          text_body: message.text?.body || null,
+          text_body: message.text?.body || extractInteractiveAnswer(message),
+          interactive_reply: message.interactive?.button_reply || message.interactive?.list_reply || null,
           raw_message: message,
           raw_change: change
         });
@@ -101,6 +113,70 @@ async function persistWebhookEvent(payload, extracted, processing = {}) {
   }
 }
 
+async function getConversation(fromNumber) {
+  if (!supabase || !fromNumber) return null;
+  const { data, error } = await supabase
+    .from('whatsapp_conversations')
+    .select('current_step,status')
+    .eq('from_number', fromNumber)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+function cleanInteractiveBody(body, step) {
+  const value = String(body || '').trim();
+  if (!step?.prompt) return value;
+  const promptIndex = value.indexOf(step.prompt);
+  if (promptIndex === -1) return step.prompt;
+  return `${value.slice(0, promptIndex)}${step.prompt}`.trim();
+}
+
+async function sendJustineReply(message, body) {
+  const phoneNumberId = message.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const conversation = await getConversation(message.from_number);
+  const step = conversation?.status === 'active' ? STEPS[conversation.current_step] : null;
+
+  if (step?.type === 'buttons' && Array.isArray(step.choices)) {
+    const interactiveBody = cleanInteractiveBody(body, step);
+    const footer = 'You can also type a number.';
+
+    if (step.choices.length <= 3 && step.choices.every(item => String(item.label).length <= 20)) {
+      return sendWhatsAppButtons({
+        to: message.from_number,
+        phoneNumberId,
+        body: interactiveBody,
+        footer,
+        buttons: step.choices.map((item, index) => ({
+          id: `choice:${index + 1}`,
+          title: item.label
+        }))
+      });
+    }
+
+    if (step.choices.length <= 10) {
+      return sendWhatsAppList({
+        to: message.from_number,
+        phoneNumberId,
+        body: interactiveBody,
+        footer,
+        buttonText: 'Choose an option',
+        rows: step.choices.map((item, index) => ({
+          id: `choice:${index + 1}`,
+          title: item.label,
+          description: `Option ${index + 1}`
+        }))
+      });
+    }
+  }
+
+  return sendWhatsAppText({
+    to: message.from_number,
+    phoneNumberId,
+    body
+  });
+}
+
 async function replyToIncomingMessages(messages = []) {
   const results = [];
   const incoming = messages.filter(item => item.type === 'message' && item.from_number);
@@ -108,8 +184,8 @@ async function replyToIncomingMessages(messages = []) {
   for (const message of incoming) {
     try {
       let body;
-      if (message.message_type !== 'text') {
-        body = 'I can currently process text messages only. Please type your answer or a short description of your labour-law issue.';
+      if (!['text', 'interactive'].includes(message.message_type) || !message.text_body) {
+        body = 'I can currently process text answers, reply buttons and list selections. Please type your answer or select one of the options shown.';
       } else {
         body = await processIncomingMessage(message);
       }
@@ -119,11 +195,7 @@ async function replyToIncomingMessages(messages = []) {
         continue;
       }
 
-      const result = await sendWhatsAppText({
-        to: message.from_number,
-        phoneNumberId: message.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID,
-        body
-      });
+      const result = await sendJustineReply(message, body);
       results.push({ to: message.from_number, ok: true, result });
     } catch (error) {
       console.error('WhatsApp intake failed:', {
