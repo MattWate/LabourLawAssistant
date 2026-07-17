@@ -3,22 +3,39 @@ const { createClient } = require('@supabase/supabase-js');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
-exports.handler = async (event, context) => {
-    // Only allow GET requests
+function isWpEligible(facts = {}) {
+    if (facts.effective_decision?.wp_eligible === true) return true;
+    if (facts.admin_override?.wp_eligible === true) return true;
+    return facts.wp_eligible === true;
+}
+
+function normaliseCaseForWorkstation(caseRow = {}) {
+    const facts = { ...(caseRow.case_facts || {}) };
+
+    // The workstation previously hid all drafting controls unless the intake
+    // explicitly set wants_letter. WhatsApp intakes are decision-led, so a
+    // lawyer-approved WP path must expose the drafting action automatically.
+    if (isWpEligible(facts) && facts.wants_letter !== false) {
+        facts.wants_letter = true;
+    }
+
+    return {
+        ...caseRow,
+        case_facts: facts
+    };
+}
+
+exports.handler = async (event) => {
     if (event.httpMethod !== 'GET') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    // --- SECURITY CHECK (Verify the Admin Token) ---
     const authHeader = event.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Missing Authentication Token' }) };
     }
 
     const token = authHeader.replace('Bearer ', '');
-    
-    // Initialize a request-specific Supabase client WITH the user's token.
-    // This ensures Row Level Security (RLS) knows exactly who is making the request!
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
         global: {
             headers: {
@@ -26,35 +43,27 @@ exports.handler = async (event, context) => {
             }
         }
     });
-    
-    // Ask Supabase if this token is a real, logged-in admin user
+
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    
     if (authErr || !user) {
         return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Invalid or Expired Token' }) };
     }
-    // ------------------------------------------------
 
     try {
-        // Fetch all cases, ordered by the most recently updated.
-        // Because we attached the token to the client above, RLS will allow this request.
         const { data, error } = await supabase
             .from('cases')
             .select('*')
             .order('updated_at', { ascending: false });
 
-        if (error) {
-            throw error;
-        }
+        if (error) throw error;
 
         return {
             statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify((data || []).map(normaliseCaseForWorkstation))
         };
-
     } catch (error) {
-        console.error("Database Error:", error);
+        console.error('Database Error:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message })
