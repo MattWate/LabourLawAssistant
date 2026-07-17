@@ -12,10 +12,10 @@ function isWpEligible(facts = {}) {
 function normaliseCaseForWorkstation(caseRow = {}) {
     const facts = { ...(caseRow.case_facts || {}) };
 
-    // The workstation previously hid all drafting controls unless the intake
-    // explicitly set wants_letter. WhatsApp intakes are decision-led, so a
-    // lawyer-approved WP path must expose the drafting action automatically.
-    if (isWpEligible(facts) && facts.wants_letter !== false) {
+    // The lawyer's effective WP decision controls whether drafting is
+    // available. It must not depend on whether the intake explicitly set a
+    // separate wants_letter flag.
+    if (isWpEligible(facts)) {
         facts.wants_letter = true;
     }
 
