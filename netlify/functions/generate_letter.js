@@ -3,19 +3,19 @@ const { loadWpSkillSet, buildProtectedPromptContext } = require('./lib/skillRegi
 const { buildCaseBrief, callClaudeForWpDraft } = require('./lib/claudeDrafting');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 function canGenerateWpLetter(facts = {}) {
-  if (facts.wp_eligible !== true) return false;
+  if (facts.wp_eligible !== true && facts.effective_decision?.wp_eligible !== true && facts.admin_override?.wp_eligible !== true) return false;
   if (facts.hard_disqualifier) return false;
   return true;
 }
 
 function blockedReason(facts = {}) {
   if (facts.hard_disqualifier) return 'The case has a hard disqualifier and cannot generate a Without Prejudice letter until reviewed.';
-  if (facts.wp_eligible !== true) return 'The Strategic Engagement Matrix did not recommend a Without Prejudice letter.';
+  if (facts.wp_eligible !== true && facts.effective_decision?.wp_eligible !== true && facts.admin_override?.wp_eligible !== true) return 'The effective firm decision does not currently mark this case as WP eligible.';
   return 'This case is not eligible for a Without Prejudice demand letter under the current scoring matrix.';
 }
 
@@ -26,22 +26,32 @@ function normaliseSenderVariant(value = '') {
 }
 
 function normaliseClientSide(value = '') {
-  const text = String(value || '').trim().toLowerCase();
-  return text === 'employer' ? 'employer' : 'employee';
+  return String(value || '').trim().toLowerCase() === 'employer' ? 'employer' : 'employee';
+}
+
+function json(statusCode, body) {
+  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+}
+
+async function authenticate(event) {
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+  if (!authHeader.startsWith('Bearer ')) throw new Error('Unauthorized: Missing Authentication Token');
+  const { data, error } = await supabase.auth.getUser(authHeader.slice(7));
+  if (error || !data?.user) throw new Error('Unauthorized: Invalid or expired token');
+  return data.user;
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
-
-  const authHeader = event.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized: Missing Authentication Token' }) };
-  }
+  if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
 
   try {
+    if (!supabase) throw new Error('Supabase is not configured for letter generation');
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
+    await authenticate(event);
+
     const request = JSON.parse(event.body || '{}');
     const { caseId } = request;
-    if (!caseId) return { statusCode: 400, body: JSON.stringify({ error: 'Case ID required' }) };
+    if (!caseId) return json(400, { error: 'Case ID required' });
 
     const senderVariant = normaliseSenderVariant(request.sender_variant || request.senderVariant || 'VRS');
     const clientSide = normaliseClientSide(request.client_side || request.clientSide || 'employee');
@@ -52,32 +62,21 @@ exports.handler = async (event) => {
       .eq('id', caseId)
       .single();
 
-    if (caseErr || !caseData) throw new Error('Case not found');
+    if (caseErr || !caseData) throw new Error(`Case not found: ${caseErr?.message || caseId}`);
 
     const facts = caseData.case_facts || {};
 
     if (!canGenerateWpLetter(facts)) {
-      await supabase
-        .from('cases')
-        .update({
-          letter_status: 'not_applicable',
-          case_facts: {
-            ...facts,
-            wp_letter_status: 'NOT_APPLICABLE',
-            wp_generation_blocked_reason: blockedReason(facts)
-          }
-        })
-        .eq('id', caseId);
+      await supabase.from('cases').update({
+        letter_status: 'not_applicable',
+        case_facts: {
+          ...facts,
+          wp_letter_status: 'NOT_APPLICABLE',
+          wp_generation_blocked_reason: blockedReason(facts)
+        }
+      }).eq('id', caseId);
 
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: false,
-          blocked: true,
-          message: blockedReason(facts)
-        })
-      };
+      return json(400, { success: false, blocked: true, error: blockedReason(facts) });
     }
 
     const skillSet = await loadWpSkillSet(supabase, { side: clientSide });
@@ -104,35 +103,32 @@ exports.handler = async (event) => {
       llm_call_logs: [...existingLogs, log]
     };
 
-    await supabase
-      .from('cases')
-      .update({
-        draft_letter: partA,
-        supervisory_assessment: partB,
-        letter_status: 'pending_review',
-        case_facts: updatedFacts
-      })
-      .eq('id', caseId);
+    const { error: updateError } = await supabase.from('cases').update({
+      draft_letter: partA,
+      supervisory_assessment: partB,
+      letter_status: 'pending_review',
+      case_facts: updatedFacts,
+      updated_at: new Date().toISOString()
+    }).eq('id', caseId);
+    if (updateError) throw new Error(`Draft generated but could not be saved: ${updateError.message}`);
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        success: true,
-        letter: partA,
-        supervisory_assessment: partB,
-        metadata: {
-          client_side: clientSide,
-          sender_variant: senderVariant,
-          skill_version: skillSet.version,
-          skill_hash: skillSet.skill_hash,
-          template_required: updatedFacts.wp_template_required
-        },
-        message: 'Draft generated using the protected VRS skill set and held pending attorney review.'
-      })
-    };
+    return json(200, {
+      success: true,
+      letter: partA,
+      supervisory_assessment: partB,
+      metadata: {
+        client_side: clientSide,
+        sender_variant: senderVariant,
+        skill_version: skillSet.version,
+        skill_hash: skillSet.skill_hash,
+        model: log.model,
+        template_required: updatedFacts.wp_template_required
+      },
+      message: 'Draft generated using the protected VRS skill set and held pending attorney review.'
+    });
   } catch (error) {
-    console.error('Drafting Error:', error);
-    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    const statusCode = String(error.message).startsWith('Unauthorized') ? 401 : 500;
+    console.error('Drafting Error:', { message: error.message, stack: error.stack });
+    return json(statusCode, { error: error.message });
   }
 };
