@@ -36,6 +36,25 @@ exports.handler = async (event) => {
     const request = JSON.parse(event.body || '{}');
     if (!request.caseId) return json(400, { error: 'Case ID required' });
 
+    const { data: caseData, error: caseError } = await supabase
+      .from('cases')
+      .select('case_facts')
+      .eq('id', request.caseId)
+      .single();
+    if (caseError || !caseData) return json(404, { error: 'Case not found' });
+
+    const facts = caseData.case_facts || {};
+    await supabase.from('cases').update({
+      letter_status: 'generating',
+      case_facts: {
+        ...facts,
+        wp_letter_status: 'QUEUED',
+        wp_generation_queued_at: new Date().toISOString(),
+        wp_generation_error: null
+      },
+      updated_at: new Date().toISOString()
+    }).eq('id', request.caseId);
+
     const endpoint = `${siteBaseUrl(event)}/.netlify/functions/generate_letter-background`;
     const queued = await fetch(endpoint, {
       method: 'POST',
@@ -48,6 +67,16 @@ exports.handler = async (event) => {
 
     if (!queued.ok) {
       const text = await queued.text();
+      await supabase.from('cases').update({
+        letter_status: 'generation_failed',
+        case_facts: {
+          ...facts,
+          wp_letter_status: 'QUEUE_FAILED',
+          wp_generation_error: text.slice(0, 1000),
+          wp_generation_failed_at: new Date().toISOString()
+        },
+        updated_at: new Date().toISOString()
+      }).eq('id', request.caseId);
       throw new Error(`Could not queue background drafting: ${queued.status} ${text.slice(0, 500)}`);
     }
 
