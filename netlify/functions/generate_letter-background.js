@@ -112,7 +112,6 @@ exports.handler = async (event) => {
 
     const { error: updateError } = await supabase.from('cases').update({
       draft_letter: partA,
-      supervisory_assessment: partB,
       letter_status: 'pending_review',
       case_facts: updatedFacts,
       updated_at: new Date().toISOString()
