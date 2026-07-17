@@ -1,4 +1,4 @@
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-sonnet-20241022';
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514';
 const ANTHROPIC_VERSION = '2023-06-01';
 
 function parseJsonOnly(text = '') {
@@ -9,7 +9,7 @@ function parseJsonOnly(text = '') {
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
     if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1));
-    throw firstError;
+    throw new Error(`Claude returned invalid JSON: ${firstError.message}`);
   }
 }
 
@@ -28,8 +28,8 @@ function buildCaseBrief({ facts = {}, senderVariant = 'VRS', clientSide = 'emplo
     track_label: facts.track_label || null,
     secondary_track: facts.secondary_track || null,
     override_flags: facts.override_flags || [],
-    substantive_score: facts.substantive_score || null,
-    procedural_score: facts.procedural_score || null,
+    substantive_score: facts.substantive_score ?? null,
+    procedural_score: facts.procedural_score ?? null,
     merit_band: facts.merit_band || null,
     wp_type: facts.wp_type || null,
     legal_basis: facts.legal_basis || [],
@@ -115,12 +115,13 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Claude WP drafting call failed: ${response.status} ${text.slice(0, 500)}`);
+    throw new Error(`Claude WP drafting call failed using ${CLAUDE_MODEL}: ${response.status} ${text.slice(0, 500)}`);
   }
 
   const data = await response.json();
-  const text = (data.content || []).map(item => item.text || '').join('\n').trim();
-  const parsed = parseJsonOnly(text);
+  const responseText = (data.content || []).map(item => item.text || '').join('\n').trim();
+  if (!responseText) throw new Error('Claude returned an empty drafting response');
+  const parsed = parseJsonOnly(responseText);
 
   return {
     draft: parsed,
