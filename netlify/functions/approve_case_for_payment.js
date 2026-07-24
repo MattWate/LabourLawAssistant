@@ -31,6 +31,16 @@ function extractEmail(value = '') {
   return String(value || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null;
 }
 
+function isTemplateLookupError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('template') && (
+    message.includes('not found') ||
+    message.includes('does not exist') ||
+    message.includes('translation') ||
+    message.includes('language')
+  );
+}
+
 async function sendPaymentRequest({ conversation, caseData, payment }) {
   if (!conversation?.from_number) return { sent: false, mode: 'none' };
 
@@ -38,23 +48,40 @@ async function sendPaymentRequest({ conversation, caseData, payment }) {
   const clientName = facts.client_name || caseData.client_name || 'Client';
   const phoneNumberId = conversation.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
   const templateName = String(process.env.WHATSAPP_PAYMENT_TEMPLATE_NAME || 'payment_link_ready').trim();
-  const languageCode = String(process.env.WHATSAPP_PAYMENT_TEMPLATE_LANGUAGE || 'en').trim();
+  const configuredLanguage = String(process.env.WHATSAPP_PAYMENT_TEMPLATE_LANGUAGE || 'en').trim();
 
   if (templateName) {
-    await sendWhatsAppTemplate({
-      to: conversation.from_number,
-      phoneNumberId,
-      templateName,
-      languageCode,
-      components: [{
-        type: 'body',
-        parameters: [
-          { type: 'text', text: clientName },
-          { type: 'text', text: payment.payment_url }
-        ]
-      }]
-    });
-    return { sent: true, mode: 'template', template_name: templateName };
+    const languageCodes = [...new Set([configuredLanguage, 'en_US', 'en_GB', 'en'].filter(Boolean))];
+    let lastError = null;
+
+    for (const languageCode of languageCodes) {
+      try {
+        await sendWhatsAppTemplate({
+          to: conversation.from_number,
+          phoneNumberId,
+          templateName,
+          languageCode,
+          components: [{
+            type: 'body',
+            parameters: [
+              { type: 'text', text: clientName },
+              { type: 'text', text: payment.payment_url }
+            ]
+          }]
+        });
+        return {
+          sent: true,
+          mode: 'template',
+          template_name: templateName,
+          template_language: languageCode
+        };
+      } catch (error) {
+        lastError = error;
+        if (!isTemplateLookupError(error)) throw error;
+      }
+    }
+
+    throw new Error(`WhatsApp template ${templateName} was not found for language codes ${languageCodes.join(', ')}. Confirm that the template is approved in the same WhatsApp Business Account as this phone number. Last Meta error: ${lastError?.message || 'unknown error'}`);
   }
 
   await sendWhatsAppText({
@@ -135,6 +162,7 @@ exports.handler = async (event) => {
         payment_requested_at: new Date().toISOString(),
         payment_request_channel: delivery.mode,
         payment_template_name: delivery.template_name || null,
+        payment_template_language: delivery.template_language || null,
         payment_url: payment.payment_url,
         payment_amount: payment.amount,
         payment_reference: payment.m_payment_id
@@ -151,7 +179,8 @@ exports.handler = async (event) => {
       employer_email: employerEmail,
       whatsapp_sent: delivery.sent,
       whatsapp_mode: delivery.mode,
-      template_name: delivery.template_name || null
+      template_name: delivery.template_name || null,
+      template_language: delivery.template_language || null
     });
   } catch (error) {
     const status = error.message === 'Unauthorized' ? 401 : 500;
