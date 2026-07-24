@@ -91,7 +91,6 @@ exports.handler = async (event) => {
     const employerEmail = facts.employer_email || extractEmail(facts.employer_contact_details);
     const clientEmail = facts.client_email || extractEmail(facts.contact_info || caseData.contact_info);
 
-    if (!clientEmail) return json(400, { error: 'Client email is missing from the case' });
     if (!employerEmail) return json(400, { error: 'Employer email is missing from the case' });
 
     const approvedAt = new Date().toISOString();
@@ -101,7 +100,7 @@ exports.handler = async (event) => {
       lawyer_approved: true,
       lawyer_approved_at: approvedAt,
       lawyer_approved_by: lawyer.email || lawyer.id,
-      client_email: clientEmail,
+      ...(clientEmail ? { client_email: clientEmail } : {}),
       employer_email: employerEmail
     };
 
