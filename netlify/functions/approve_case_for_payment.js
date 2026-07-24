@@ -31,24 +31,13 @@ function extractEmail(value = '') {
   return String(value || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null;
 }
 
-function formatAmount(value) {
-  const amount = Number(value || process.env.PAYFAST_WP_LETTER_AMOUNT || 950);
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
-}
-
-function shortCaseReference(caseId = '') {
-  return String(caseId).replace(/-/g, '').slice(0, 8).toUpperCase();
-}
-
 async function sendPaymentRequest({ conversation, caseData, payment }) {
   if (!conversation?.from_number) return { sent: false, mode: 'none' };
 
   const facts = caseData.case_facts || {};
   const clientName = facts.client_name || caseData.client_name || 'Client';
-  const amount = formatAmount(payment.amount);
-  const reference = shortCaseReference(caseData.id);
   const phoneNumberId = conversation.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const templateName = String(process.env.WHATSAPP_PAYMENT_TEMPLATE_NAME || '').trim();
+  const templateName = String(process.env.WHATSAPP_PAYMENT_TEMPLATE_NAME || 'payment_link_ready').trim();
   const languageCode = String(process.env.WHATSAPP_PAYMENT_TEMPLATE_LANGUAGE || 'en').trim();
 
   if (templateName) {
@@ -61,9 +50,7 @@ async function sendPaymentRequest({ conversation, caseData, payment }) {
         type: 'body',
         parameters: [
           { type: 'text', text: clientName },
-          { type: 'text', text: amount },
-          { type: 'text', text: payment.payment_url },
-          { type: 'text', text: reference }
+          { type: 'text', text: payment.payment_url }
         ]
       }]
     });
@@ -73,7 +60,7 @@ async function sendPaymentRequest({ conversation, caseData, payment }) {
   await sendWhatsAppText({
     to: conversation.from_number,
     phoneNumberId,
-    body: `Hello ${clientName}, a VRS lawyer has reviewed your matter and approved it to proceed to a formal letter. The fee is ${amount}. Please use the secure payment link below.\n\n${payment.payment_url}\n\nReference: ${reference}`
+    body: `Hi ${clientName}, VRS has reviewed your case. To proceed, please complete payment here: ${payment.payment_url}. Once payment is received, the legal team will prepare and review your letter.`
   });
   return { sent: true, mode: 'session_text' };
 }
