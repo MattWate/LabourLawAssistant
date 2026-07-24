@@ -36,6 +36,31 @@ function wpEligible(facts = {}) {
   return facts.wp_eligible === true || facts.effective_decision?.wp_eligible === true || facts.admin_override?.wp_eligible === true;
 }
 
+function isMissingColumn(error) {
+  const message = String(error?.message || '');
+  return error?.code === 'PGRST204' || /could not find the .* column/i.test(message);
+}
+
+async function insertPayment(payload) {
+  let result = await supabase.from('payments').insert(payload).select().single();
+  if (!result.error) return result;
+
+  if (!isMissingColumn(result.error)) return result;
+
+  // Older production schemas may not yet contain the checkout metadata columns.
+  const legacyPayload = {
+    case_id: payload.case_id,
+    provider: payload.provider,
+    m_payment_id: payload.m_payment_id,
+    amount: payload.amount,
+    item_name: payload.item_name,
+    status: payload.status
+  };
+
+  result = await supabase.from('payments').insert(legacyPayload).select().single();
+  return result;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true });
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
@@ -77,21 +102,18 @@ exports.handler = async (event) => {
       custom_str1: caseId
     });
 
-    const { data: payment, error: payErr } = await supabase
-      .from('payments')
-      .insert({
-        case_id: caseId,
-        provider: 'payfast',
-        m_payment_id: mPaymentId,
-        amount,
-        item_name: itemName,
-        status: 'pending',
-        checkout_url: getPayfastBaseUrl(),
-        checkout_fields: fields,
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    const checkoutBaseUrl = getPayfastBaseUrl();
+    const { data: payment, error: payErr } = await insertPayment({
+      case_id: caseId,
+      provider: 'payfast',
+      m_payment_id: mPaymentId,
+      amount,
+      item_name: itemName,
+      status: 'pending',
+      checkout_url: checkoutBaseUrl,
+      checkout_fields: fields,
+      updated_at: new Date().toISOString()
+    });
     if (payErr) throw payErr;
 
     await supabase.from('cases').update({ payment_status: 'pending', status: 'payment_pending', updated_at: new Date().toISOString() }).eq('id', caseId);
@@ -100,7 +122,7 @@ exports.handler = async (event) => {
       success: true,
       payment_id: payment.id,
       m_payment_id: mPaymentId,
-      payment_url: `${getPayfastBaseUrl()}?${fieldsToQuery(fields)}`,
+      payment_url: `${checkoutBaseUrl}?${fieldsToQuery(fields)}`,
       fields,
       amount,
       item_name: itemName
