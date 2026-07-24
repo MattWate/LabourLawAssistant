@@ -414,7 +414,7 @@
       return '<div class="case-card ' + (active ? 'active' : '') + '" onclick="selectCase(\'' + c.id + '\')"><div class="case-row"><div class="case-name">' + esc(name) + '</div>' + statusBadge(st) + '</div><div class="case-summary">' + esc(sum.slice(0, 120)) + (sum.length > 120 ? '...' : '') + '</div><div class="badges"><span class="badge blue">' + esc(ed.track || 'track?') + '</span><span class="badge ' + meritClass(ed.merit_band) + '">' + esc(ed.merit_band || 'review') + '</span>' + (bool(ed.wp_eligible) ? '<span class="badge green">WP</span>' : '') + (f.admin_override?.overridden ? '<span class="badge purple">override</span>' : '') + '</div></div>';
     }
 
-    function selectCase(id) { selectedCaseId = id; renderWorkstation(); }
+    function selectCase(id) { selectedCaseId = id; currentView = 'workstation'; render(); }
 
     function statusBadge(s) {
       const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
@@ -498,7 +498,7 @@
       const btn = $('btn-payment-' + id);
       if (btn) { btn.disabled = true; btn.textContent = 'Creating Payment...'; }
       try {
-        await saveCaseFacts(id);
+        await saveCaseFacts(id, false);
         const res = await fetch('/.netlify/functions/approve_case_for_payment', {
           method: 'POST',
           headers: headers(),
@@ -526,7 +526,7 @@
       return res.json();
     }
 
-    async function saveCaseFacts(id) {
+    async function saveCaseFacts(id, refresh = true) {
       const c = casesData.find(x => x.id === id);
       if (!c) return;
       const f = { ...(c.case_facts || {}) };
@@ -539,8 +539,10 @@
         f[k] = v;
       });
       await updateCase({ id, case_facts: f, client_name: f.client_name, issue_summary: f.incident_description });
-      toast('Case facts saved.');
-      await fetchCases();
+      if (refresh) {
+        toast('Case facts saved.');
+        await fetchCases();
+      }
     }
 
     function openNewCaseModal() { openModal('new-case-modal'); }
