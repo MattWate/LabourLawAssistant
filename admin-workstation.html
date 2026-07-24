@@ -111,6 +111,7 @@
         <button id="nav-workstation" class="btn ghost" onclick="setView('workstation')">Case Workstation</button>
         <button class="btn ghost" onclick="setQueueFilter('review');setView('workstation')">Attorney Review</button>
         <button class="btn ghost" onclick="setQueueFilter('info');setView('workstation')">Needs More Info</button>
+        <button class="btn ghost" onclick="setQueueFilter('payment');setView('workstation')">Awaiting Payment</button>
         <button class="btn ghost" onclick="setQueueFilter('drafting');setView('workstation')">Drafting Queue</button>
       </nav>
       <div class="side-foot">
@@ -298,6 +299,7 @@
       const f = facts(c);
       const q = (f.client_questions || []).filter(x => x.status === 'pending').length;
       if (c.status === 'archived') return 'archived';
+      if (c.payment_status === 'pending' || c.status === 'payment_pending') return 'payment_pending';
       if (q) return 'needs_info';
       if (f.attorney_review_flag || c.status === 'requires_attorney') return 'attorney_review';
       if (c.letter_status === 'pending_review') return 'pending_review';
@@ -312,6 +314,7 @@
         active: active.length,
         review: active.filter(c => statusOf(c) === 'attorney_review').length,
         info: active.filter(c => statusOf(c) === 'needs_info').length,
+        payment: active.filter(c => statusOf(c) === 'payment_pending').length,
         drafting: active.filter(c => statusOf(c) === 'needs_drafting').length,
         pending: active.filter(c => c.letter_status === 'pending_review').length,
         approved: active.filter(c => c.letter_status === 'approved').length,
@@ -339,6 +342,7 @@
         metric('Active Cases', s.active, 'Open matters', "setQueueFilter('active');setView('workstation')") +
         metric('Attorney Review', s.review, 'Needs legal judgement', "setQueueFilter('review');setView('workstation')") +
         metric('Needs More Info', s.info, 'Waiting on client', "setQueueFilter('info');setView('workstation')") +
+        metric('Awaiting Payment', s.payment, 'Payment link issued', "setQueueFilter('payment');setView('workstation')") +
         metric('Drafting Queue', s.drafting, 'Ready for letter', "setQueueFilter('drafting');setView('workstation')") +
         metric('Pending Review', s.pending, 'Drafts awaiting approval', "setQueueFilter('approved');setView('workstation')") +
         metric('Approved', s.approved, 'Ready for delivery', "setQueueFilter('approved');setView('workstation')") +
@@ -366,6 +370,7 @@
         if (currentQueueFilter === 'active' && c.status === 'archived') return false;
         if (currentQueueFilter === 'review' && statusOf(c) !== 'attorney_review') return false;
         if (currentQueueFilter === 'info' && statusOf(c) !== 'needs_info') return false;
+        if (currentQueueFilter === 'payment' && statusOf(c) !== 'payment_pending') return false;
         if (currentQueueFilter === 'drafting' && statusOf(c) !== 'needs_drafting') return false;
         if (currentQueueFilter === 'approved' && c.letter_status !== 'approved') return false;
         if (currentQueueFilter === 'wp' && !bool(ed.wp_eligible)) return false;
@@ -386,7 +391,7 @@
       if (selected) selectedCaseId = selected.id;
       $('main').innerHTML =
         '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search cases..." oninput="renderWorkstation()"/><div class="filters">' +
-        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
+        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('payment','Awaiting Payment') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
         '</div></div><div class="case-list">' +
         (rows.length ? rows.map(c => caseCard(c, c.id === selectedCaseId)).join('') : '<div class="loader">No cases match this queue.</div>') +
         '</div></section><section class="centre">' +
@@ -412,7 +417,7 @@
     function selectCase(id) { selectedCaseId = id; renderWorkstation(); }
 
     function statusBadge(s) {
-      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
+      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
       const item = map[s] || [s, 'blue'];
       return '<span class="badge ' + item[1] + '">' + esc(item[0]) + '</span>';
     }
@@ -428,9 +433,17 @@
     function selectedHtml(c) {
       const f = facts(c);
       const ed = effective(c);
-      return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id">Case ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions"><button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\'' + c.id + '\')">Save Facts</button></div></div><div class="fact-grid">' +
+      return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id">Case ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions">' + paymentAction(c) + '<button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\'' + c.id + '\')">Save Facts</button></div></div><div class="fact-grid">' +
         fact('Employer', f.employer_name) + fact('Contact', f.contact_info || c.contact_info) + fact('Incident Date', f.incident_date) + fact('Employment Status', f.employment_status) + fact('Incident Description', f.incident_description || c.issue_summary, true) +
         '</div></div><div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\'' + c.id + '\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\'' + c.id + '\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
+    }
+
+    function paymentAction(c) {
+      const ed = effective(c);
+      if (c.payment_status === 'paid') return '<span class="badge green">Payment received</span>';
+      if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button>';
+      if (!bool(ed.wp_eligible)) return '';
+      return '<button id="btn-payment-' + c.id + '" class="btn success" onclick="approveCaseForPayment(\'' + c.id + '\')">Approve & Request Payment</button>';
     }
 
     function fact(label, value, wide = false) {
@@ -474,7 +487,33 @@
       const ed = effective(c);
       const questions = f.client_questions || [];
       const legal = ed.legal_basis || f.legal_basis || [];
-      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div><div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
+      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge ' + (c.payment_status === 'paid' ? 'green' : c.payment_status === 'pending' ? 'amber' : 'blue') + '">Payment: ' + esc(c.payment_status || 'not requested') + '</span><span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div><div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
+    }
+
+    async function approveCaseForPayment(id) {
+      const c = casesData.find(x => x.id === id);
+      if (!c) return toast('Case not found.');
+      const f = facts(c);
+      if (!confirm('Approve this case and send the client a PayFast payment request?')) return;
+      const btn = $('btn-payment-' + id);
+      if (btn) { btn.disabled = true; btn.textContent = 'Creating Payment...'; }
+      try {
+        await saveCaseFacts(id);
+        const res = await fetch('/.netlify/functions/approve_case_for_payment', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ caseId: id })
+        });
+        let result = {};
+        try { result = await res.json(); } catch (e) {}
+        if (!res.ok) throw new Error(result.error || 'Could not approve case for payment.');
+        const channel = result.whatsapp_mode === 'template' ? 'WhatsApp template' : result.whatsapp_sent ? 'WhatsApp message' : 'payment link';
+        toast('Case approved. The ' + channel + ' was created successfully.');
+        await fetchCases();
+      } catch (e) {
+        toast(e.message || 'Payment approval failed.');
+        if (btn) { btn.disabled = false; btn.textContent = 'Approve & Request Payment'; }
+      }
     }
 
     async function updateCase(payload) {
