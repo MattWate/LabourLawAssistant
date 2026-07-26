@@ -43,8 +43,9 @@ const STEPS = {
     choice('Poor performance', 'Poor Performance', 'P2_PERFORMANCE_STANDARDS'),
     choice('Incapacity, illness or injury', 'Incapacity', 'I2_INCAPACITY_NATURE'),
     choice('Retrenchment or operational requirements', 'Retrenchment', 'R2_HEADCOUNT'),
-    choice('Other', 'Other', 'A2_MISCONDUCT_CATEGORY')
+    choice('Other', 'Other', 'FIRED_REASON_OTHER_EXPLANATION')
   ]),
+  FIRED_REASON_OTHER_EXPLANATION: text('Please explain the reason your employer gave for dismissing you.', 'dismissal_reason_other_explanation', 'COMPANY_NAME', { minWords: 3 }),
 
   A2_MISCONDUCT_CATEGORY: buttons('What was the stated misconduct allegation?', 'misconduct_category', [
     choice('Theft', 'theft', 'A3_CONDUCT_ADMISSION'), choice('Assault', 'assault', 'A3_CONDUCT_ADMISSION'),
