@@ -35,9 +35,10 @@ async function authenticate(event) {
 
 async function recordFailure(caseId, error) {
   if (!supabase || !caseId) return;
-  const { data } = await supabase.from('cases').select('case_facts').eq('id', caseId).maybeSingle();
+  const { data } = await supabase.from('cases').select('case_facts,payment_status').eq('id', caseId).maybeSingle();
   const facts = data?.case_facts || {};
   await supabase.from('cases').update({
+    status: data?.payment_status === 'paid' ? 'paid_ready_for_drafting' : undefined,
     letter_status: 'generation_failed',
     case_facts: {
       ...facts,
@@ -65,15 +66,19 @@ exports.handler = async (event) => {
 
     const { data: caseData, error: caseErr } = await supabase
       .from('cases')
-      .select('case_facts')
+      .select('case_facts,payment_status,wp_generation_unlocked')
       .eq('id', caseId)
       .single();
     if (caseErr || !caseData) throw new Error(`Case not found: ${caseErr?.message || caseId}`);
 
     const facts = caseData.case_facts || {};
+    const isPaid = caseData.payment_status === 'paid' || facts.payment_status === 'paid';
+    const isUnlocked = caseData.wp_generation_unlocked === true || facts.wp_generation_unlocked === true;
+    if (!isPaid || !isUnlocked) throw new Error('Drafting is locked until PayFast confirms payment.');
     if (!canGenerateWpLetter(facts)) throw new Error(blockedReason(facts));
 
     await supabase.from('cases').update({
+      status: 'drafting_in_progress',
       letter_status: 'generating',
       case_facts: {
         ...facts,
@@ -111,6 +116,7 @@ exports.handler = async (event) => {
     };
 
     const { error: updateError } = await supabase.from('cases').update({
+      status: 'draft_ready_for_review',
       draft_letter: partA,
       letter_status: 'pending_review',
       case_facts: updatedFacts,
