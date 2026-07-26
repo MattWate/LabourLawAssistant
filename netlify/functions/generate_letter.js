@@ -38,13 +38,27 @@ exports.handler = async (event) => {
 
     const { data: caseData, error: caseError } = await supabase
       .from('cases')
-      .select('case_facts')
+      .select('case_facts,payment_status,paid_at,wp_generation_unlocked,letter_status')
       .eq('id', request.caseId)
       .single();
     if (caseError || !caseData) return json(404, { error: 'Case not found' });
 
     const facts = caseData.case_facts || {};
+    const isPaid = caseData.payment_status === 'paid' || facts.payment_status === 'paid';
+    const isUnlocked = caseData.wp_generation_unlocked === true || facts.wp_generation_unlocked === true;
+    if (!isPaid || !isUnlocked) {
+      return json(403, {
+        error: 'Drafting is locked until PayFast confirms payment',
+        payment_status: caseData.payment_status || facts.payment_status || 'unpaid'
+      });
+    }
+
+    if (['generating', 'draft_ready', 'approved', 'sent'].includes(caseData.letter_status)) {
+      return json(409, { error: `Letter drafting cannot start while letter status is ${caseData.letter_status}` });
+    }
+
     await supabase.from('cases').update({
+      status: 'drafting_in_progress',
       letter_status: 'generating',
       case_facts: {
         ...facts,
@@ -68,6 +82,7 @@ exports.handler = async (event) => {
     if (!queued.ok) {
       const text = await queued.text();
       await supabase.from('cases').update({
+        status: 'paid_ready_for_drafting',
         letter_status: 'generation_failed',
         case_facts: {
           ...facts,
@@ -87,8 +102,9 @@ exports.handler = async (event) => {
       message: 'Draft generation started. Refresh the case shortly to review the completed letter.'
     });
   } catch (error) {
-    const statusCode = String(error.message).startsWith('Unauthorized') ? 401 : 500;
-    console.error('Draft Queue Error:', { message: error.message, stack: error.stack });
-    return json(statusCode, { error: error.message });
+    const message = String(error.message || 'Unknown error');
+    const statusCode = message.startsWith('Unauthorized') ? 401 : 500;
+    console.error('Draft Queue Error:', { message, stack: error.stack });
+    return json(statusCode, { error: message });
   }
 };
