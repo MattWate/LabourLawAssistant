@@ -112,6 +112,7 @@
         <button class="btn ghost" onclick="setQueueFilter('review');setView('workstation')">Attorney Review</button>
         <button class="btn ghost" onclick="setQueueFilter('info');setView('workstation')">Needs More Info</button>
         <button class="btn ghost" onclick="setQueueFilter('payment');setView('workstation')">Awaiting Payment</button>
+        <button class="btn ghost" onclick="setQueueFilter('paid');setView('workstation')">Paid – Ready to Draft</button>
         <button class="btn ghost" onclick="setQueueFilter('drafting');setView('workstation')">Drafting Queue</button>
       </nav>
       <div class="side-foot">
@@ -299,6 +300,7 @@
       const f = facts(c);
       const q = (f.client_questions || []).filter(x => x.status === 'pending').length;
       if (c.status === 'archived') return 'archived';
+      if (c.payment_status === 'paid' && c.status === 'paid_ready_for_drafting') return 'paid_ready_for_drafting';
       if (c.payment_status === 'pending' || c.status === 'payment_pending') return 'payment_pending';
       if (q) return 'needs_info';
       if (f.attorney_review_flag || c.status === 'requires_attorney') return 'attorney_review';
@@ -315,7 +317,8 @@
         review: active.filter(c => statusOf(c) === 'attorney_review').length,
         info: active.filter(c => statusOf(c) === 'needs_info').length,
         payment: active.filter(c => statusOf(c) === 'payment_pending').length,
-        drafting: active.filter(c => statusOf(c) === 'needs_drafting').length,
+        paid: active.filter(c => statusOf(c) === 'paid_ready_for_drafting').length,
+        drafting: active.filter(c => ['needs_drafting','drafting_in_progress'].includes(statusOf(c))).length,
         pending: active.filter(c => c.letter_status === 'pending_review').length,
         approved: active.filter(c => c.letter_status === 'approved').length,
         wp: active.filter(c => bool(effective(c).wp_eligible)).length,
@@ -343,7 +346,8 @@
         metric('Attorney Review', s.review, 'Needs legal judgement', "setQueueFilter('review');setView('workstation')") +
         metric('Needs More Info', s.info, 'Waiting on client', "setQueueFilter('info');setView('workstation')") +
         metric('Awaiting Payment', s.payment, 'Payment link issued', "setQueueFilter('payment');setView('workstation')") +
-        metric('Drafting Queue', s.drafting, 'Ready for letter', "setQueueFilter('drafting');setView('workstation')") +
+        metric('Paid – Ready to Draft', s.paid, 'Payment confirmed', "setQueueFilter('paid');setView('workstation')") +
+        metric('Drafting Queue', s.drafting, 'Drafting underway', "setQueueFilter('drafting');setView('workstation')") +
         metric('Pending Review', s.pending, 'Drafts awaiting approval', "setQueueFilter('approved');setView('workstation')") +
         metric('Approved', s.approved, 'Ready for delivery', "setQueueFilter('approved');setView('workstation')") +
         metric('WP Eligible', s.wp, 'Effective WP path', "setQueueFilter('wp');setView('workstation')") +
@@ -371,7 +375,8 @@
         if (currentQueueFilter === 'review' && statusOf(c) !== 'attorney_review') return false;
         if (currentQueueFilter === 'info' && statusOf(c) !== 'needs_info') return false;
         if (currentQueueFilter === 'payment' && statusOf(c) !== 'payment_pending') return false;
-        if (currentQueueFilter === 'drafting' && statusOf(c) !== 'needs_drafting') return false;
+        if (currentQueueFilter === 'paid' && statusOf(c) !== 'paid_ready_for_drafting') return false;
+        if (currentQueueFilter === 'drafting' && !['needs_drafting','drafting_in_progress'].includes(statusOf(c))) return false;
         if (currentQueueFilter === 'approved' && c.letter_status !== 'approved') return false;
         if (currentQueueFilter === 'wp' && !bool(ed.wp_eligible)) return false;
         if (currentQueueFilter === 'high' && !['HIGH','MEDIUM-HIGH'].includes(String(ed.merit_band || '').toUpperCase())) return false;
@@ -391,7 +396,7 @@
       if (selected) selectedCaseId = selected.id;
       $('main').innerHTML =
         '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search cases..." oninput="renderWorkstation()"/><div class="filters">' +
-        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('payment','Awaiting Payment') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
+        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('payment','Awaiting Payment') + chip('paid','Paid – Ready') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
         '</div></div><div class="case-list">' +
         (rows.length ? rows.map(c => caseCard(c, c.id === selectedCaseId)).join('') : '<div class="loader">No cases match this queue.</div>') +
         '</div></section><section class="centre">' +
@@ -417,7 +422,7 @@
     function selectCase(id) { selectedCaseId = id; currentView = 'workstation'; render(); }
 
     function statusBadge(s) {
-      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
+      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
       const item = map[s] || [s, 'blue'];
       return '<span class="badge ' + item[1] + '">' + esc(item[0]) + '</span>';
     }
@@ -440,7 +445,7 @@
 
     function paymentAction(c) {
       const ed = effective(c);
-      if (c.payment_status === 'paid') return '<span class="badge green">Payment received</span>';
+      if (c.payment_status === 'paid') return '<span class="badge green">Payment received ' + esc(date(c.paid_at)) + '</span>';
       if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button>';
       if (!bool(ed.wp_eligible)) return '';
       return '<button id="btn-payment-' + c.id + '" class="btn success" onclick="approveCaseForPayment(\'' + c.id + '\')">Approve & Request Payment</button>';
@@ -478,7 +483,7 @@
     function letterCard(c) {
       const f = facts(c);
       if (c.draft_letter) return '<div class="card"><h3>Drafted Letter</h3><textarea id="letter-editor" class="letter">' + esc(c.draft_letter) + '</textarea><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn ghost" onclick="saveLetter(\'' + c.id + '\',\'pending_review\')">Save Draft</button><button class="btn success" onclick="saveLetter(\'' + c.id + '\',\'approved\')">Approve</button></div></div>';
-      if (f.wants_letter) return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted);line-height:1.5">This matter is marked as requiring a letter. Save corrected facts first, then generate a draft.</p><button id="btn-generate-' + c.id + '" class="btn warn" onclick="generateDraft(\'' + c.id + '\')">Generate Draft Letter</button></div>';
+      if (f.wants_letter) { const paid = c.payment_status === 'paid' && (c.wp_generation_unlocked === true || f.wp_generation_unlocked === true); return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted);line-height:1.5">' + (paid ? 'Payment is confirmed. Save corrected facts, then start the controlled draft.' : 'Drafting is locked until PayFast confirms payment.') + '</p><button id="btn-generate-' + c.id + '" class="btn warn" ' + (paid ? '' : 'disabled') + ' onclick="generateDraft(\'' + c.id + '\')">' + (paid ? 'Generate Draft Letter' : 'Awaiting Confirmed Payment') + '</button></div>'; }
       return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted)">No letter requested at this stage.</p></div>';
     }
 
@@ -709,8 +714,9 @@
       btn.textContent = 'Drafting...';
       try {
         const res = await fetch('/.netlify/functions/generate_letter', { method: 'POST', headers: headers(), body: JSON.stringify({ caseId: id }) });
-        if (!res.ok) throw new Error('Draft generation failed.');
-        toast('Draft generated.');
+        let result = {}; try { result = await res.json(); } catch (e) {}
+        if (!res.ok) throw new Error(result.error || 'Draft generation failed.');
+        toast(result.message || 'Draft generation started.');
         await fetchCases();
       } catch (e) {
         toast(e.message);
