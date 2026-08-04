@@ -125,7 +125,7 @@
     const buttonContainer = document.getElementById('button-input-container');
     const inputEl = document.getElementById('user-input');
 
-    let collectedFacts = {};
+    let collectedFacts = { source: "web" };
     let activeCaseId = null;
 
     // --- JUSTINE INTAKE SCRIPT ---
@@ -228,9 +228,17 @@
                 { label: "Poor Performance", next: "P2_PERFORMANCE_STANDARDS", val: "Poor Performance" },
                 { label: "Incapacity (illness, injury or inability)", next: "I2_INCAPACITY_NATURE", val: "Incapacity" },
                 { label: "Retrenchment or Operational Requirements", next: "R2_HEADCOUNT", val: "Retrenchment" },
-                { label: "Other", next: "A2_MISCONDUCT_CATEGORY", val: "Other" }
+                { label: "Other", next: "FIRED_REASON_OTHER_EXPLANATION", val: "Other" }
             ], 
             saveAs: "dismissal_reason_type" 
+        },
+
+        FIRED_REASON_OTHER_EXPLANATION: {
+            msg: "Please explain the reason your employer gave for dismissing you.",
+            type: "text",
+            next: "COMPANY_NAME",
+            saveAs: "dismissal_reason_other_explanation",
+            minWords: 3
         },
 
         // ==========================================
@@ -1176,10 +1184,10 @@
             saveAs: "client_name"
         },
         CLIENT_PHONE: {
-            msg: "And finally, what is the best cell phone number to reach you on?",
+            msg: "And finally, what WhatsApp cell phone number should VRS use to contact you? Please include the country code, for example +27 82 123 4567.",
             type: "text",
             next: "HANDOFF",
-            saveAs: "contact_info"
+            saveAs: "whatsapp_number"
         },
 
         HANDOFF: { action: "evaluate" }
@@ -1214,6 +1222,64 @@
         scrollToBottom();
     }
 
+    const AI_SKIP_CONFIDENCE = 0.8;
+
+    function hasKnownValue(value) {
+        return value !== null && value !== undefined && !(typeof value === "string" && value.trim() === "");
+    }
+
+    function normaliseChoice(value) {
+        return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9+<>\- ]/g, " ").replace(/\s+/g, " ");
+    }
+
+    function matchedStoredOption(step, value) {
+        if (!step || step.type !== "buttons" || !Array.isArray(step.options)) return null;
+        const wanted = normaliseChoice(value);
+        return step.options.find(opt => normaliseChoice(opt.val) === wanted || normaliseChoice(opt.label) === wanted) || null;
+    }
+
+    function canSkipStep(step) {
+        if (!step || !step.saveAs || !hasKnownValue(collectedFacts[step.saveAs])) return false;
+        const meta = collectedFacts._fact_metadata?.[step.saveAs];
+        if (meta?.source === "initial_narrative_ai" && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
+        if (step.type === "buttons") return Boolean(matchedStoredOption(step, collectedFacts[step.saveAs]));
+        if (step.type === "date") return /^\d{4}-\d{2}-\d{2}$/.test(String(collectedFacts[step.saveAs]));
+        if (step.minWords) return String(collectedFacts[step.saveAs]).split(/\s+/).filter(Boolean).length >= step.minWords;
+        return true;
+    }
+
+    function mergeAIExtractedFacts(data) {
+        const governance = data.governance || {};
+        const hydrated = data.hydrated_facts || governance.hydrated_facts || {};
+        const confidenceByField = governance.confidence_per_field || data.confidence_per_field || {};
+        const overallConfidence = Number(governance.confidence ?? data.confidence ?? 0);
+        const metadata = { ...(collectedFacts._fact_metadata || {}) };
+        const candidates = { ...hydrated };
+
+        if (!hasKnownValue(candidates.employment_status) && hasKnownValue(data.category)) candidates.employment_status = data.category;
+        if (!hasKnownValue(candidates.dismissal_reason_type) && hasKnownValue(data.dismissal_reason_type)) candidates.dismissal_reason_type = data.dismissal_reason_type;
+        if (!hasKnownValue(candidates.advisory_topic) && hasKnownValue(data.advisory_topic)) candidates.advisory_topic = data.advisory_topic;
+
+        Object.entries(candidates).forEach(([key, value]) => {
+            if (!hasKnownValue(value) || hasKnownValue(collectedFacts[key])) return;
+            const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
+            if (confidence < AI_SKIP_CONFIDENCE) return;
+            collectedFacts[key] = value;
+            metadata[key] = { source: "initial_narrative_ai", confidence, captured_at: new Date().toISOString() };
+        });
+
+        collectedFacts._fact_metadata = metadata;
+        collectedFacts.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === "initial_narrative_ai");
+    }
+
+    function normaliseWhatsAppNumber(value) {
+        let digits = String(value || "").replace(/\D/g, "");
+        if (digits.startsWith("00")) digits = digits.slice(2);
+        if (digits.startsWith("0") && digits.length === 10) digits = "27" + digits.slice(1);
+        if (digits.length < 10 || digits.length > 15) return null;
+        return digits;
+    }
+
     function renderState() {
         let step = scriptFlow[currentState];
 
@@ -1223,20 +1289,13 @@
             return;
         }
 
-        // Smart Skipper:
-        // If the classifier already extracted a structured answer, skip that question silently.
-        // It will not skip minimum-word narrative questions, because those must be asked directly.
-        while (step && step.saveAs && collectedFacts[step.saveAs] !== undefined && !step.minWords) {
-            const knownVal = collectedFacts[step.saveAs];
+        // Smart skipper: use only valid direct answers or high-confidence AI-extracted facts.
+        while (step && canSkipStep(step)) {
             let nextState = step.next;
-
-            if (step.type === "buttons" && step.options) {
-                const matchedOption = step.options.find(opt => opt.val === knownVal);
-                if (matchedOption && matchedOption.next) {
-                    nextState = matchedOption.next;
-                }
+            if (step.type === "buttons") {
+                const matchedOption = matchedStoredOption(step, collectedFacts[step.saveAs]);
+                if (matchedOption?.next) nextState = matchedOption.next;
             }
-
             if (!nextState) break;
             currentState = nextState;
             step = scriptFlow[currentState];
@@ -1345,10 +1404,10 @@
                 if (finalCategory === "Ambiguous") {
                     currentState = "START_FALLBACK";
                 } else {
-                    collectedFacts["employment_status"] = finalCategory;
-
-                    if (data.dismissal_reason_type) collectedFacts["dismissal_reason_type"] = data.dismissal_reason_type;
-                    if (data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
+                    mergeAIExtractedFacts(data);
+                    if (!hasKnownValue(collectedFacts["employment_status"])) collectedFacts["employment_status"] = finalCategory;
+                    if (!hasKnownValue(collectedFacts["dismissal_reason_type"]) && data.dismissal_reason_type) collectedFacts["dismissal_reason_type"] = data.dismissal_reason_type;
+                    if (!hasKnownValue(collectedFacts["advisory_topic"]) && data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
 
                     const routeMap = {
                         "Dismissed": "FIRED_DATE",
@@ -1377,7 +1436,26 @@
         buttonContainer.style.display = 'none';
 
         appendMessage(displayValue, "user");
-        if (saveKey) collectedFacts[saveKey] = actualValue;
+        if (saveKey) {
+            collectedFacts[saveKey] = actualValue;
+            collectedFacts._fact_metadata = {
+                ...(collectedFacts._fact_metadata || {}),
+                [saveKey]: { source: "user_answer", confidence: 1, captured_at: new Date().toISOString() }
+            };
+        }
+
+        if (saveKey === "whatsapp_number") {
+            const normalised = normaliseWhatsAppNumber(actualValue);
+            if (!normalised) {
+                appendMessage("Please enter a valid WhatsApp number, including the country code where possible.", "bot");
+                currentState = "CLIENT_PHONE";
+                renderState();
+                return;
+            }
+            collectedFacts.whatsapp_number = normalised;
+            collectedFacts.contact_info = normalised;
+            collectedFacts.contact_channel = "whatsapp";
+        }
 
         // Keep compatibility with the backend scorer while using Master Guide field names in the UI flow.
         if (saveKey === "worker_status") {

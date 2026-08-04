@@ -9,6 +9,50 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
+function normaliseWhatsAppNumber(value = "") {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0") && digits.length === 10) digits = `27${digits.slice(1)}`;
+  return digits.length >= 10 && digits.length <= 15 ? digits : null;
+}
+
+async function linkWebCaseToWhatsApp({ caseId, facts = {}, caseFacts = {} }) {
+  const number = normaliseWhatsAppNumber(facts.whatsapp_number || facts.contact_info);
+  if (!number) return { linked: false, reason: "no_valid_whatsapp_number" };
+
+  const now = new Date().toISOString();
+  const payload = {
+    from_number: number,
+    contact_name: facts.client_name || null,
+    phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
+    current_step: "COMPLETE",
+    status: "completed",
+    collected_facts: { ...caseFacts, contact_info: number, whatsapp_number: number, source: facts.source || "web" },
+    case_id: caseId,
+    handoff_reason: null,
+    error_message: null,
+    last_inbound_at: null,
+    updated_at: now
+  };
+
+  const { data: existing, error: readError } = await supabase
+    .from("whatsapp_conversations")
+    .select("id")
+    .eq("from_number", number)
+    .maybeSingle();
+  if (readError) throw readError;
+
+  if (existing?.id) {
+    const { error } = await supabase.from("whatsapp_conversations").update(payload).eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("whatsapp_conversations").insert({ ...payload, processed_message_ids: [], created_at: now });
+    if (error) throw error;
+  }
+
+  return { linked: true, number };
+}
+
 async function getActiveLLM() {
   const { data } = await supabase
     .from('system_settings')
@@ -235,7 +279,25 @@ exports.handler = async (event) => {
       }).select().single();
       if (error) throw error;
 
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, scorecard, governance: caseFacts.llm_governance }) };
+      let whatsapp = { linked: false, reason: 'not_web_intake' };
+      if (facts.source === 'web' || facts.whatsapp_number) {
+        try {
+          whatsapp = await linkWebCaseToWhatsApp({ caseId: data.id, facts, caseFacts });
+          if (whatsapp.linked) {
+            const normalisedFacts = { ...caseFacts, contact_info: whatsapp.number, whatsapp_number: whatsapp.number, source: 'web' };
+            await supabase.from('cases').update({
+              contact_info: whatsapp.number,
+              case_facts: normalisedFacts,
+              updated_at: new Date().toISOString()
+            }).eq('id', data.id);
+          }
+        } catch (linkError) {
+          console.warn('Web case WhatsApp linking failed:', linkError.message);
+          whatsapp = { linked: false, reason: linkError.message };
+        }
+      }
+
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, scorecard, governance: caseFacts.llm_governance, whatsapp }) };
     }
 
     if (action === 'close') {
