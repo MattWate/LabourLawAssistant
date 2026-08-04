@@ -24,7 +24,6 @@ jobs:
 
           p = Path('netlify/functions/lib/whatsappConversation.js')
           s = p.read_text()
-
           marker = "function routeClassification(classification = {}) {\n"
           helpers = r'''const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
 
@@ -39,7 +38,7 @@ function choiceForStoredValue(step, value) {
 }
 
 function stepIsAnswered(step, facts = {}) {
-  if (!step?.saveAs || !hasValue(facts[step.saveAs])) return False;
+  if (!step?.saveAs || !hasValue(facts[step.saveAs])) return false;
   const value = facts[step.saveAs];
   const meta = facts._fact_metadata?.[step.saveAs];
   if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
@@ -74,7 +73,6 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
   const confidenceByField = governance.confidence_per_field || classification.confidence_per_field || {};
   const metadata = { ...(facts._fact_metadata || {}) };
   const merged = { ...facts };
-
   const candidates = { ...hydrated };
   const overallConfidence = Number(governance.confidence ?? classification.confidence ?? 0);
   if (!hasValue(candidates.employment_status) && hasValue(classification.category)) candidates.employment_status = classification.category;
@@ -106,8 +104,6 @@ function markDirectAnswer(facts, key) {
 }
 
 '''
-          # fix Python-like typo after embedding
-          helpers = helpers.replace('return False;', 'return false;')
           if helpers not in s:
             if marker not in s:
               raise SystemExit('routeClassification marker not found')
@@ -148,7 +144,6 @@ function markDirectAnswer(facts, key) {
           if old_text not in s:
             raise SystemExit('text answer block not found')
           s = s.replace(old_text, new_text, 1)
-
           p.write_text(s)
           PY
       - name: Validate JavaScript syntax
@@ -162,3 +157,4 @@ function markDirectAnswer(facts, key) {
           git add netlify/functions/lib/whatsappConversation.js netlify/functions/lib/llmGovernance.js
           git commit -m "Skip answered WhatsApp intake questions" || exit 0
           git push
+# trigger 2
