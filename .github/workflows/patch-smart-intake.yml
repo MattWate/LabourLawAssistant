@@ -1,0 +1,164 @@
+name: Patch smart intake conversation
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/patch-smart-intake.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch intake extraction and skipping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          gov = Path('netlify/functions/lib/llmGovernance.js')
+          s = gov.read_text()
+          s = s.replace("    'incident_date', 'dismissal_reason_type', 'conduct_admission', 'length_of_service',\n", "    'incident_date', 'dismissal_reason_type', 'misconduct_category', 'conduct_admission', 'length_of_service',\n")
+          s = s.replace("    'selection_criteria_objective', 'retrenchment_alternatives', 'severance_pay',\n    'role_refilled'\n", "    'selection_criteria_objective', 'retrenchment_alternatives', 'severance_pay',\n    'role_refilled', 'employer_name', 'employer_contact_details', 'contract_type', 'sector'\n")
+          s = s.replace('    "dismissal_reason_type": null,\n    "conduct_admission": null,', '    "dismissal_reason_type": null,\n    "misconduct_category": null,\n    "conduct_admission": null,')
+          gov.write_text(s)
+
+          p = Path('netlify/functions/lib/whatsappConversation.js')
+          s = p.read_text()
+
+          marker = "function routeClassification(classification = {}) {\n"
+          helpers = r'''const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
+
+function hasValue(value) {
+  return value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
+}
+
+function choiceForStoredValue(step, value) {
+  if (!step || step.type !== 'buttons' || !hasValue(value)) return null;
+  const wanted = normalize(String(value));
+  return step.choices.find(item => normalize(String(item.value)) === wanted || normalize(item.label) === wanted) || null;
+}
+
+function stepIsAnswered(step, facts = {}) {
+  if (!step?.saveAs || !hasValue(facts[step.saveAs])) return False;
+  const value = facts[step.saveAs];
+  const meta = facts._fact_metadata?.[step.saveAs];
+  if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
+  if (step.type === 'date') return validDate(String(value));
+  if (step.type === 'buttons') return Boolean(choiceForStoredValue(step, value));
+  if (step.minWords) return wordCount(String(value)) >= step.minWords;
+  return true;
+}
+
+function resolveNextUnanswered(stepName, facts = {}) {
+  let current = stepName;
+  const visited = new Set();
+  for (let i = 0; i < 60 && current; i += 1) {
+    if (visited.has(current) || DEFLECTIONS[current] || current === 'HANDOFF') return current;
+    visited.add(current);
+    const step = STEPS[current];
+    if (!step || step.type === 'classify' || step.type === 'evaluate' || !stepIsAnswered(step, facts)) return current;
+    if (step.type === 'buttons') {
+      const selected = choiceForStoredValue(step, facts[step.saveAs]);
+      if (!selected) return current;
+      current = selected.next;
+    } else {
+      current = step.next;
+    }
+  }
+  return current || 'HANDOFF';
+}
+
+function mergeNarrativeFacts(facts = {}, classification = {}) {
+  const governance = classification.governance || {};
+  const hydrated = classification.hydrated_facts || governance.hydrated_facts || {};
+  const confidenceByField = governance.confidence_per_field || classification.confidence_per_field || {};
+  const metadata = { ...(facts._fact_metadata || {}) };
+  const merged = { ...facts };
+
+  const candidates = { ...hydrated };
+  const overallConfidence = Number(governance.confidence ?? classification.confidence ?? 0);
+  if (!hasValue(candidates.employment_status) && hasValue(classification.category)) candidates.employment_status = classification.category;
+  if (!hasValue(candidates.dismissal_reason_type) && hasValue(classification.dismissal_reason_type)) candidates.dismissal_reason_type = classification.dismissal_reason_type;
+  if (!hasValue(candidates.advisory_topic) && hasValue(classification.advisory_topic)) candidates.advisory_topic = classification.advisory_topic;
+
+  Object.entries(candidates).forEach(([key, value]) => {
+    if (!hasValue(value) || hasValue(merged[key])) return;
+    const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
+    if (confidence < AI_SKIP_CONFIDENCE) return;
+    merged[key] = value;
+    metadata[key] = { source: 'initial_narrative_ai', confidence, captured_at: new Date().toISOString() };
+  });
+
+  merged._fact_metadata = metadata;
+  merged.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === 'initial_narrative_ai');
+  return merged;
+}
+
+function markDirectAnswer(facts, key) {
+  if (!key) return facts;
+  return {
+    ...facts,
+    _fact_metadata: {
+      ...(facts._fact_metadata || {}),
+      [key]: { source: 'user_answer', confidence: 1, captured_at: new Date().toISOString() }
+    }
+  };
+}
+
+'''
+          # fix Python-like typo after embedding
+          helpers = helpers.replace('return False;', 'return false;')
+          if helpers not in s:
+            if marker not in s:
+              raise SystemExit('routeClassification marker not found')
+            s = s.replace(marker, helpers + marker, 1)
+
+          old_classify = """    facts = { ...facts, initial_query: input, employment_status: classification.category || 'Ambiguous',
+      dismissal_reason_type: classification.dismissal_reason_type || null, advisory_topic: classification.advisory_topic || null };
+    const next = routeClassification(classification);
+"""
+          new_classify = """    facts = mergeNarrativeFacts({ ...facts, initial_query: input }, classification);
+    if (!hasValue(facts.employment_status)) facts.employment_status = classification.category || 'Ambiguous';
+    if (!hasValue(facts.dismissal_reason_type) && classification.dismissal_reason_type) facts.dismissal_reason_type = classification.dismissal_reason_type;
+    if (!hasValue(facts.advisory_topic) && classification.advisory_topic) facts.advisory_topic = classification.advisory_topic;
+    const next = resolveNextUnanswered(routeClassification(classification), facts);
+"""
+          if old_classify not in s:
+            raise SystemExit('classification block not found')
+          s = s.replace(old_classify, new_classify, 1)
+
+          old_answer = """    facts[step.saveAs] = selected.value;
+    next = selected.next;
+"""
+          new_answer = """    facts[step.saveAs] = selected.value;
+    facts = markDirectAnswer(facts, step.saveAs);
+    next = resolveNextUnanswered(selected.next, facts);
+"""
+          if old_answer not in s:
+            raise SystemExit('button answer block not found')
+          s = s.replace(old_answer, new_answer, 1)
+
+          old_text = """    facts[step.saveAs] = input;
+    next = step.next;
+"""
+          new_text = """    facts[step.saveAs] = input;
+    facts = markDirectAnswer(facts, step.saveAs);
+    next = resolveNextUnanswered(step.next, facts);
+"""
+          if old_text not in s:
+            raise SystemExit('text answer block not found')
+          s = s.replace(old_text, new_text, 1)
+
+          p.write_text(s)
+          PY
+      - name: Validate JavaScript syntax
+        run: |
+          node --check netlify/functions/lib/whatsappConversation.js
+          node --check netlify/functions/lib/llmGovernance.js
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add netlify/functions/lib/whatsappConversation.js netlify/functions/lib/llmGovernance.js
+          git commit -m "Skip answered WhatsApp intake questions" || exit 0
+          git push
