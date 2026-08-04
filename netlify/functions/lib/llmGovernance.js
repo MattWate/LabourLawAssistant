@@ -108,14 +108,14 @@ function boolOrNull(value) {
 
 function cleanHydratedFacts(input = {}) {
   const allowed = [
-    'incident_date', 'dismissal_reason_type', 'conduct_admission', 'length_of_service',
+    'incident_date', 'dismissal_reason_type', 'misconduct_category', 'conduct_admission', 'length_of_service',
     'gross_monthly_salary', 'hearing_held', 'paid_suspension', 'prior_warnings',
     'pip_given', 'pip_duration', 'narrative', 'employment_status', 'advisory_topic',
     'proc_notice', 'proc_rep', 'proc_chair', 'proc_consultation', 'protected_ground',
     'performance_standards_communicated', 'training_provided', 'performance_control',
     'team_meeting_standards', 'retrenchment_consultation', 's189_notice',
     'selection_criteria_objective', 'retrenchment_alternatives', 'severance_pay',
-    'role_refilled'
+    'role_refilled', 'employer_name', 'employer_contact_details', 'contract_type', 'sector'
   ];
 
   const hydrated = {};
@@ -248,6 +248,7 @@ Return this JSON shape exactly:
   "hydrated_facts": {
     "incident_date": null,
     "dismissal_reason_type": null,
+    "misconduct_category": null,
     "conduct_admission": null,
     "length_of_service": null,
     "gross_monthly_salary": null,

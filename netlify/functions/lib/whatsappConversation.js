@@ -315,6 +315,85 @@ async function restartConversation(conversation, message) {
     case_id: null, handoff_reason: null, error_message: null, processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
   return `${INTRO}\n\n${renderPrompt('JUR_EMPLOYEE')}`;
 }
+const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
+
+function hasValue(value) {
+  return value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
+}
+
+function choiceForStoredValue(step, value) {
+  if (!step || step.type !== 'buttons' || !hasValue(value)) return null;
+  const wanted = normalize(String(value));
+  return step.choices.find(item => normalize(String(item.value)) === wanted || normalize(item.label) === wanted) || null;
+}
+
+function stepIsAnswered(step, facts = {}) {
+  if (!step?.saveAs || !hasValue(facts[step.saveAs])) return false;
+  const value = facts[step.saveAs];
+  const meta = facts._fact_metadata?.[step.saveAs];
+  if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
+  if (step.type === 'date') return validDate(String(value));
+  if (step.type === 'buttons') return Boolean(choiceForStoredValue(step, value));
+  if (step.minWords) return wordCount(String(value)) >= step.minWords;
+  return true;
+}
+
+function resolveNextUnanswered(stepName, facts = {}) {
+  let current = stepName;
+  const visited = new Set();
+  for (let i = 0; i < 60 && current; i += 1) {
+    if (visited.has(current) || DEFLECTIONS[current] || current === 'HANDOFF') return current;
+    visited.add(current);
+    const step = STEPS[current];
+    if (!step || step.type === 'classify' || step.type === 'evaluate' || !stepIsAnswered(step, facts)) return current;
+    if (step.type === 'buttons') {
+      const selected = choiceForStoredValue(step, facts[step.saveAs]);
+      if (!selected) return current;
+      current = selected.next;
+    } else {
+      current = step.next;
+    }
+  }
+  return current || 'HANDOFF';
+}
+
+function mergeNarrativeFacts(facts = {}, classification = {}) {
+  const governance = classification.governance || {};
+  const hydrated = classification.hydrated_facts || governance.hydrated_facts || {};
+  const confidenceByField = governance.confidence_per_field || classification.confidence_per_field || {};
+  const metadata = { ...(facts._fact_metadata || {}) };
+  const merged = { ...facts };
+
+  const candidates = { ...hydrated };
+  const overallConfidence = Number(governance.confidence ?? classification.confidence ?? 0);
+  if (!hasValue(candidates.employment_status) && hasValue(classification.category)) candidates.employment_status = classification.category;
+  if (!hasValue(candidates.dismissal_reason_type) && hasValue(classification.dismissal_reason_type)) candidates.dismissal_reason_type = classification.dismissal_reason_type;
+  if (!hasValue(candidates.advisory_topic) && hasValue(classification.advisory_topic)) candidates.advisory_topic = classification.advisory_topic;
+
+  Object.entries(candidates).forEach(([key, value]) => {
+    if (!hasValue(value) || hasValue(merged[key])) return;
+    const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
+    if (confidence < AI_SKIP_CONFIDENCE) return;
+    merged[key] = value;
+    metadata[key] = { source: 'initial_narrative_ai', confidence, captured_at: new Date().toISOString() };
+  });
+
+  merged._fact_metadata = metadata;
+  merged.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === 'initial_narrative_ai');
+  return merged;
+}
+
+function markDirectAnswer(facts, key) {
+  if (!key) return facts;
+  return {
+    ...facts,
+    _fact_metadata: {
+      ...(facts._fact_metadata || {}),
+      [key]: { source: 'user_answer', confidence: 1, captured_at: new Date().toISOString() }
+    }
+  };
+}
+
 function routeClassification(classification = {}) {
   const category = classification.category || classification.employment_status || 'Ambiguous';
   if (category === 'Dismissed') return 'FIRED_DATE';
@@ -353,9 +432,11 @@ async function processIncomingMessage(message) {
 
   if (step.type === 'classify') {
     const classification = await invokeAsk('classify', { text: input });
-    facts = { ...facts, initial_query: input, employment_status: classification.category || 'Ambiguous',
-      dismissal_reason_type: classification.dismissal_reason_type || null, advisory_topic: classification.advisory_topic || null };
-    const next = routeClassification(classification);
+    facts = mergeNarrativeFacts({ ...facts, initial_query: input }, classification);
+    if (!hasValue(facts.employment_status)) facts.employment_status = classification.category || 'Ambiguous';
+    if (!hasValue(facts.dismissal_reason_type) && classification.dismissal_reason_type) facts.dismissal_reason_type = classification.dismissal_reason_type;
+    if (!hasValue(facts.advisory_topic) && classification.advisory_topic) facts.advisory_topic = classification.advisory_topic;
+    const next = resolveNextUnanswered(routeClassification(classification), facts);
     await updateConversation(conversation.id, { current_step: next, collected_facts: facts, classification,
       processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
     return renderPrompt(next);
@@ -367,12 +448,14 @@ async function processIncomingMessage(message) {
     const selected = matchChoice(input, step);
     if (!selected) return `I did not understand that answer. Reply with the number or wording shown.\n\n${renderPrompt(stepName)}`;
     facts[step.saveAs] = selected.value;
-    next = selected.next;
+    facts = markDirectAnswer(facts, step.saveAs);
+    next = resolveNextUnanswered(selected.next, facts);
   } else {
     if (step.type === 'date' && !validDate(input)) return `Please enter the date as YYYY-MM-DD or DD/MM/YYYY.\n\n${step.prompt}`;
     if (step.minWords && wordCount(input) < step.minWords) return `Please add a little more detail, ideally at least ${step.minWords} words.\n\n${step.prompt}`;
     facts[step.saveAs] = input;
-    next = step.next;
+    facts = markDirectAnswer(facts, step.saveAs);
+    next = resolveNextUnanswered(step.next, facts);
   }
 
   if (DEFLECTIONS[next]) return markHandoff(conversation, message, next, facts);
