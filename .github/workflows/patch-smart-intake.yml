@@ -2,150 +2,19 @@ name: Patch smart intake conversation
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/patch-smart-intake.yml']
+    paths:
+      - '.github/workflows/patch-smart-intake.yml'
+
 permissions:
   contents: write
+
 jobs:
   patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Patch intake extraction and skipping
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          gov = Path('netlify/functions/lib/llmGovernance.js')
-          s = gov.read_text()
-          s = s.replace("    'incident_date', 'dismissal_reason_type', 'conduct_admission', 'length_of_service',\n", "    'incident_date', 'dismissal_reason_type', 'misconduct_category', 'conduct_admission', 'length_of_service',\n")
-          s = s.replace("    'selection_criteria_objective', 'retrenchment_alternatives', 'severance_pay',\n    'role_refilled'\n", "    'selection_criteria_objective', 'retrenchment_alternatives', 'severance_pay',\n    'role_refilled', 'employer_name', 'employer_contact_details', 'contract_type', 'sector'\n")
-          s = s.replace('    "dismissal_reason_type": null,\n    "conduct_admission": null,', '    "dismissal_reason_type": null,\n    "misconduct_category": null,\n    "conduct_admission": null,')
-          gov.write_text(s)
-
-          p = Path('netlify/functions/lib/whatsappConversation.js')
-          s = p.read_text()
-          marker = "function routeClassification(classification = {}) {\n"
-          helpers = r'''const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
-
-function hasValue(value) {
-  return value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
-}
-
-function choiceForStoredValue(step, value) {
-  if (!step || step.type !== 'buttons' || !hasValue(value)) return null;
-  const wanted = normalize(String(value));
-  return step.choices.find(item => normalize(String(item.value)) === wanted || normalize(item.label) === wanted) || null;
-}
-
-function stepIsAnswered(step, facts = {}) {
-  if (!step?.saveAs || !hasValue(facts[step.saveAs])) return false;
-  const value = facts[step.saveAs];
-  const meta = facts._fact_metadata?.[step.saveAs];
-  if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
-  if (step.type === 'date') return validDate(String(value));
-  if (step.type === 'buttons') return Boolean(choiceForStoredValue(step, value));
-  if (step.minWords) return wordCount(String(value)) >= step.minWords;
-  return true;
-}
-
-function resolveNextUnanswered(stepName, facts = {}) {
-  let current = stepName;
-  const visited = new Set();
-  for (let i = 0; i < 60 && current; i += 1) {
-    if (visited.has(current) || DEFLECTIONS[current] || current === 'HANDOFF') return current;
-    visited.add(current);
-    const step = STEPS[current];
-    if (!step || step.type === 'classify' || step.type === 'evaluate' || !stepIsAnswered(step, facts)) return current;
-    if (step.type === 'buttons') {
-      const selected = choiceForStoredValue(step, facts[step.saveAs]);
-      if (!selected) return current;
-      current = selected.next;
-    } else {
-      current = step.next;
-    }
-  }
-  return current || 'HANDOFF';
-}
-
-function mergeNarrativeFacts(facts = {}, classification = {}) {
-  const governance = classification.governance || {};
-  const hydrated = classification.hydrated_facts || governance.hydrated_facts || {};
-  const confidenceByField = governance.confidence_per_field || classification.confidence_per_field || {};
-  const metadata = { ...(facts._fact_metadata || {}) };
-  const merged = { ...facts };
-  const candidates = { ...hydrated };
-  const overallConfidence = Number(governance.confidence ?? classification.confidence ?? 0);
-  if (!hasValue(candidates.employment_status) && hasValue(classification.category)) candidates.employment_status = classification.category;
-  if (!hasValue(candidates.dismissal_reason_type) && hasValue(classification.dismissal_reason_type)) candidates.dismissal_reason_type = classification.dismissal_reason_type;
-  if (!hasValue(candidates.advisory_topic) && hasValue(classification.advisory_topic)) candidates.advisory_topic = classification.advisory_topic;
-
-  Object.entries(candidates).forEach(([key, value]) => {
-    if (!hasValue(value) || hasValue(merged[key])) return;
-    const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
-    if (confidence < AI_SKIP_CONFIDENCE) return;
-    merged[key] = value;
-    metadata[key] = { source: 'initial_narrative_ai', confidence, captured_at: new Date().toISOString() };
-  });
-
-  merged._fact_metadata = metadata;
-  merged.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === 'initial_narrative_ai');
-  return merged;
-}
-
-function markDirectAnswer(facts, key) {
-  if (!key) return facts;
-  return {
-    ...facts,
-    _fact_metadata: {
-      ...(facts._fact_metadata || {}),
-      [key]: { source: 'user_answer', confidence: 1, captured_at: new Date().toISOString() }
-    }
-  };
-}
-
-'''
-          if helpers not in s:
-            if marker not in s:
-              raise SystemExit('routeClassification marker not found')
-            s = s.replace(marker, helpers + marker, 1)
-
-          old_classify = """    facts = { ...facts, initial_query: input, employment_status: classification.category || 'Ambiguous',
-      dismissal_reason_type: classification.dismissal_reason_type || null, advisory_topic: classification.advisory_topic || null };
-    const next = routeClassification(classification);
-"""
-          new_classify = """    facts = mergeNarrativeFacts({ ...facts, initial_query: input }, classification);
-    if (!hasValue(facts.employment_status)) facts.employment_status = classification.category || 'Ambiguous';
-    if (!hasValue(facts.dismissal_reason_type) && classification.dismissal_reason_type) facts.dismissal_reason_type = classification.dismissal_reason_type;
-    if (!hasValue(facts.advisory_topic) && classification.advisory_topic) facts.advisory_topic = classification.advisory_topic;
-    const next = resolveNextUnanswered(routeClassification(classification), facts);
-"""
-          if old_classify not in s:
-            raise SystemExit('classification block not found')
-          s = s.replace(old_classify, new_classify, 1)
-
-          old_answer = """    facts[step.saveAs] = selected.value;
-    next = selected.next;
-"""
-          new_answer = """    facts[step.saveAs] = selected.value;
-    facts = markDirectAnswer(facts, step.saveAs);
-    next = resolveNextUnanswered(selected.next, facts);
-"""
-          if old_answer not in s:
-            raise SystemExit('button answer block not found')
-          s = s.replace(old_answer, new_answer, 1)
-
-          old_text = """    facts[step.saveAs] = input;
-    next = step.next;
-"""
-          new_text = """    facts[step.saveAs] = input;
-    facts = markDirectAnswer(facts, step.saveAs);
-    next = resolveNextUnanswered(step.next, facts);
-"""
-          if old_text not in s:
-            raise SystemExit('text answer block not found')
-          s = s.replace(old_text, new_text, 1)
-          p.write_text(s)
-          PY
+        run: python -c "import base64; exec(base64.b64decode('CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aAoKZ292ID0gUGF0aCgnbmV0bGlmeS9mdW5jdGlvbnMvbGliL2xsbUdvdmVybmFuY2UuanMnKQpzID0gZ292LnJlYWRfdGV4dCgpCnMgPSBzLnJlcGxhY2UoIiAgICAnaW5jaWRlbnRfZGF0ZScsICdkaXNtaXNzYWxfcmVhc29uX3R5cGUnLCAnY29uZHVjdF9hZG1pc3Npb24nLCAnbGVuZ3RoX29mX3NlcnZpY2UnLFxuIiwgIiAgICAnaW5jaWRlbnRfZGF0ZScsICdkaXNtaXNzYWxfcmVhc29uX3R5cGUnLCAnbWlzY29uZHVjdF9jYXRlZ29yeScsICdjb25kdWN0X2FkbWlzc2lvbicsICdsZW5ndGhfb2Zfc2VydmljZScsXG4iKQpzID0gcy5yZXBsYWNlKCIgICAgJ3NlbGVjdGlvbl9jcml0ZXJpYV9vYmplY3RpdmUnLCAncmV0cmVuY2htZW50X2FsdGVybmF0aXZlcycsICdzZXZlcmFuY2VfcGF5JyxcbiAgICAncm9sZV9yZWZpbGxlZCdcbiIsICIgICAgJ3NlbGVjdGlvbl9jcml0ZXJpYV9vYmplY3RpdmUnLCAncmV0cmVuY2htZW50X2FsdGVybmF0aXZlcycsICdzZXZlcmFuY2VfcGF5JyxcbiAgICAncm9sZV9yZWZpbGxlZCcsICdlbXBsb3llcl9uYW1lJywgJ2VtcGxveWVyX2NvbnRhY3RfZGV0YWlscycsICdjb250cmFjdF90eXBlJywgJ3NlY3RvcidcbiIpCnMgPSBzLnJlcGxhY2UoJyAgICAiZGlzbWlzc2FsX3JlYXNvbl90eXBlIjogbnVsbCxcbiAgICAiY29uZHVjdF9hZG1pc3Npb24iOiBudWxsLCcsICcgICAgImRpc21pc3NhbF9yZWFzb25fdHlwZSI6IG51bGwsXG4gICAgIm1pc2NvbmR1Y3RfY2F0ZWdvcnkiOiBudWxsLFxuICAgICJjb25kdWN0X2FkbWlzc2lvbiI6IG51bGwsJykKZ292LndyaXRlX3RleHQocykKCnAgPSBQYXRoKCduZXRsaWZ5L2Z1bmN0aW9ucy9saWIvd2hhdHNhcHBDb252ZXJzYXRpb24uanMnKQpzID0gcC5yZWFkX3RleHQoKQoKbWFya2VyID0gImZ1bmN0aW9uIHJvdXRlQ2xhc3NpZmljYXRpb24oY2xhc3NpZmljYXRpb24gPSB7fSkge1xuIgpoZWxwZXJzID0gIiIiY29uc3QgQUlfU0tJUF9DT05GSURFTkNFID0gTnVtYmVyKHByb2Nlc3MuZW52LldIQVRTQVBQX0FJX1NLSVBfQ09ORklERU5DRSB8fCAwLjgpOwoKZnVuY3Rpb24gaGFzVmFsdWUodmFsdWUpIHsKICByZXR1cm4gdmFsdWUgIT09IG51bGwgJiYgdmFsdWUgIT09IHVuZGVmaW5lZCAmJiAhKHR5cGVvZiB2YWx1ZSA9PT0gJ3N0cmluZycgJiYgdmFsdWUudHJpbSgpID09PSAnJyk7Cn0KCmZ1bmN0aW9uIGNob2ljZUZvclN0b3JlZFZhbHVlKHN0ZXAsIHZhbHVlKSB7CiAgaWYgKCFzdGVwIHx8IHN0ZXAudHlwZSAhPT0gJ2J1dHRvbnMnIHx8ICFoYXNWYWx1ZSh2YWx1ZSkpIHJldHVybiBudWxsOwogIGNvbnN0IHdhbnRlZCA9IG5vcm1hbGl6ZShTdHJpbmcodmFsdWUpKTsKICByZXR1cm4gc3RlcC5jaG9pY2VzLmZpbmQoaXRlbSA9PiBub3JtYWxpemUoU3RyaW5nKGl0ZW0udmFsdWUpKSA9PT0gd2FudGVkIHx8IG5vcm1hbGl6ZShpdGVtLmxhYmVsKSA9PT0gd2FudGVkKSB8fCBudWxsOwp9CgpmdW5jdGlvbiBzdGVwSXNBbnN3ZXJlZChzdGVwLCBmYWN0cyA9IHt9KSB7CiAgaWYgKCFzdGVwPy5zYXZlQXMgfHwgIWhhc1ZhbHVlKGZhY3RzW3N0ZXAuc2F2ZUFzXSkpIHJldHVybiBmYWxzZTsKICBjb25zdCB2YWx1ZSA9IGZhY3RzW3N0ZXAuc2F2ZUFzXTsKICBjb25zdCBtZXRhID0gZmFjdHMuX2ZhY3RfbWV0YWRhdGE/LltzdGVwLnNhdmVBc107CiAgaWYgKG1ldGE/LnNvdXJjZSA9PT0gJ2luaXRpYWxfbmFycmF0aXZlX2FpJyAmJiBOdW1iZXIobWV0YS5jb25maWRlbmNlIHx8IDApIDwgQUlfU0tJUF9DT05GSURFTkNFKSByZXR1cm4gZmFsc2U7CiAgaWYgKHN0ZXAudHlwZSA9PT0gJ2RhdGUnKSByZXR1cm4gdmFsaWREYXRlKFN0cmluZyh2YWx1ZSkpOwogIGlmIChzdGVwLnR5cGUgPT09ICdidXR0b25zJykgcmV0dXJuIEJvb2xlYW4oY2hvaWNlRm9yU3RvcmVkVmFsdWUoc3RlcCwgdmFsdWUpKTsKICBpZiAoc3RlcC5taW5Xb3JkcykgcmV0dXJuIHdvcmRDb3VudChTdHJpbmcodmFsdWUpKSA+PSBzdGVwLm1pbldvcmRzOwogIHJldHVybiB0cnVlOwp9CgpmdW5jdGlvbiByZXNvbHZlTmV4dFVuYW5zd2VyZWQoc3RlcE5hbWUsIGZhY3RzID0ge30pIHsKICBsZXQgY3VycmVudCA9IHN0ZXBOYW1lOwogIGNvbnN0IHZpc2l0ZWQgPSBuZXcgU2V0KCk7CiAgZm9yIChsZXQgaSA9IDA7IGkgPCA2MCAmJiBjdXJyZW50OyBpICs9IDEpIHsKICAgIGlmICh2aXNpdGVkLmhhcyhjdXJyZW50KSB8fCBERUZMRUNUSU9OU1tjdXJyZW50XSB8fCBjdXJyZW50ID09PSAnSEFORE9GRicpIHJldHVybiBjdXJyZW50OwogICAgdmlzaXRlZC5hZGQoY3VycmVudCk7CiAgICBjb25zdCBzdGVwID0gU1RFUFNbY3VycmVudF07CiAgICBpZiAoIXN0ZXAgfHwgc3RlcC50eXBlID09PSAnY2xhc3NpZnknIHx8IHN0ZXAudHlwZSA9PT0gJ2V2YWx1YXRlJyB8fCAhc3RlcElzQW5zd2VyZWQoc3RlcCwgZmFjdHMpKSByZXR1cm4gY3VycmVudDsKICAgIGlmIChzdGVwLnR5cGUgPT09ICdidXR0b25zJykgewogICAgICBjb25zdCBzZWxlY3RlZCA9IGNob2ljZUZvclN0b3JlZFZhbHVlKHN0ZXAsIGZhY3RzW3N0ZXAuc2F2ZUFzXSk7CiAgICAgIGlmICghc2VsZWN0ZWQpIHJldHVybiBjdXJyZW50OwogICAgICBjdXJyZW50ID0gc2VsZWN0ZWQubmV4dDsKICAgIH0gZWxzZSB7CiAgICAgIGN1cnJlbnQgPSBzdGVwLm5leHQ7CiAgICB9CiAgfQogIHJldHVybiBjdXJyZW50IHx8ICdIQU5ET0ZGJzsKfQoKZnVuY3Rpb24gbWVyZ2VOYXJyYXRpdmVGYWN0cyhmYWN0cyA9IHt9LCBjbGFzc2lmaWNhdGlvbiA9IHt9KSB7CiAgY29uc3QgZ292ZXJuYW5jZSA9IGNsYXNzaWZpY2F0aW9uLmdvdmVybmFuY2UgfHwge307CiAgY29uc3QgaHlkcmF0ZWQgPSBjbGFzc2lmaWNhdGlvbi5oeWRyYXRlZF9mYWN0cyB8fCBnb3Zlcm5hbmNlLmh5ZHJhdGVkX2ZhY3RzIHx8IHt9OwogIGNvbnN0IGNvbmZpZGVuY2VCeUZpZWxkID0gZ292ZXJuYW5jZS5jb25maWRlbmNlX3Blcl9maWVsZCB8fCBjbGFzc2lmaWNhdGlvbi5jb25maWRlbmNlX3Blcl9maWVsZCB8fCB7fTsKICBjb25zdCBtZXRhZGF0YSA9IHsgLi4uKGZhY3RzLl9mYWN0X21ldGFkYXRhIHx8IHt9KSB9OwogIGNvbnN0IG1lcmdlZCA9IHsgLi4uZmFjdHMgfTsKCiAgY29uc3QgY2FuZGlkYXRlcyA9IHsgLi4uaHlkcmF0ZWQgfTsKICBjb25zdCBvdmVyYWxsQ29uZmlkZW5jZSA9IE51bWJlcihnb3Zlcm5hbmNlLmNvbmZpZGVuY2UgPz8gY2xhc3NpZmljYXRpb24uY29uZmlkZW5jZSA/PyAwKTsKICBpZiAoIWhhc1ZhbHVlKGNhbmRpZGF0ZXMuZW1wbG95bWVudF9zdGF0dXMpICYmIGhhc1ZhbHVlKGNsYXNzaWZpY2F0aW9uLmNhdGVnb3J5KSkgY2FuZGlkYXRlcy5lbXBsb3ltZW50X3N0YXR1cyA9IGNsYXNzaWZpY2F0aW9uLmNhdGVnb3J5OwogIGlmICghaGFzVmFsdWUoY2FuZGlkYXRlcy5kaXNtaXNzYWxfcmVhc29uX3R5cGUpICYmIGhhc1ZhbHVlKGNsYXNzaWZpY2F0aW9uLmRpc21pc3NhbF9yZWFzb25fdHlwZSkpIGNhbmRpZGF0ZXMuZGlzbWlzc2FsX3JlYXNvbl90eXBlID0gY2xhc3NpZmljYXRpb24uZGlzbWlzc2FsX3JlYXNvbl90eXBlOwogIGlmICghaGFzVmFsdWUoY2FuZGlkYXRlcy5hZHZpc29yeV90b3BpYykgJiYgaGFzVmFsdWUoY2xhc3NpZmljYXRpb24uYWR2aXNvcnlfdG9waWMpKSBjYW5kaWRhdGVzLmFkdmlzb3J5X3RvcGljID0gY2xhc3NpZmljYXRpb24uYWR2aXNvcnlfdG9waWM7CgogIE9iamVjdC5lbnRyaWVzKGNhbmRpZGF0ZXMpLmZvckVhY2goKFtrZXksIHZhbHVlXSkgPT4gewogICAgaWYgKCFoYXNWYWx1ZSh2YWx1ZSkgfHwgaGFzVmFsdWUobWVyZ2VkW2tleV0pKSByZXR1cm47CiAgICBjb25zdCBjb25maWRlbmNlID0gTnVtYmVyKGNvbmZpZGVuY2VCeUZpZWxkW2tleV0gPz8gb3ZlcmFsbENvbmZpZGVuY2UgPz8gMCk7CiAgICBpZiAoY29uZmlkZW5jZSA8IEFJX1NLSVBfQ09ORklERU5DRSkgcmV0dXJuOwogICAgbWVyZ2VkW2tleV0gPSB2YWx1ZTsKICAgIG1ldGFkYXRhW2tleV0gPSB7IHNvdXJjZTogJ2luaXRpYWxfbmFycmF0aXZlX2FpJywgY29uZmlkZW5jZSwgY2FwdHVyZWRfYXQ6IG5ldyBEYXRlKCkudG9JU09TdHJpbmcoKSB9OwogIH0pOwoKICBtZXJnZWQuX2ZhY3RfbWV0YWRhdGEgPSBtZXRhZGF0YTsKICBtZXJnZWQuYWlfZXh0cmFjdGVkX2ZpZWxkcyA9IE9iamVjdC5rZXlzKG1ldGFkYXRhKS5maWx0ZXIoa2V5ID0+IG1ldGFkYXRhW2tleV0/LnNvdXJjZSA9PT0gJ2luaXRpYWxfbmFycmF0aXZlX2FpJyk7CiAgcmV0dXJuIG1lcmdlZDsKfQoKZnVuY3Rpb24gbWFya0RpcmVjdEFuc3dlcihmYWN0cywga2V5KSB7CiAgaWYgKCFrZXkpIHJldHVybiBmYWN0czsKICByZXR1cm4gewogICAgLi4uZmFjdHMsCiAgICBfZmFjdF9tZXRhZGF0YTogewogICAgICAuLi4oZmFjdHMuX2ZhY3RfbWV0YWRhdGEgfHwge30pLAogICAgICBba2V5XTogeyBzb3VyY2U6ICd1c2VyX2Fuc3dlcicsIGNvbmZpZGVuY2U6IDEsIGNhcHR1cmVkX2F0OiBuZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCkgfQogICAgfQogIH07Cn0KCiIiIgppZiBoZWxwZXJzIG5vdCBpbiBzOgogICAgaWYgbWFya2VyIG5vdCBpbiBzOgogICAgICAgIHJhaXNlIFN5c3RlbUV4aXQoJ3JvdXRlQ2xhc3NpZmljYXRpb24gbWFya2VyIG5vdCBmb3VuZCcpCiAgICBzID0gcy5yZXBsYWNlKG1hcmtlciwgaGVscGVycyArIG1hcmtlciwgMSkKCm9sZF9jbGFzc2lmeSA9ICIiIiAgICBmYWN0cyA9IHsgLi4uZmFjdHMsIGluaXRpYWxfcXVlcnk6IGlucHV0LCBlbXBsb3ltZW50X3N0YXR1czogY2xhc3NpZmljYXRpb24uY2F0ZWdvcnkgfHwgJ0FtYmlndW91cycsCiAgICAgIGRpc21pc3NhbF9yZWFzb25fdHlwZTogY2xhc3NpZmljYXRpb24uZGlzbWlzc2FsX3JlYXNvbl90eXBlIHx8IG51bGwsIGFkdmlzb3J5X3RvcGljOiBjbGFzc2lmaWNhdGlvbi5hZHZpc29yeV90b3BpYyB8fCBudWxsIH07CiAgICBjb25zdCBuZXh0ID0gcm91dGVDbGFzc2lmaWNhdGlvbihjbGFzc2lmaWNhdGlvbik7CiIiIgpuZXdfY2xhc3NpZnkgPSAiIiIgICAgZmFjdHMgPSBtZXJnZU5hcnJhdGl2ZUZhY3RzKHsgLi4uZmFjdHMsIGluaXRpYWxfcXVlcnk6IGlucHV0IH0sIGNsYXNzaWZpY2F0aW9uKTsKICAgIGlmICghaGFzVmFsdWUoZmFjdHMuZW1wbG95bWVudF9zdGF0dXMpKSBmYWN0cy5lbXBsb3ltZW50X3N0YXR1cyA9IGNsYXNzaWZpY2F0aW9uLmNhdGVnb3J5IHx8ICdBbWJpZ3VvdXMnOwogICAgaWYgKCFoYXNWYWx1ZShmYWN0cy5kaXNtaXNzYWxfcmVhc29uX3R5cGUpICYmIGNsYXNzaWZpY2F0aW9uLmRpc21pc3NhbF9yZWFzb25fdHlwZSkgZmFjdHMuZGlzbWlzc2FsX3JlYXNvbl90eXBlID0gY2xhc3NpZmljYXRpb24uZGlzbWlzc2FsX3JlYXNvbl90eXBlOwogICAgaWYgKCFoYXNWYWx1ZShmYWN0cy5hZHZpc29yeV90b3BpYykgJiYgY2xhc3NpZmljYXRpb24uYWR2aXNvcnlfdG9waWMpIGZhY3RzLmFkdmlzb3J5X3RvcGljID0gY2xhc3NpZmljYXRpb24uYWR2aXNvcnlfdG9waWM7CiAgICBjb25zdCBuZXh0ID0gcmVzb2x2ZU5leHRVbmFuc3dlcmVkKHJvdXRlQ2xhc3NpZmljYXRpb24oY2xhc3NpZmljYXRpb24pLCBmYWN0cyk7CiIiIgppZiBvbGRfY2xhc3NpZnkgbm90IGluIHM6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCdjbGFzc2lmaWNhdGlvbiBibG9jayBub3QgZm91bmQnKQpzID0gcy5yZXBsYWNlKG9sZF9jbGFzc2lmeSwgbmV3X2NsYXNzaWZ5LCAxKQoKb2xkX2Fuc3dlciA9ICIiIiAgICBmYWN0c1tzdGVwLnNhdmVBc10gPSBzZWxlY3RlZC52YWx1ZTsKICAgIG5leHQgPSBzZWxlY3RlZC5uZXh0OwoiIiIKbmV3X2Fuc3dlciA9ICIiIiAgICBmYWN0c1tzdGVwLnNhdmVBc10gPSBzZWxlY3RlZC52YWx1ZTsKICAgIGZhY3RzID0gbWFya0RpcmVjdEFuc3dlcihmYWN0cywgc3RlcC5zYXZlQXMpOwogICAgbmV4dCA9IHJlc29sdmVOZXh0VW5hbnN3ZXJlZChzZWxlY3RlZC5uZXh0LCBmYWN0cyk7CiIiIgppZiBvbGRfYW5zd2VyIG5vdCBpbiBzOgogICAgcmFpc2UgU3lzdGVtRXhpdCgnYnV0dG9uIGFuc3dlciBibG9jayBub3QgZm91bmQnKQpzID0gcy5yZXBsYWNlKG9sZF9hbnN3ZXIsIG5ld19hbnN3ZXIsIDEpCgpvbGRfdGV4dCA9ICIiIiAgICBmYWN0c1tzdGVwLnNhdmVBc10gPSBpbnB1dDsKICAgIG5leHQgPSBzdGVwLm5leHQ7CiIiIgpuZXdfdGV4dCA9ICIiIiAgICBmYWN0c1tzdGVwLnNhdmVBc10gPSBpbnB1dDsKICAgIGZhY3RzID0gbWFya0RpcmVjdEFuc3dlcihmYWN0cywgc3RlcC5zYXZlQXMpOwogICAgbmV4dCA9IHJlc29sdmVOZXh0VW5hbnN3ZXJlZChzdGVwLm5leHQsIGZhY3RzKTsKIiIiCmlmIG9sZF90ZXh0IG5vdCBpbiBzOgogICAgcmFpc2UgU3lzdGVtRXhpdCgnY2xhc3NpZmljYXRpb24gYmxvY2sgbm90IGZvdW5kJykKcyA9IHMucmVwbGFjZShvbGRfdGV4dCwgbmV3X3RleHQsIDEpCgpwLndyaXRlX3RleHQocykK'))"
       - name: Validate JavaScript syntax
         run: |
           node --check netlify/functions/lib/whatsappConversation.js
@@ -157,4 +26,3 @@ function markDirectAnswer(facts, key) {
           git add netlify/functions/lib/whatsappConversation.js netlify/functions/lib/llmGovernance.js
           git commit -m "Skip answered WhatsApp intake questions" || exit 0
           git push
-# trigger 2
