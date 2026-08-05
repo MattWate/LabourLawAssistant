@@ -305,6 +305,7 @@
       if (q) return 'needs_info';
       if (f.attorney_review_flag || c.status === 'requires_attorney') return 'attorney_review';
       if (c.letter_status === 'pending_review') return 'pending_review';
+      if (c.letter_status === 'sent' || c.status === 'letter_sent') return 'sent';
       if (c.letter_status === 'approved') return 'approved';
       if (c.letter_status === 'needs_drafting' || (f.wants_letter === true && !c.draft_letter)) return 'needs_drafting';
       return c.status || 'new';
@@ -422,7 +423,7 @@
     function selectCase(id) { selectedCaseId = id; currentView = 'workstation'; render(); }
 
     function statusBadge(s) {
-      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
+      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved – Ready to Send','green'], sent:['Letter Sent','green'], letter_sent:['Letter Sent','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
       const item = map[s] || [s, 'blue'];
       return '<span class="badge ' + item[1] + '">' + esc(item[0]) + '</span>';
     }
@@ -482,7 +483,21 @@
 
     function letterCard(c) {
       const f = facts(c);
-      if (c.draft_letter) return '<div class="card"><h3>Drafted Letter</h3><textarea id="letter-editor" class="letter">' + esc(c.draft_letter) + '</textarea><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button class="btn ghost" onclick="saveLetter(\'' + c.id + '\',\'pending_review\')">Save Draft</button><button class="btn success" onclick="saveLetter(\'' + c.id + '\',\'approved\')">Approve</button></div></div>';
+      if (c.draft_letter) {
+        const approved = c.letter_status === 'approved';
+        const sent = c.letter_status === 'sent';
+        const audit = sent
+          ? '<div class="timeline" style="margin-top:12px"><div class="timeline-item"><strong>Released</strong>' + esc(date(f.letter_sent_at)) + '</div><div class="timeline-item"><strong>Recipient</strong>' + esc(txt(f.letter_sent_to)) + '</div><div class="timeline-item"><strong>Resend ID</strong>' + esc(txt(f.resend_message_id)) + '</div></div>'
+          : approved
+            ? '<div class="timeline-item" style="margin-top:12px"><strong>Approved</strong>' + esc(date(f.letter_approved_at)) + ' by ' + esc(txt(f.letter_approved_by)) + '</div>'
+            : '<p style="color:var(--muted);margin:12px 0 0">Review and edit the draft, save it, then approve it before release.</p>';
+        const buttons = sent
+          ? '<button class="btn ghost" disabled>Letter Released</button>'
+          : approved
+            ? '<button class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'save\')">Save Changes</button><button id="btn-send-' + c.id + '" class="btn success" onclick="manageLetter(\'' + c.id + '\',\'send\')">Release & Send Letter</button>'
+            : '<button class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'save\')">Save Draft</button><button id="btn-approve-' + c.id + '" class="btn success" onclick="manageLetter(\'' + c.id + '\',\'approve\')">Approve Letter</button>';
+        return '<div class="card"><h3>Drafted Letter</h3><textarea id="letter-editor" class="letter" ' + (sent ? 'readonly' : '') + '>' + esc(c.draft_letter) + '</textarea>' + audit + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px;flex-wrap:wrap">' + buttons + '</div></div>';
+      }
       if (f.wants_letter) { const paid = c.payment_status === 'paid' && (c.wp_generation_unlocked === true || f.wp_generation_unlocked === true); return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted);line-height:1.5">' + (paid ? 'Payment is confirmed. Save corrected facts, then start the controlled draft.' : 'Drafting is locked until PayFast confirms payment.') + '</p><button id="btn-generate-' + c.id + '" class="btn warn" ' + (paid ? '' : 'disabled') + ' onclick="generateDraft(\'' + c.id + '\')">' + (paid ? 'Generate Draft Letter' : 'Awaiting Confirmed Payment') + '</button></div>'; }
       return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted)">No letter requested at this stage.</p></div>';
     }
@@ -701,11 +716,26 @@
       }
     }
 
-    async function saveLetter(id, status) {
-      const draft = $('letter-editor').value;
-      await updateCase({ id, draft_letter: draft, letter_status: status });
-      toast(status === 'approved' ? 'Letter approved.' : 'Draft saved.');
-      await fetchCases();
+    async function manageLetter(id, action) {
+      const editor = $('letter-editor');
+      const draft = editor ? editor.value.trim() : '';
+      if (!draft) return toast('The letter is empty.');
+      if (action === 'approve' && !confirm('Approve this exact version of the letter? It will still require a separate release action.')) return;
+      if (action === 'send' && !confirm('Release and email this approved letter to the employer now? This action cannot be undone.')) return;
+      const btn = $(action === 'approve' ? 'btn-approve-' + id : action === 'send' ? 'btn-send-' + id : '');
+      if (btn) { btn.disabled = true; btn.textContent = action === 'send' ? 'Sending...' : action === 'approve' ? 'Approving...' : 'Saving...'; }
+      try {
+        const res = await fetch('/.netlify/functions/manage_letter_release', { method:'POST', headers:headers(), body:JSON.stringify({ caseId:id, action, draft_letter:draft }) });
+        let result={}; try { result=await res.json(); } catch(e) {}
+        if (!res.ok) throw new Error(result.error || 'Letter action failed.');
+        if (action === 'save') toast('Draft saved and returned to pending review.');
+        if (action === 'approve') toast('Letter approved. It is now ready for release.');
+        if (action === 'send') toast('Letter sent to ' + (result.sent_to || 'the employer') + '.');
+        await fetchCases();
+      } catch(e) {
+        toast(e.message || 'Letter action failed.');
+        if (btn) { btn.disabled=false; btn.textContent=action==='send'?'Release & Send Letter':action==='approve'?'Approve Letter':'Save Draft'; }
+      }
     }
 
     async function generateDraft(id) {
