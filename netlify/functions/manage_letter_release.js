@@ -1,6 +1,12 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendApprovedLetter } = require('./lib/email');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
+const {
+  sha256,
+  renderLetterDocument,
+  storeLetterDocument,
+  downloadStoredLetter
+} = require('./lib/letterDocument');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -25,37 +31,21 @@ function cleanEmail(value) {
 }
 
 function employerEmail(caseData, facts) {
-  return cleanEmail(
-    facts.employer_email ||
-    facts.employer_contact_email ||
-    facts.employer_contact_details ||
-    caseData.employer_email
-  );
+  return cleanEmail(facts.employer_email || facts.employer_contact_email || facts.employer_contact_details || caseData.employer_email);
 }
 
 function clientEmail(caseData, facts) {
-  return cleanEmail(
-    facts.client_email ||
-    facts.email ||
-    facts.contact_email ||
-    caseData.client_email ||
-    caseData.contact_info
-  );
+  return cleanEmail(facts.client_email || facts.email || facts.contact_email || caseData.client_email || caseData.contact_info);
 }
 
 async function paymentConversation(caseId) {
-  const { data } = await supabase
-    .from('whatsapp_conversations')
-    .select('from_number,phone_number_id')
-    .eq('case_id', caseId)
-    .maybeSingle();
+  const { data } = await supabase.from('whatsapp_conversations').select('from_number,phone_number_id').eq('case_id', caseId).maybeSingle();
   return data || null;
 }
 
 async function notifyLetterSent(caseData, facts) {
   const conversation = await paymentConversation(caseData.id);
   if (!conversation?.from_number) return { sent: false, mode: 'none' };
-
   const clientName = facts.client_name || caseData.client_name || 'Client';
   const employerName = facts.employer_name || 'your employer';
   const templateName = String(process.env.WHATSAPP_LETTER_SENT_TEMPLATE_NAME || '').trim();
@@ -64,16 +54,9 @@ async function notifyLetterSent(caseData, facts) {
 
   try {
     if (templateName) {
-      await sendWhatsAppTemplate({
-        to: conversation.from_number,
-        phoneNumberId,
-        templateName,
-        languageCode,
-        bodyParameters: [clientName, employerName]
-      });
+      await sendWhatsAppTemplate({ to: conversation.from_number, phoneNumberId, templateName, languageCode, bodyParameters: [clientName, employerName] });
       return { sent: true, mode: 'template', template_name: templateName, language_code: languageCode };
     }
-
     await sendWhatsAppText({
       to: conversation.from_number,
       phoneNumberId,
@@ -86,6 +69,24 @@ async function notifyLetterSent(caseData, facts) {
   }
 }
 
+async function generateApprovedDocument({ caseData, facts, draft, user, approvedAt }) {
+  const document = renderLetterDocument({ caseId: caseData.id, facts, draft, approvedAt });
+  const stored = await storeLetterDocument({ supabase, caseId: caseData.id, document });
+  return {
+    document,
+    facts: {
+      ...facts,
+      approved_text_hash: document.approved_text_hash,
+      letter_document_bucket: stored.bucket,
+      letter_document_path: stored.path,
+      letter_document_filename: document.filename,
+      letter_document_template: document.template_name,
+      letter_document_generated_at: new Date().toISOString(),
+      letter_document_generated_by: user.email || user.id
+    }
+  };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
 
@@ -96,13 +97,9 @@ exports.handler = async (event) => {
     const caseId = request.caseId;
     const action = String(request.action || '').trim().toLowerCase();
     if (!caseId) return json(400, { error: 'Case ID required' });
-    if (!['save', 'approve', 'send'].includes(action)) return json(400, { error: 'Action must be save, approve or send' });
+    if (!['save', 'approve', 'regenerate', 'send'].includes(action)) return json(400, { error: 'Action must be save, approve, regenerate or send' });
 
-    const { data: caseData, error: caseError } = await supabase
-      .from('cases')
-      .select('*')
-      .eq('id', caseId)
-      .single();
+    const { data: caseData, error: caseError } = await supabase.from('cases').select('*').eq('id', caseId).single();
     if (caseError || !caseData) return json(404, { error: 'Case not found' });
 
     const facts = caseData.case_facts || {};
@@ -117,7 +114,10 @@ exports.handler = async (event) => {
         letter_last_edited_at: now,
         letter_last_edited_by: user.email || user.id,
         letter_approved_at: null,
-        letter_approved_by: null
+        letter_approved_by: null,
+        approved_text_hash: null,
+        letter_document_path: null,
+        letter_document_filename: null
       };
       const { error } = await supabase.from('cases').update({
         draft_letter: draft,
@@ -133,7 +133,8 @@ exports.handler = async (event) => {
     if (action === 'approve') {
       if (!draft) return json(400, { error: 'The draft letter is empty' });
       if (caseData.payment_status !== 'paid') return json(403, { error: 'The letter cannot be approved until payment is confirmed' });
-      const updatedFacts = {
+
+      const baseFacts = {
         ...facts,
         wp_letter_status: 'APPROVED',
         letter_last_edited_at: draft !== String(caseData.draft_letter || '').trim() ? now : facts.letter_last_edited_at,
@@ -141,28 +142,54 @@ exports.handler = async (event) => {
         letter_approved_at: now,
         letter_approved_by: user.email || user.id
       };
+      const generated = await generateApprovedDocument({ caseData, facts: baseFacts, draft, user, approvedAt: now });
       const { error } = await supabase.from('cases').update({
         draft_letter: draft,
         status: 'letter_approved_ready_to_send',
         letter_status: 'approved',
-        case_facts: updatedFacts,
+        case_facts: generated.facts,
         updated_at: now
       }).eq('id', caseId);
       if (error) throw error;
-      return json(200, { success: true, action: 'approve', letter_status: 'approved' });
+      return json(200, {
+        success: true,
+        action: 'approve',
+        letter_status: 'approved',
+        document_ready: true,
+        document_filename: generated.document.filename
+      });
     }
 
-    if (caseData.letter_status !== 'approved') {
-      return json(409, { error: 'Approve the letter before sending it' });
+    if (action === 'regenerate') {
+      if (caseData.letter_status !== 'approved') return json(409, { error: 'Approve the letter before generating the final document' });
+      if (!draft) return json(400, { error: 'The approved letter is empty' });
+      if (draft !== String(caseData.draft_letter || '').trim()) return json(409, { error: 'The letter has changed since approval. Save and approve it again.' });
+      const generated = await generateApprovedDocument({
+        caseData,
+        facts,
+        draft,
+        user,
+        approvedAt: facts.letter_approved_at || now
+      });
+      const { error } = await supabase.from('cases').update({ case_facts: generated.facts, updated_at: now }).eq('id', caseId);
+      if (error) throw error;
+      return json(200, { success: true, action: 'regenerate', document_ready: true, document_filename: generated.document.filename });
     }
+
+    if (caseData.letter_status !== 'approved') return json(409, { error: 'Approve the letter before sending it' });
     if (!draft) return json(400, { error: 'The approved letter is empty' });
-    if (draft !== String(caseData.draft_letter || '').trim()) {
-      return json(409, { error: 'The letter has changed since approval. Save and approve the revised version before sending.' });
-    }
+    if (draft !== String(caseData.draft_letter || '').trim()) return json(409, { error: 'The letter has changed since approval. Save and approve the revised version before sending.' });
+    if (facts.approved_text_hash !== sha256(draft)) return json(409, { error: 'The generated document does not match the approved letter. Regenerate it before sending.' });
+    if (!facts.letter_document_path || !facts.letter_document_filename) return json(409, { error: 'Generate the final VRS document before sending.' });
 
     const to = employerEmail(caseData, facts);
     if (!to) return json(400, { error: 'A valid employer email address is required before release' });
     const cc = clientEmail(caseData, facts);
+    const documentBuffer = await downloadStoredLetter({
+      supabase,
+      bucket: facts.letter_document_bucket || process.env.LETTER_DOCUMENT_BUCKET || 'case-documents',
+      storagePath: facts.letter_document_path
+    });
 
     const emailResult = await sendApprovedLetter({
       employerEmail: to,
@@ -170,7 +197,8 @@ exports.handler = async (event) => {
       clientName: facts.client_name || caseData.client_name,
       employerName: facts.employer_name,
       letter: draft,
-      caseId
+      caseId,
+      document: { filename: facts.letter_document_filename, buffer: documentBuffer }
     });
 
     const notification = await notifyLetterSent(caseData, facts);
@@ -200,6 +228,7 @@ exports.handler = async (event) => {
       letter_status: 'sent',
       sent_to: to,
       copied_to: cc,
+      document_filename: facts.letter_document_filename,
       resend_message_id: emailResult?.id || null,
       whatsapp_notification: notification
     });
