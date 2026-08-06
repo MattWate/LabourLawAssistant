@@ -5,7 +5,9 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.39.0",
+    "docxtemplater": "^3.62.1",
     "dotenv": "^16.3.1",
-    "openai": "^4.28.0"
+    "openai": "^4.28.0",
+    "pizzip": "^3.2.0"
   }
 }
