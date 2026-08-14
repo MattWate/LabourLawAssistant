@@ -1,5 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
-const { parseFormBody, verifySignature, validateWithPayfast } = require('./lib/payfast');
+const { parseFormBody, verifyRawItnSignature, validateWithPayfast } = require('./lib/payfast');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -17,6 +17,23 @@ function normaliseStatus(status = '') {
 
 function caseIdFrom(data = {}) {
   return data.custom_str1 || data.case_id || null;
+}
+
+function amountsMatch(expected, received) {
+  const a = Number(expected);
+  const b = Number(received);
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 0.01;
+}
+
+async function getExistingPayment(mPaymentId) {
+  if (!supabase || !mPaymentId) return null;
+  const { data, error } = await supabase
+    .from('payments')
+    .select('id, case_id, amount, m_payment_id')
+    .eq('m_payment_id', mPaymentId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
 }
 
 async function upsertPayment(data, checks) {
@@ -46,11 +63,12 @@ async function upsertPayment(data, checks) {
     return inserted;
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('payments')
     .select('id, case_id')
     .eq('m_payment_id', mPaymentId)
     .maybeSingle();
+  if (existingError) throw existingError;
 
   if (existing?.id) {
     if (!payload.case_id && existing.case_id) delete payload.case_id;
@@ -95,10 +113,7 @@ async function notifyPaymentConfirmed(caseData) {
         phoneNumberId,
         templateName,
         languageCode,
-        components: [{
-          type: 'body',
-          parameters: [{ type: 'text', text: clientName }]
-        }]
+        bodyParameters: [clientName]
       });
       return { sent: true, mode: 'template', template_name: templateName, language_code: languageCode };
     }
@@ -116,10 +131,16 @@ async function notifyPaymentConfirmed(caseData) {
 }
 
 async function unlockCaseIfPaid(payment, data, checks) {
-  if (!supabase || !payment?.case_id) return;
+  if (!supabase || !payment?.case_id) return { unlocked: false, reason: 'missing_case_id' };
   const isPaid = normaliseStatus(data.payment_status) === 'paid';
-  const isVerified = checks.signatureValid === true && checks.merchantValid === true && checks.payfastValidationStatus === 'valid';
-  if (!isPaid || !isVerified) return;
+  const isVerified = checks.signatureValid === true &&
+    checks.merchantValid === true &&
+    checks.payfastValidationStatus === 'valid' &&
+    checks.amountValid === true &&
+    checks.paymentLinkValid === true;
+
+  if (!isPaid) return { unlocked: false, reason: 'payment_not_complete' };
+  if (!isVerified) return { unlocked: false, reason: 'verification_failed' };
 
   const { data: caseData, error } = await supabase
     .from('cases')
@@ -128,13 +149,14 @@ async function unlockCaseIfPaid(payment, data, checks) {
     .maybeSingle();
   if (error || !caseData) throw error || new Error('Case not found for paid transaction');
 
-  if (caseData.payment_status === 'paid' && caseData.status === 'paid_ready_for_drafting') return;
+  if (caseData.payment_status === 'paid' && caseData.status === 'paid_ready_for_drafting') {
+    return { unlocked: true, reason: 'already_unlocked' };
+  }
 
   const paidAt = caseData.paid_at || new Date().toISOString();
   const facts = caseData.case_facts || {};
-  const notification = await notifyPaymentConfirmed(caseData);
 
-  await supabase.from('cases').update({
+  const { error: updateError } = await supabase.from('cases').update({
     payment_status: 'paid',
     paid_at: paidAt,
     wp_generation_unlocked: true,
@@ -146,12 +168,30 @@ async function unlockCaseIfPaid(payment, data, checks) {
       paid_at: paidAt,
       wp_generation_unlocked: true,
       payfast_payment_id: payment.pf_payment_id || data.pf_payment_id || null,
-      payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null,
-      payment_confirmation_notification: notification,
-      payment_confirmation_notified_at: notification.sent ? new Date().toISOString() : null
+      payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null
     },
     updated_at: new Date().toISOString()
   }).eq('id', payment.case_id);
+  if (updateError) throw updateError;
+
+  const notification = await notifyPaymentConfirmed(caseData);
+  const notificationAt = notification.sent ? new Date().toISOString() : null;
+  const { error: notificationUpdateError } = await supabase.from('cases').update({
+    case_facts: {
+      ...facts,
+      payment_status: 'paid',
+      paid_at: paidAt,
+      wp_generation_unlocked: true,
+      payfast_payment_id: payment.pf_payment_id || data.pf_payment_id || null,
+      payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null,
+      payment_confirmation_notification: notification,
+      payment_confirmation_notified_at: notificationAt
+    },
+    updated_at: new Date().toISOString()
+  }).eq('id', payment.case_id);
+  if (notificationUpdateError) throw notificationUpdateError;
+
+  return { unlocked: true, reason: 'verified_payment', notification };
 }
 
 exports.handler = async (event) => {
@@ -163,10 +203,17 @@ exports.handler = async (event) => {
 
   try {
     const data = parseFormBody(rawBody);
-    const signatureValid = verifySignature(data);
+    const existingPayment = await getExistingPayment(data.m_payment_id || null);
+
+    const signatureValid = verifyRawItnSignature(rawBody);
     const merchantValid = process.env.PAYFAST_MERCHANT_ID
       ? String(data.merchant_id || '') === String(process.env.PAYFAST_MERCHANT_ID)
-      : null;
+      : false;
+    const amountValid = Boolean(existingPayment) && amountsMatch(existingPayment.amount, data.amount_gross);
+    const incomingCaseId = caseIdFrom(data);
+    const paymentLinkValid = Boolean(existingPayment?.case_id) &&
+      Boolean(incomingCaseId) &&
+      String(existingPayment.case_id) === String(incomingCaseId);
 
     let payfastValidationStatus = 'not_checked';
     let payfastValidationResponse = null;
@@ -182,9 +229,17 @@ exports.handler = async (event) => {
       }
     }
 
-    const checks = { signatureValid, merchantValid, payfastValidationStatus, payfastValidationResponse };
+    const checks = {
+      signatureValid,
+      merchantValid,
+      amountValid,
+      paymentLinkValid,
+      payfastValidationStatus,
+      payfastValidationResponse
+    };
+
     const payment = await upsertPayment(data, checks);
-    await unlockCaseIfPaid(payment, data, checks);
+    const unlockResult = await unlockCaseIfPaid(payment, data, checks);
 
     console.log('Payfast ITN received', {
       m_payment_id: data.m_payment_id,
@@ -193,7 +248,10 @@ exports.handler = async (event) => {
       payment_status: data.payment_status,
       signatureValid,
       merchantValid,
-      payfastValidationStatus
+      amountValid,
+      paymentLinkValid,
+      payfastValidationStatus,
+      unlockResult
     });
 
     return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: 'OK' };
