@@ -13,6 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Patch admin workstation generation UX
         run: |
+          echo "Applying draft polling UX patch"
           python - <<'PY'
           from pathlib import Path
           p = Path('admin-workstation.html')
@@ -41,7 +42,6 @@ jobs:
       const timeoutMs = options.timeoutMs || 180000;
       const intervalMs = options.intervalMs || 4000;
       const started = Date.now();
-      let lastStatus = null;
 
       while (Date.now() - started < timeoutMs) {
         await sleep(intervalMs);
@@ -51,7 +51,6 @@ jobs:
         const current = freshCases.find(c => c.id === id);
         if (!current) throw new Error('Case could not be found while checking the draft.');
 
-        lastStatus = current.letter_status || current.status || null;
         casesData = freshCases;
 
         if (current.draft_letter && !['generating', 'generation_failed'].includes(current.letter_status)) {
