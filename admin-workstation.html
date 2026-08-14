@@ -203,14 +203,26 @@
     let currentQueueFilter = 'all';
     let selectedCaseId = null;
 
+    db.auth.onAuthStateChange((event, session) => {
+      currentToken = session?.access_token || null;
+      if (event === 'SIGNED_OUT') {
+        selectedCaseId = null;
+        $('login').style.display = 'flex';
+      }
+    });
+
     checkAuth();
 
     async function checkAuth() {
-      const { data: { session } } = await db.auth.getSession();
-      if (session) {
-        currentToken = session.access_token;
-        document.getElementById('login').style.display = 'none';
-        await fetchCases();
+      try {
+        const token = await getFreshAccessToken();
+        if (token) {
+          document.getElementById('login').style.display = 'none';
+          await fetchCases();
+        }
+      } catch (e) {
+        currentToken = null;
+        $('login').style.display = 'flex';
       }
     }
 
@@ -244,13 +256,70 @@
       $('login').style.display = 'flex';
     }
 
+    async function getFreshAccessToken(forceRefresh = false) {
+      let result = forceRefresh ? await db.auth.refreshSession() : await db.auth.getSession();
+      let session = result.data?.session || null;
+      let error = result.error || null;
+
+      if (!error && session && !forceRefresh) {
+        const expiresAtMs = Number(session.expires_at || 0) * 1000;
+        if (expiresAtMs && expiresAtMs - Date.now() < 60000) {
+          result = await db.auth.refreshSession();
+          session = result.data?.session || null;
+          error = result.error || null;
+        }
+      }
+
+      if (error || !session?.access_token) {
+        throw new Error('SESSION_EXPIRED');
+      }
+
+      currentToken = session.access_token;
+      return currentToken;
+    }
+
+    async function expireSessionUi() {
+      currentToken = null;
+      selectedCaseId = null;
+      $('login').style.display = 'flex';
+      toast('Your session has expired. Please sign in again. Your work has not been lost.');
+    }
+
+    async function authFetch(url, options = {}) {
+      const request = async (forceRefresh = false) => {
+        const token = await getFreshAccessToken(forceRefresh);
+        const requestHeaders = { ...(options.headers || {}), 'Authorization': 'Bearer ' + token };
+        if (options.body !== undefined && !requestHeaders['Content-Type']) requestHeaders['Content-Type'] = 'application/json';
+        return fetch(url, { ...options, headers: requestHeaders });
+      };
+
+      let response;
+      try {
+        response = await request(false);
+        if (response.status === 401) response = await request(true);
+      } catch (error) {
+        if (error.message === 'SESSION_EXPIRED') {
+          await expireSessionUi();
+          throw new Error('Your session has expired. Please sign in again.');
+        }
+        throw error;
+      }
+
+      if (response.status === 401) {
+        await expireSessionUi();
+        throw new Error('Your session has expired. Please sign in again.');
+      }
+
+      return response;
+    }
+
     function headers() {
       return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken };
     }
 
     async function fetchCases(show = false) {
       try {
-        const res = await fetch('/.netlify/functions/get_cases', { headers: headers() });
+        const res = await authFetch('/.netlify/functions/get_cases', { headers: headers() });
         if (!res.ok) throw new Error('Could not load cases. Please log in again.');
         casesData = await res.json();
         if (!selectedCaseId && casesData.length) selectedCaseId = casesData[0].id;
@@ -520,7 +589,7 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Creating Payment...'; }
       try {
         await saveCaseFacts(id, false);
-        const res = await fetch('/.netlify/functions/approve_case_for_payment', {
+        const res = await authFetch('/.netlify/functions/approve_case_for_payment', {
           method: 'POST',
           headers: headers(),
           body: JSON.stringify({ caseId: id })
@@ -538,7 +607,7 @@
     }
 
     async function updateCase(payload) {
-      const res = await fetch('/.netlify/functions/update_case', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+      const res = await authFetch('/.netlify/functions/update_case', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
       if (!res.ok) {
         let message = 'Update failed.';
         try { message = (await res.json()).error || message; } catch(e) {}
@@ -656,7 +725,7 @@
       btn.disabled = true;
       btn.textContent = 'Creating...';
       try {
-        const res = await fetch('/.netlify/functions/create_case', { method: 'POST', headers: headers() });
+        const res = await authFetch('/.netlify/functions/create_case', { method: 'POST', headers: headers() });
         if (!res.ok) throw new Error('Could not create base case.');
         const created = await res.json();
         const id = created.case.id;
@@ -748,7 +817,7 @@
 
       setLetterActionBusy(id, true, action);
       try {
-        const res = await fetch('/.netlify/functions/manage_letter_release', { method:'POST', headers:headers(), body:JSON.stringify({ caseId:id, action, draft_letter:draft }) });
+        const res = await authFetch('/.netlify/functions/manage_letter_release', { method:'POST', headers:headers(), body:JSON.stringify({ caseId:id, action, draft_letter:draft }) });
         let result={}; try { result=await res.json(); } catch(e) {}
         if (!res.ok) throw new Error(result.error || 'Letter action failed.');
         if (action === 'save') toast('Revised draft saved. This version now requires approval before release.');
@@ -770,7 +839,7 @@
 
       while (Date.now() - started < timeoutMs) {
         await sleep(intervalMs);
-        const res = await fetch('/.netlify/functions/get_cases', { headers: headers() });
+        const res = await authFetch('/.netlify/functions/get_cases', { headers: headers() });
         if (!res.ok) throw new Error('Could not refresh drafting status.');
         const freshCases = await res.json();
         const current = freshCases.find(c => c.id === id);
@@ -812,7 +881,7 @@
         btn.textContent = 'Starting…';
       }
       try {
-        const res = await fetch('/.netlify/functions/generate_letter', { method: 'POST', headers: headers(), body: JSON.stringify({ caseId: id }) });
+        const res = await authFetch('/.netlify/functions/generate_letter', { method: 'POST', headers: headers(), body: JSON.stringify({ caseId: id }) });
         let result = {}; try { result = await res.json(); } catch (e) {}
 
         if (!res.ok) {
