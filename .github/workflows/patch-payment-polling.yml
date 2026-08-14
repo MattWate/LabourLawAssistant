@@ -1,0 +1,28 @@
+name: Patch workstation payment polling
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-payment-polling.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node .github/scripts/patch-payment-polling.js
+      - run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('admin-workstation.html').read_text()
+          scripts=re.findall(r'<script[^>]*>(.*?)</script>', s, re.S)
+          Path('/tmp/admin.js').write_text('\n'.join(scripts[1:] if len(scripts)>1 else scripts))
+          PY
+          node --check /tmp/admin.js
+      - run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add admin-workstation.html
+          git commit -m "Auto-refresh paid cases in workstation"
+          git push
