@@ -51,10 +51,36 @@ function generateSignature(data = {}, passphrase = process.env.PAYFAST_PASSPHRAS
   return crypto.createHash('md5').update(buildSignatureString(data, passphrase)).digest('hex');
 }
 
+// Checkout signatures are built from our canonical outgoing field order.
 function verifySignature(data = {}, passphrase = process.env.PAYFAST_PASSPHRASE || '') {
   if (!data.signature) return false;
   const expected = generateSignature(data, passphrase);
   return String(data.signature).toLowerCase() === expected.toLowerCase();
+}
+
+// ITN signatures must preserve the order in which PayFast posted the fields.
+// Parsing into an object and then re-ordering them can invalidate an otherwise
+// legitimate notification, so verification is performed from the raw form body.
+function buildRawItnSignatureString(rawBody = '', passphrase = '') {
+  const params = new URLSearchParams(rawBody || '');
+  const pairs = [];
+
+  for (const [key, value] of params.entries()) {
+    if (key === 'signature') continue;
+    if (value === undefined || value === null || String(value).trim() === '') continue;
+    pairs.push(`${key}=${encodePayfastValue(value)}`);
+  }
+
+  if (passphrase) pairs.push(`passphrase=${encodePayfastValue(passphrase)}`);
+  return pairs.join('&');
+}
+
+function verifyRawItnSignature(rawBody = '', passphrase = process.env.PAYFAST_PASSPHRASE || '') {
+  const params = new URLSearchParams(rawBody || '');
+  const received = params.get('signature');
+  if (!received) return false;
+  const expected = crypto.createHash('md5').update(buildRawItnSignatureString(rawBody, passphrase)).digest('hex');
+  return String(received).toLowerCase() === expected.toLowerCase();
 }
 
 function parseFormBody(body = '') {
@@ -109,6 +135,8 @@ module.exports = {
   getPayfastValidateUrl,
   generateSignature,
   verifySignature,
+  verifyRawItnSignature,
+  buildRawItnSignatureString,
   parseFormBody,
   amountToPayfast,
   generatePaymentId,
