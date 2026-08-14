@@ -202,6 +202,8 @@
     let currentView = 'dashboard';
     let currentQueueFilter = 'all';
     let selectedCaseId = null;
+    let paymentPollTimer = null;
+    let paymentRenderTimer = null;
 
     db.auth.onAuthStateChange((event, session) => {
       currentToken = session?.access_token || null;
@@ -250,6 +252,10 @@
     }
 
     async function handleLogout() {
+      if (paymentPollTimer) clearTimeout(paymentPollTimer);
+      if (paymentRenderTimer) clearTimeout(paymentRenderTimer);
+      paymentPollTimer = null;
+      paymentRenderTimer = null;
       await db.auth.signOut();
       currentToken = null;
       selectedCaseId = null;
@@ -324,9 +330,75 @@
         casesData = await res.json();
         if (!selectedCaseId && casesData.length) selectedCaseId = casesData[0].id;
         render();
+        schedulePaymentPolling();
         if (show) toast('Cases refreshed.');
       } catch (e) {
         $('main').innerHTML = '<div class="loader">' + esc(e.message) + '</div>';
+      }
+    }
+
+    function hasPendingPayments(list = casesData) {
+      return list.some(c => c.payment_status === 'pending' || c.status === 'payment_pending');
+    }
+
+    function userIsEditing() {
+      const active = document.activeElement;
+      return !!active && (active.matches?.('.fact-input, #letter-editor, input, textarea, select') || active.isContentEditable);
+    }
+
+    function renderPaymentUpdateWhenSafe(message) {
+      if (paymentRenderTimer) clearTimeout(paymentRenderTimer);
+      const attempt = () => {
+        if (!userIsEditing()) {
+          paymentRenderTimer = null;
+          render();
+          if (message) toast(message);
+          return;
+        }
+        paymentRenderTimer = setTimeout(attempt, 1200);
+      };
+      attempt();
+    }
+
+    function schedulePaymentPolling(delayMs = 8000) {
+      if (paymentPollTimer) clearTimeout(paymentPollTimer);
+      paymentPollTimer = null;
+      if (!currentToken || !hasPendingPayments()) return;
+      paymentPollTimer = setTimeout(pollPendingPayments, delayMs);
+    }
+
+    async function pollPendingPayments() {
+      paymentPollTimer = null;
+      if (!currentToken || !hasPendingPayments()) return;
+
+      const pendingBefore = new Set(
+        casesData
+          .filter(c => c.payment_status === 'pending' || c.status === 'payment_pending')
+          .map(c => c.id)
+      );
+
+      try {
+        const res = await authFetch('/.netlify/functions/get_cases', { headers: headers() });
+        if (!res.ok) throw new Error('Could not refresh payment status.');
+        const freshCases = await res.json();
+        const newlyPaid = freshCases.filter(c =>
+          pendingBefore.has(c.id) &&
+          c.payment_status === 'paid' &&
+          c.status === 'paid_ready_for_drafting'
+        );
+
+        if (newlyPaid.length) {
+          casesData = freshCases;
+          const names = newlyPaid.map(c => facts(c).client_name || c.client_name || 'Client');
+          const message = newlyPaid.length === 1
+            ? 'Payment confirmed for ' + names[0] + '. The case is ready for drafting.'
+            : newlyPaid.length + ' payments were confirmed. Those cases are ready for drafting.';
+          renderPaymentUpdateWhenSafe(message);
+        }
+
+        if (hasPendingPayments(freshCases)) schedulePaymentPolling();
+      } catch (e) {
+        if (currentToken) schedulePaymentPolling(15000);
       }
     }
 
