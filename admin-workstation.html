@@ -180,13 +180,13 @@
 
   <div id="request-info-modal" class="modal">
     <div class="modal-card glass">
-      <div class="modal-head"><div><h2>Request More Information</h2><p>Prepare questions for the client. WhatsApp can plug into this later.</p></div><button class="btn ghost" onclick="closeModal('request-info-modal')">Close</button></div>
+      <div class="modal-head"><div><h2>Request More Information</h2><p>Send a question to the client or record an offline request.</p></div><button class="btn ghost" onclick="closeModal('request-info-modal')">Close</button></div>
       <div class="section"><h3>Question</h3><div class="edit-grid">
         <div class="block"><label>Channel</label><select class="select" id="q-channel"><option>whatsapp</option><option>email</option><option>phone</option><option>manual</option></select></div>
         <div class="block"><label>Answer Type</label><select class="select" id="q-type"><option>text</option><option>yes-no</option><option>date</option><option>document</option></select></div>
         <div class="block wide"><label>Question to Client</label><textarea class="textarea" id="q-text"></textarea></div>
       </div></div>
-      <div class="modal-actions"><button class="btn ghost" onclick="closeModal('request-info-modal')">Cancel</button><button class="btn warn" onclick="saveInfoRequest()">Save Question</button></div>
+      <div class="modal-actions"><button class="btn ghost" onclick="closeModal('request-info-modal')">Cancel</button><button id="q-submit" class="btn warn" onclick="saveInfoRequest()">Send / Record Request</button></div>
     </div>
   </div>
 
@@ -770,26 +770,35 @@
 
     async function saveInfoRequest() {
       const c = casesData.find(x => x.id === selectedCaseId);
-      if (!c) return;
+      if (!c) return toast('Select a case first.');
       const question = $('q-text').value.trim();
       if (!question) return toast('Add a question first.');
-      const f = { ...(c.case_facts || {}) };
-      const questions = Array.isArray(f.client_questions) ? [...f.client_questions] : [];
-      questions.push({
-        question,
-        channel: $('q-channel').value,
-        answer_type: $('q-type').value,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-        answered_at: null,
-        answer: null
-      });
-      f.client_questions = questions;
-      await updateCase({ id: c.id, case_facts: f, status: 'needs_more_info' });
-      $('q-text').value = '';
-      closeModal('request-info-modal');
-      toast('Client question saved.');
-      await fetchCases();
+      const channel = $('q-channel').value;
+      const answerType = $('q-type').value;
+      const btn = $('q-submit');
+      if (btn) { btn.disabled = true; btn.textContent = (channel === 'whatsapp' || channel === 'email') ? 'Sending…' : 'Saving…'; }
+
+      try {
+        const res = await authFetch('/.netlify/functions/request_case_info', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ caseId: c.id, question, channel, answer_type: answerType })
+        });
+        let result = {};
+        try { result = await res.json(); } catch (e) {}
+        if (!res.ok) throw new Error(result.error || 'Could not send the information request.');
+
+        $('q-text').value = '';
+        closeModal('request-info-modal');
+        if (result.delivery?.sent && channel === 'whatsapp') toast('Question sent to client via WhatsApp.');
+        else if (result.delivery?.sent && channel === 'email') toast('Question sent to client by email.');
+        else toast('Client information request recorded.');
+        await fetchCases();
+      } catch (e) {
+        toast(e.message || 'Could not send the information request.');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Send / Record Request'; }
+      }
     }
 
     async function createManualCase() {
