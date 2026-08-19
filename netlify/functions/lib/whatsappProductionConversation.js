@@ -7,6 +7,7 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 
 const CLIENT_EMAIL_PROMPT = 'What email address should VRS use to contact you and copy you on any approved letter sent to your employer?';
 const COMPLETION_MESSAGE = 'Thank you. Your information has been submitted securely to VRS. A VRS lawyer will review the details and Justine’s initial assessment. You will receive feedback soon confirming whether your matter has sufficient merit and whether you are eligible for a formal letter to your employer.';
+const INFO_REPLY_CONFIRMATION = 'Thank you. I have added your response to your case and notified the VRS legal team for review.';
 
 function clean(value = '') {
   return String(value || '').trim();
@@ -73,8 +74,74 @@ async function completeAfterEmail(conversation, message, email) {
   return COMPLETION_MESSAGE;
 }
 
+async function capturePendingInfoReply(conversation, message) {
+  if (!conversation?.case_id || !message?.text_body) return null;
+
+  const { data: caseData, error } = await supabase
+    .from('cases')
+    .select('id,status,case_facts')
+    .eq('id', conversation.case_id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!caseData) return null;
+
+  const facts = caseData.case_facts || {};
+  const questions = Array.isArray(facts.client_questions) ? [...facts.client_questions] : [];
+  let pendingIndex = -1;
+  for (let i = questions.length - 1; i >= 0; i -= 1) {
+    if (questions[i]?.status === 'pending' && questions[i]?.channel === 'whatsapp') {
+      pendingIndex = i;
+      break;
+    }
+  }
+  if (pendingIndex === -1) return null;
+
+  const answer = clean(message.text_body);
+  if (!answer) return 'Please type your answer to the VRS legal team’s question.';
+
+  const now = new Date().toISOString();
+  const pending = { ...questions[pendingIndex] };
+  questions[pendingIndex] = {
+    ...pending,
+    status: 'answered',
+    answer,
+    answered_at: now,
+    answer_channel: 'whatsapp',
+    answer_message_id: message.whatsapp_message_id || null
+  };
+
+  const remainingPending = questions.some(item => item?.status === 'pending');
+  const returnStatus = remainingPending ? 'needs_more_info' : (pending.return_status || 'requires_attorney');
+
+  const { error: updateError } = await supabase.from('cases').update({
+    status: returnStatus,
+    case_facts: {
+      ...facts,
+      client_questions: questions,
+      client_answer_received_at: now,
+      attorney_review_flag: true
+    },
+    updated_at: now
+  }).eq('id', caseData.id);
+  if (updateError) throw updateError;
+
+  await updateConversation(conversation.id, {
+    processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id),
+    last_inbound_at: now
+  });
+
+  return INFO_REPLY_CONFIRMATION;
+}
+
 async function processIncomingMessage(message) {
   const conversation = await getConversation(message.from_number);
+
+  if (conversation && Array.isArray(conversation.processed_message_ids) && message.whatsapp_message_id && conversation.processed_message_ids.includes(message.whatsapp_message_id)) {
+    return null;
+  }
+
+  const pendingInfoReply = await capturePendingInfoReply(conversation, message);
+  if (pendingInfoReply) return pendingInfoReply;
 
   if (conversation?.current_step === 'CLIENT_PHONE' && conversation.status === 'active') {
     const input = clean(message.text_body);
@@ -122,5 +189,6 @@ module.exports = {
     CLIENT_EMAIL: { type: 'text', prompt: CLIENT_EMAIL_PROMPT, saveAs: 'client_email', next: 'HANDOFF' }
   },
   CLIENT_EMAIL_PROMPT,
-  COMPLETION_MESSAGE
+  COMPLETION_MESSAGE,
+  INFO_REPLY_CONFIRMATION
 };
