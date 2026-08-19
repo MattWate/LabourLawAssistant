@@ -133,14 +133,17 @@ async function notifyPaymentConfirmed(caseData) {
 async function unlockCaseIfPaid(payment, data, checks) {
   if (!supabase || !payment?.case_id) return { unlocked: false, reason: 'missing_case_id' };
   const isPaid = normaliseStatus(data.payment_status) === 'paid';
-  const isVerified = checks.signatureValid === true &&
-    checks.merchantValid === true &&
+
+  // We require the transaction to match a payment we created and for PayFast
+  // itself to validate the ITN. A local signature mismatch should not block a
+  // legitimate payment when PayFast's server-side validation succeeds.
+  const corePaymentChecksValid = checks.merchantValid === true &&
     checks.payfastValidationStatus === 'valid' &&
     checks.amountValid === true &&
     checks.paymentLinkValid === true;
 
   if (!isPaid) return { unlocked: false, reason: 'payment_not_complete' };
-  if (!isVerified) return { unlocked: false, reason: 'verification_failed' };
+  if (!corePaymentChecksValid) return { unlocked: false, reason: 'verification_failed' };
 
   const { data: caseData, error } = await supabase
     .from('cases')
@@ -155,6 +158,7 @@ async function unlockCaseIfPaid(payment, data, checks) {
 
   const paidAt = caseData.paid_at || new Date().toISOString();
   const facts = caseData.case_facts || {};
+  const verificationMode = checks.signatureValid === true ? 'signature_and_server' : 'server_validated';
 
   const { error: updateError } = await supabase.from('cases').update({
     payment_status: 'paid',
@@ -168,7 +172,10 @@ async function unlockCaseIfPaid(payment, data, checks) {
       paid_at: paidAt,
       wp_generation_unlocked: true,
       payfast_payment_id: payment.pf_payment_id || data.pf_payment_id || null,
-      payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null
+      payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null,
+      payfast_verification_mode: verificationMode,
+      payfast_signature_valid: checks.signatureValid === true,
+      payfast_server_validation_status: checks.payfastValidationStatus
     },
     updated_at: new Date().toISOString()
   }).eq('id', payment.case_id);
@@ -184,6 +191,9 @@ async function unlockCaseIfPaid(payment, data, checks) {
       wp_generation_unlocked: true,
       payfast_payment_id: payment.pf_payment_id || data.pf_payment_id || null,
       payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null,
+      payfast_verification_mode: verificationMode,
+      payfast_signature_valid: checks.signatureValid === true,
+      payfast_server_validation_status: checks.payfastValidationStatus,
       payment_confirmation_notification: notification,
       payment_confirmation_notified_at: notificationAt
     },
@@ -191,7 +201,7 @@ async function unlockCaseIfPaid(payment, data, checks) {
   }).eq('id', payment.case_id);
   if (notificationUpdateError) throw notificationUpdateError;
 
-  return { unlocked: true, reason: 'verified_payment', notification };
+  return { unlocked: true, reason: 'verified_payment', verificationMode, notification };
 }
 
 exports.handler = async (event) => {
@@ -218,15 +228,16 @@ exports.handler = async (event) => {
     let payfastValidationStatus = 'not_checked';
     let payfastValidationResponse = null;
 
-    if (signatureValid) {
-      try {
-        const validation = await validateWithPayfast(rawBody);
-        payfastValidationStatus = validation.ok ? 'valid' : 'invalid';
-        payfastValidationResponse = validation.body;
-      } catch (validationError) {
-        payfastValidationStatus = 'error';
-        payfastValidationResponse = validationError.message;
-      }
+    // Always perform PayFast's own server-side ITN validation. This is the
+    // authoritative fallback when our local signature reconstruction differs
+    // from the exact payload PayFast used to generate its signature.
+    try {
+      const validation = await validateWithPayfast(rawBody);
+      payfastValidationStatus = validation.ok ? 'valid' : 'invalid';
+      payfastValidationResponse = validation.body;
+    } catch (validationError) {
+      payfastValidationStatus = 'error';
+      payfastValidationResponse = validationError.message;
     }
 
     const checks = {
