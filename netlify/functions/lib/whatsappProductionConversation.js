@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const baseConversation = require('./whatsappConversation');
+const { caseReference } = require('./caseReference');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -71,7 +72,8 @@ async function completeAfterEmail(conversation, message, email) {
     last_inbound_at: new Date().toISOString()
   });
 
-  return COMPLETION_MESSAGE;
+  const reference = evaluation.caseReference || caseReference(evaluation.caseId);
+  return `${COMPLETION_MESSAGE}\n\nYour VRS case reference is ${reference}. Please keep this reference and quote it if you contact VRS through another channel.`;
 }
 
 async function capturePendingInfoReply(conversation, message) {
@@ -176,7 +178,8 @@ async function processIncomingMessage(message) {
   // Older completed conversations may still receive the original detailed assessment.
   // Replace it with the production client-facing confirmation without changing saved legal analysis.
   if (typeof result === 'string' && /Initial assessment:|Reference:/i.test(result) && /confidential VRS intake/i.test(result)) {
-    return COMPLETION_MESSAGE;
+    const reference = caseReference(conversation?.case_id);
+    return reference ? `${COMPLETION_MESSAGE}\n\nYour VRS case reference is ${reference}. Please quote it if you contact VRS through another channel.` : COMPLETION_MESSAGE;
   }
 
   return result;

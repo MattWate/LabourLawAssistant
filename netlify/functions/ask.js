@@ -4,6 +4,7 @@ const OpenAI = require('openai');
 const { scoreCase } = require('./lib/scoringEngine');
 const { applyOverridePostProcessing } = require('./lib/overridePostProcessor');
 const { classifyAndHydrateMatter, mergeGovernanceFacts } = require('./lib/llmGovernance');
+const { caseReference } = require('./lib/caseReference');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -254,7 +255,7 @@ exports.handler = async (event) => {
         letter_status: 'not_applicable'
       }).select().single();
       if (error) throw error;
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: true, caseId: data.id, triage, message: triage.recommended_next_step }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: true, caseId: data.id, caseReference: caseReference(data.id, data.created_at), triage, message: triage.recommended_next_step }) };
     }
 
     if (action === 'evaluate') {
@@ -297,7 +298,7 @@ exports.handler = async (event) => {
         }
       }
 
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, scorecard, governance: caseFacts.llm_governance, whatsapp }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, caseReference: caseReference(data.id, data.created_at), scorecard, governance: caseFacts.llm_governance, whatsapp }) };
     }
 
     if (action === 'close') {

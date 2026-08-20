@@ -1566,6 +1566,7 @@
 
             if (data.caseId) {
                 activeCaseId = data.caseId;
+                if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}. Please keep this and quote it if you contact VRS through another channel.`, "bot");
                 console.log("Jurisdiction triage captured:", data.caseId);
             }
         } catch (error) {
@@ -1593,6 +1594,7 @@
 
             activeCaseId = data.caseId;
             appendMessage(data.pitch, "bot");
+            if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}. Please keep this and quote it if you contact VRS through another channel.`, "bot");
 
             buttonContainer.innerHTML = '';
             if (data.hasMerit) {
