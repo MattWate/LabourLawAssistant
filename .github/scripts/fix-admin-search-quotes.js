@@ -1,0 +1,1 @@
+const fs=require('fs');const p='admin-workstation.html';let s=fs.readFileSync(p,'utf8');s=s.replace(`oninput="setCaseSearch(this.value, 'dashboard')"`,`oninput="setCaseSearch(this.value, \\'dashboard\\')"`);s=s.replace(`oninput="setCaseSearch(this.value, 'workstation')"`,`oninput="setCaseSearch(this.value, \\'workstation\\')"`);fs.writeFileSync(p,s);console.log('fixed');
