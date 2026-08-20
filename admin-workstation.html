@@ -202,6 +202,7 @@
     let currentView = 'dashboard';
     let currentQueueFilter = 'all';
     let selectedCaseId = null;
+    let caseSearchQuery = '';
     let paymentPollTimer = null;
     let paymentRenderTimer = null;
 
@@ -480,9 +481,11 @@
         '<button class="btn ghost" onclick="fetchCases(true)">Refresh</button>';
 
       const s = stats();
-      const recent = casesData.slice(0, 8);
+      const dashboardMatches = caseSearchQuery ? filteredCases() : casesData;
+      const recent = dashboardMatches.slice(0, 8);
 
       $('main').innerHTML =
+        '<div class="panel" style="margin-bottom:14px;padding:14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input class="field" id="dashboard-case-search" style="flex:1;min-width:260px" placeholder="Search by client name or VRS reference..." value="' + attr(caseSearchQuery) + '" oninput="setCaseSearch(this.value, 'dashboard')"/><button class="btn ghost" onclick="clearCaseSearch()">Clear</button></div>' + (caseSearchQuery ? '<div style="margin-top:8px;color:var(--muted);font-size:.86rem">' + recent.length + ' recent match' + (dashboardMatches.length === 1 ? '' : 'es') + ' shown · ' + dashboardMatches.length + ' total</div>' : '') + '</div>' +
         '<div class="dashboard">' +
         metric('Active Cases', s.active, 'Open matters', "setQueueFilter('active');setView('workstation')") +
         metric('Attorney Review', s.review, 'Needs legal judgement', "setQueueFilter('review');setView('workstation')") +
@@ -509,7 +512,7 @@
     }
 
     function filteredCases() {
-      const search = ($('case-search')?.value || '').toLowerCase().trim();
+      const search = String(caseSearchQuery || '').toLowerCase().trim();
       return casesData.filter(c => {
         const f = facts(c);
         const ed = effective(c);
@@ -537,7 +540,7 @@
       const selected = casesData.find(c => c.id === selectedCaseId) || rows[0] || null;
       if (selected) selectedCaseId = selected.id;
       $('main').innerHTML =
-        '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search cases..." oninput="renderWorkstation()"/><div class="filters">' +
+        '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search name, reference, employer or contact..." value="' + attr(caseSearchQuery) + '" oninput="setCaseSearch(this.value, 'workstation')"/><div class="filters">' +
         chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('payment','Awaiting Payment') + chip('paid','Paid – Ready') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
         '</div></div><div class="case-list">' +
         (rows.length ? rows.map(c => caseCard(c, c.id === selectedCaseId)).join('') : '<div class="loader">No cases match this queue.</div>') +
@@ -559,6 +562,24 @@
       const name = f.client_name || c.client_name || 'Anonymous Client';
       const sum = f.incident_description || c.issue_summary || ed.recommended_next_step || 'No summary captured yet.';
       return '<div class="case-card ' + (active ? 'active' : '') + '" onclick="selectCase(\'' + c.id + '\')"><div class="case-row"><div><div class="case-name">' + esc(name) + '</div><div class="case-id">' + esc(f.case_reference || c.case_reference || '') + '</div></div>' + statusBadge(st) + '</div><div class="case-summary">' + esc(sum.slice(0, 120)) + (sum.length > 120 ? '...' : '') + '</div><div class="badges"><span class="badge blue">' + esc(ed.track || 'track?') + '</span><span class="badge ' + meritClass(ed.merit_band) + '">' + esc(ed.merit_band || 'review') + '</span>' + (bool(ed.wp_eligible) ? '<span class="badge green">WP</span>' : '') + (f.admin_override?.overridden ? '<span class="badge purple">override</span>' : '') + '</div></div>';
+    }
+
+    function setCaseSearch(value, source = 'workstation') {
+      caseSearchQuery = String(value || '');
+      if (source === 'dashboard') {
+        renderDashboard();
+        const input = $('dashboard-case-search');
+        if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      } else {
+        renderWorkstation();
+        const input = $('case-search');
+        if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      }
+    }
+
+    function clearCaseSearch() {
+      caseSearchQuery = '';
+      render();
     }
 
     function selectCase(id) { selectedCaseId = id; currentView = 'workstation'; render(); }
