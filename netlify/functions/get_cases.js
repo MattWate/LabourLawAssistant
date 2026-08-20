@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { withCaseReference } = require('./lib/caseReference');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -10,7 +11,8 @@ function isWpEligible(facts = {}) {
 }
 
 function normaliseCaseForWorkstation(caseRow = {}) {
-    const facts = { ...(caseRow.case_facts || {}) };
+    const referenced = withCaseReference(caseRow);
+    const facts = { ...(referenced.case_facts || {}) };
 
     // The lawyer's effective WP decision controls whether drafting is
     // available. It must not depend on whether the intake explicitly set a
@@ -20,7 +22,7 @@ function normaliseCaseForWorkstation(caseRow = {}) {
     }
 
     return {
-        ...caseRow,
+        ...referenced,
         case_facts: facts
     };
 }
