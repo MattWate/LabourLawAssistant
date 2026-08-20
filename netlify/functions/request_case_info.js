@@ -1,11 +1,13 @@
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
-const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
+const { sendWhatsAppText } = require('./lib/whatsapp');
 const { sendEmail } = require('./lib/email');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const supabase = supabaseUrl && serviceKey ? createClient(supabaseUrl, serviceKey) : null;
+
+const WHATSAPP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function json(statusCode, body) {
   return {
@@ -31,31 +33,31 @@ function clean(value = '') {
   return String(value || '').trim();
 }
 
+function withinWhatsAppCustomerServiceWindow(lastInboundAt) {
+  if (!lastInboundAt) return false;
+  const lastInboundMs = new Date(lastInboundAt).getTime();
+  if (!Number.isFinite(lastInboundMs)) return false;
+  return Date.now() - lastInboundMs < WHATSAPP_WINDOW_MS;
+}
+
 async function deliverWhatsApp({ caseId, caseData, question }) {
   const { data: conversation, error } = await supabase
     .from('whatsapp_conversations')
-    .select('from_number,phone_number_id')
+    .select('from_number,phone_number_id,last_inbound_at')
     .eq('case_id', caseId)
     .maybeSingle();
   if (error) throw error;
-  if (!conversation?.from_number) throw new Error('No WhatsApp conversation is linked to this case');
+  if (!conversation?.from_number) throw new Error('No WhatsApp conversation is linked to this case. Please use email, phone or manual contact instead.');
+
+  if (!withinWhatsAppCustomerServiceWindow(conversation.last_inbound_at)) {
+    const err = new Error('The client is outside WhatsApp’s 24-hour messaging window, so a customised information request cannot be sent on WhatsApp. Please use email, phone or manual contact instead.');
+    err.code = 'WHATSAPP_WINDOW_CLOSED';
+    throw err;
+  }
 
   const facts = caseData.case_facts || {};
   const clientName = facts.client_name || caseData.client_name || 'Client';
   const phoneNumberId = conversation.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const templateName = clean(process.env.WHATSAPP_INFO_REQUEST_TEMPLATE_NAME);
-  const languageCode = clean(process.env.WHATSAPP_INFO_REQUEST_TEMPLATE_LANGUAGE || 'en');
-
-  if (templateName) {
-    await sendWhatsAppTemplate({
-      to: conversation.from_number,
-      phoneNumberId,
-      templateName,
-      languageCode,
-      bodyParameters: [clientName, question]
-    });
-    return { sent: true, mode: 'whatsapp_template', recipient: conversation.from_number, template_name: templateName, template_language: languageCode };
-  }
 
   await sendWhatsAppText({
     to: conversation.from_number,
@@ -142,6 +144,14 @@ exports.handler = async (event) => {
     return json(200, { success: true, request, delivery });
   } catch (error) {
     console.error('request_case_info error:', error);
-    return json(error.message === 'Unauthorized' ? 401 : 500, { error: error.message });
+    if (error.message === 'Unauthorized') return json(401, { error: error.message });
+    if (error.code === 'WHATSAPP_WINDOW_CLOSED') {
+      return json(409, {
+        error: error.message,
+        code: error.code,
+        suggested_channels: ['email', 'phone', 'manual']
+      });
+    }
+    return json(500, { error: error.message });
   }
 };
