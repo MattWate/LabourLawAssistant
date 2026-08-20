@@ -485,7 +485,7 @@
       const recent = dashboardMatches.slice(0, 8);
 
       $('main').innerHTML =
-        '<div class="panel" style="margin-bottom:14px;padding:14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input class="field" id="dashboard-case-search" style="flex:1;min-width:260px" placeholder="Search by client name or VRS reference..." value="' + attr(caseSearchQuery) + '" oninput="setCaseSearch(this.value, 'dashboard')"/><button class="btn ghost" onclick="clearCaseSearch()">Clear</button></div>' + (caseSearchQuery ? '<div style="margin-top:8px;color:var(--muted);font-size:.86rem">' + recent.length + ' recent match' + (dashboardMatches.length === 1 ? '' : 'es') + ' shown · ' + dashboardMatches.length + ' total</div>' : '') + '</div>' +
+        '<div class="panel" style="margin-bottom:14px;padding:14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input class="field" id="dashboard-case-search" style="flex:1;min-width:260px" placeholder="Search by client name or VRS reference..." value="' + attr(caseSearchQuery) + '" oninput="setCaseSearch(this.value, \'dashboard\')"/><button class="btn ghost" onclick="clearCaseSearch()">Clear</button></div>' + (caseSearchQuery ? '<div style="margin-top:8px;color:var(--muted);font-size:.86rem">' + recent.length + ' recent match' + (dashboardMatches.length === 1 ? '' : 'es') + ' shown · ' + dashboardMatches.length + ' total</div>' : '') + '</div>' +
         '<div class="dashboard">' +
         metric('Active Cases', s.active, 'Open matters', "setQueueFilter('active');setView('workstation')") +
         metric('Attorney Review', s.review, 'Needs legal judgement', "setQueueFilter('review');setView('workstation')") +
@@ -540,7 +540,7 @@
       const selected = casesData.find(c => c.id === selectedCaseId) || rows[0] || null;
       if (selected) selectedCaseId = selected.id;
       $('main').innerHTML =
-        '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search name, reference, employer or contact..." value="' + attr(caseSearchQuery) + '" oninput="setCaseSearch(this.value, 'workstation')"/><div class="filters">' +
+        '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search name, reference, employer or contact..." value="' + attr(caseSearchQuery) + '" oninput="setCaseSearch(this.value, \'workstation\')"/><div class="filters">' +
         chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('payment','Awaiting Payment') + chip('paid','Paid – Ready') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
         '</div></div><div class="case-list">' +
         (rows.length ? rows.map(c => caseCard(c, c.id === selectedCaseId)).join('') : '<div class="loader">No cases match this queue.</div>') +
