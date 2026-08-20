@@ -1,0 +1,29 @@
+name: Apply persistent admin case search
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-admin-search-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Sync main
+        run: git pull --rebase origin main
+      - name: Apply search patch
+        run: node .github/scripts/apply-admin-search-fix.js
+      - name: Commit patch and cleanup
+        run: |
+          rm -f .github/scripts/apply-admin-search-fix.js .github/workflows/apply-admin-search-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin-workstation.html .github/scripts/apply-admin-search-fix.js .github/workflows/apply-admin-search-fix.yml
+          git commit -m "Add persistent admin case search"
+          git push origin HEAD:main
