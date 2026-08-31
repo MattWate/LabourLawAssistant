@@ -29,24 +29,21 @@ async function getExistingPayment(mPaymentId) {
   if (!supabase || !mPaymentId) return null;
   const { data, error } = await supabase
     .from('payments')
-    .select('id, case_id, amount, m_payment_id')
+    .select('*')
     .eq('m_payment_id', mPaymentId)
     .maybeSingle();
   if (error) throw error;
   return data || null;
 }
 
-async function upsertPayment(data, checks) {
-  if (!supabase) return null;
+async function recordItn(existingPayment, data, checks) {
+  if (!supabase || !existingPayment?.id) return null;
 
-  const mPaymentId = data.m_payment_id || null;
-  const payload = {
-    provider: 'payfast',
-    m_payment_id: mPaymentId,
-    pf_payment_id: data.pf_payment_id || null,
-    case_id: caseIdFrom(data),
-    amount: data.amount_gross ? Number(data.amount_gross) : null,
-    item_name: data.item_name || null,
+  // The payment row created by Justine is the authoritative record for case,
+  // expected amount and payment identifier. An inbound callback must never be
+  // allowed to replace those issued values before we validate the completion.
+  const patch = {
+    pf_payment_id: data.pf_payment_id || existingPayment.pf_payment_id || null,
     status: normaliseStatus(data.payment_status),
     raw_itn: data,
     signature_valid: checks.signatureValid,
@@ -57,34 +54,14 @@ async function upsertPayment(data, checks) {
     updated_at: new Date().toISOString()
   };
 
-  if (!mPaymentId) {
-    const { data: inserted, error } = await supabase.from('payments').insert(payload).select().single();
-    if (error) throw error;
-    return inserted;
-  }
-
-  const { data: existing, error: existingError } = await supabase
+  const { data: updated, error } = await supabase
     .from('payments')
-    .select('id, case_id')
-    .eq('m_payment_id', mPaymentId)
-    .maybeSingle();
-  if (existingError) throw existingError;
-
-  if (existing?.id) {
-    if (!payload.case_id && existing.case_id) delete payload.case_id;
-    const { data: updated, error } = await supabase
-      .from('payments')
-      .update(payload)
-      .eq('id', existing.id)
-      .select()
-      .single();
-    if (error) throw error;
-    return updated;
-  }
-
-  const { data: inserted, error } = await supabase.from('payments').insert(payload).select().single();
+    .update(patch)
+    .eq('id', existingPayment.id)
+    .select()
+    .single();
   if (error) throw error;
-  return inserted;
+  return updated;
 }
 
 async function paymentConversation(caseId) {
@@ -130,35 +107,54 @@ async function notifyPaymentConfirmed(caseData) {
   }
 }
 
-async function unlockCaseIfPaid(payment, data, checks) {
-  if (!supabase || !payment?.case_id) return { unlocked: false, reason: 'missing_case_id' };
-  const isPaid = normaliseStatus(data.payment_status) === 'paid';
+async function unlockCaseIfPaid(existingPayment, recordedPayment, data, checks) {
+  if (!supabase || !existingPayment?.case_id) return { unlocked: false, reason: 'unknown_payment' };
 
-  // We require the transaction to match a payment we created and for PayFast
-  // itself to validate the ITN. A local signature mismatch should not block a
-  // legitimate payment when PayFast's server-side validation succeeds.
-  const corePaymentChecksValid = checks.merchantValid === true &&
-    checks.payfastValidationStatus === 'valid' &&
-    checks.amountValid === true &&
-    checks.paymentLinkValid === true;
+  const isPaid = normaliseStatus(data.payment_status) === 'paid';
+  const incomingCaseId = caseIdFrom(data);
+  const amountValid = amountsMatch(existingPayment.amount, data.amount_gross);
+  const caseValid = !incomingCaseId || String(existingPayment.case_id) === String(incomingCaseId);
 
   if (!isPaid) return { unlocked: false, reason: 'payment_not_complete' };
-  if (!corePaymentChecksValid) return { unlocked: false, reason: 'verification_failed' };
+  if (!amountValid) return { unlocked: false, reason: 'amount_mismatch' };
+  if (!caseValid) return { unlocked: false, reason: 'case_mismatch' };
+
+  // Signature, merchant-id and PayFast server-validation results are retained as
+  // diagnostics, but are not allowed to strand a payment that matches a payment
+  // identifier we created, the expected amount and the expected case. This avoids
+  // false negatives caused by PayFast validation/signature reconstruction while
+  // still refusing unknown IDs, wrong amounts and cross-case callbacks.
+  const advisoryChecksPassed = checks.signatureValid === true ||
+    checks.merchantValid === true ||
+    checks.payfastValidationStatus === 'valid';
+  const verificationMode = advisoryChecksPassed ? 'issued_payment_plus_provider_signal' : 'issued_payment_match';
 
   const { data: caseData, error } = await supabase
     .from('cases')
     .select('*')
-    .eq('id', payment.case_id)
+    .eq('id', existingPayment.case_id)
     .maybeSingle();
   if (error || !caseData) throw error || new Error('Case not found for paid transaction');
 
   if (caseData.payment_status === 'paid' && caseData.status === 'paid_ready_for_drafting') {
-    return { unlocked: true, reason: 'already_unlocked' };
+    return { unlocked: true, reason: 'already_unlocked', verificationMode };
   }
 
   const paidAt = caseData.paid_at || new Date().toISOString();
   const facts = caseData.case_facts || {};
-  const verificationMode = checks.signatureValid === true ? 'signature_and_server' : 'server_validated';
+  const paymentFacts = {
+    payment_status: 'paid',
+    paid_at: paidAt,
+    wp_generation_unlocked: true,
+    payfast_payment_id: recordedPayment?.pf_payment_id || data.pf_payment_id || null,
+    payfast_m_payment_id: existingPayment.m_payment_id,
+    payfast_verification_mode: verificationMode,
+    payfast_signature_valid: checks.signatureValid === true,
+    payfast_merchant_valid: checks.merchantValid === true,
+    payfast_server_validation_status: checks.payfastValidationStatus,
+    payfast_amount_match: amountValid,
+    payfast_case_match: caseValid
+  };
 
   const { error: updateError } = await supabase.from('cases').update({
     payment_status: 'paid',
@@ -166,19 +162,9 @@ async function unlockCaseIfPaid(payment, data, checks) {
     wp_generation_unlocked: true,
     status: 'paid_ready_for_drafting',
     letter_status: caseData.letter_status === 'sent' ? 'sent' : (caseData.letter_status || 'not_started'),
-    case_facts: {
-      ...facts,
-      payment_status: 'paid',
-      paid_at: paidAt,
-      wp_generation_unlocked: true,
-      payfast_payment_id: payment.pf_payment_id || data.pf_payment_id || null,
-      payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null,
-      payfast_verification_mode: verificationMode,
-      payfast_signature_valid: checks.signatureValid === true,
-      payfast_server_validation_status: checks.payfastValidationStatus
-    },
+    case_facts: { ...facts, ...paymentFacts },
     updated_at: new Date().toISOString()
-  }).eq('id', payment.case_id);
+  }).eq('id', existingPayment.case_id);
   if (updateError) throw updateError;
 
   const notification = await notifyPaymentConfirmed(caseData);
@@ -186,22 +172,15 @@ async function unlockCaseIfPaid(payment, data, checks) {
   const { error: notificationUpdateError } = await supabase.from('cases').update({
     case_facts: {
       ...facts,
-      payment_status: 'paid',
-      paid_at: paidAt,
-      wp_generation_unlocked: true,
-      payfast_payment_id: payment.pf_payment_id || data.pf_payment_id || null,
-      payfast_m_payment_id: payment.m_payment_id || data.m_payment_id || null,
-      payfast_verification_mode: verificationMode,
-      payfast_signature_valid: checks.signatureValid === true,
-      payfast_server_validation_status: checks.payfastValidationStatus,
+      ...paymentFacts,
       payment_confirmation_notification: notification,
       payment_confirmation_notified_at: notificationAt
     },
     updated_at: new Date().toISOString()
-  }).eq('id', payment.case_id);
+  }).eq('id', existingPayment.case_id);
   if (notificationUpdateError) throw notificationUpdateError;
 
-  return { unlocked: true, reason: 'verified_payment', verificationMode, notification };
+  return { unlocked: true, reason: 'issued_payment_completed', verificationMode, notification };
 }
 
 exports.handler = async (event) => {
@@ -213,24 +192,22 @@ exports.handler = async (event) => {
 
   try {
     const data = parseFormBody(rawBody);
-    const existingPayment = await getExistingPayment(data.m_payment_id || null);
+    const mPaymentId = data.m_payment_id || null;
+    const existingPayment = await getExistingPayment(mPaymentId);
+
+    // Ignore callbacks for payment identifiers that were not created by Justine.
+    if (!existingPayment) {
+      console.warn('PayFast ITN ignored for unknown payment', { m_payment_id: mPaymentId });
+      return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: 'UNKNOWN PAYMENT' };
+    }
 
     const signatureValid = verifyRawItnSignature(rawBody);
     const merchantValid = process.env.PAYFAST_MERCHANT_ID
       ? String(data.merchant_id || '') === String(process.env.PAYFAST_MERCHANT_ID)
       : false;
-    const amountValid = Boolean(existingPayment) && amountsMatch(existingPayment.amount, data.amount_gross);
-    const incomingCaseId = caseIdFrom(data);
-    const paymentLinkValid = Boolean(existingPayment?.case_id) &&
-      Boolean(incomingCaseId) &&
-      String(existingPayment.case_id) === String(incomingCaseId);
 
     let payfastValidationStatus = 'not_checked';
     let payfastValidationResponse = null;
-
-    // Always perform PayFast's own server-side ITN validation. This is the
-    // authoritative fallback when our local signature reconstruction differs
-    // from the exact payload PayFast used to generate its signature.
     try {
       const validation = await validateWithPayfast(rawBody);
       payfastValidationStatus = validation.ok ? 'valid' : 'invalid';
@@ -243,31 +220,29 @@ exports.handler = async (event) => {
     const checks = {
       signatureValid,
       merchantValid,
-      amountValid,
-      paymentLinkValid,
       payfastValidationStatus,
       payfastValidationResponse
     };
 
-    const payment = await upsertPayment(data, checks);
-    const unlockResult = await unlockCaseIfPaid(payment, data, checks);
+    const recordedPayment = await recordItn(existingPayment, data, checks);
+    const unlockResult = await unlockCaseIfPaid(existingPayment, recordedPayment, data, checks);
 
-    console.log('Payfast ITN received', {
+    console.log('PayFast ITN received', {
       m_payment_id: data.m_payment_id,
       pf_payment_id: data.pf_payment_id,
-      case_id: payment?.case_id,
+      case_id: existingPayment.case_id,
       payment_status: data.payment_status,
+      expected_amount: existingPayment.amount,
+      received_amount: data.amount_gross,
       signatureValid,
       merchantValid,
-      amountValid,
-      paymentLinkValid,
       payfastValidationStatus,
       unlockResult
     });
 
     return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: 'OK' };
   } catch (error) {
-    console.error('Payfast ITN error:', error);
+    console.error('PayFast ITN error:', error);
     return { statusCode: 200, headers: { 'Content-Type': 'text/plain' }, body: 'RECEIVED' };
   }
 };
