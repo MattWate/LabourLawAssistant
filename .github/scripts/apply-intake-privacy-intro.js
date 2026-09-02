@@ -28,3 +28,4 @@ const fs = require('fs');
 }
 
 console.log('Applied intake privacy, process and language introduction to web and WhatsApp.');
+// Trigger workflow after workflow creation.
