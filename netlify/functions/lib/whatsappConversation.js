@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { validateAndNormaliseDate } = require('./dateValidation');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -9,7 +10,7 @@ const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I will ask a few 
 const choice = (label, value, next) => ({ label, value, next });
 const buttons = (prompt, saveAs, choices) => ({ type: 'buttons', prompt, saveAs, choices });
 const text = (prompt, saveAs, next, extra = {}) => ({ type: 'text', prompt, saveAs, next, ...extra });
-const date = (prompt, saveAs, next) => ({ type: 'date', prompt, saveAs, next });
+const date = (prompt, saveAs, next, dateRules = {}) => ({ type: 'date', prompt, saveAs, next, dateRules });
 
 const STEPS = {
   JUR_EMPLOYEE: buttons('To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?', 'worker_status', [
@@ -37,7 +38,7 @@ const STEPS = {
     choice('I need help with UIF', 'UIF', 'UIF_DESC')
   ]),
 
-  FIRED_DATE: date('What was the exact date of your dismissal? Please use YYYY-MM-DD or DD/MM/YYYY.', 'incident_date', 'FIRED_REASON_TYPE'),
+  FIRED_DATE: date('What was the exact date of your dismissal? Please enter it as DD/MM/YYYY, for example 17/08/2026.', 'incident_date', 'FIRED_REASON_TYPE'),
   FIRED_REASON_TYPE: buttons('What was the stated reason given for your dismissal?', 'dismissal_reason_type', [
     choice('Misconduct', 'Misconduct', 'A2_MISCONDUCT_CATEGORY'),
     choice('Poor performance', 'Poor Performance', 'P2_PERFORMANCE_STANDARDS'),
@@ -136,7 +137,7 @@ const STEPS = {
   R10_SALARY_DURATION: text('What was your gross monthly salary, and how long were you employed?', 'gross_monthly_salary_and_duration', 'R11_RETRENCHMENT_NARRATIVE'),
   R11_RETRENCHMENT_NARRATIVE: text('In your own words, describe the retrenchment process.', 'incident_description', 'COMPANY_NAME', { minWords: 20 }),
 
-  RESIGN_DATE: date('What was the date you officially resigned?', 'incident_date', 'B2_INTOLERABLE_CONDUCT'),
+  RESIGN_DATE: date('What was the date you officially resigned? Please enter it as DD/MM/YYYY, for example 17/08/2026.', 'incident_date', 'B2_INTOLERABLE_CONDUCT'),
   B2_INTOLERABLE_CONDUCT: buttons('What conduct made your working environment intolerable?', 'intolerable_conduct', [
     choice('Demotion', 'demotion', 'B3_DURATION'), choice('Salary reduction or non-payment', 'salary reduction or non-payment', 'B3_DURATION'),
     choice('Harassment or bullying', 'harassment or bullying', 'B3_DURATION'), choice('Discrimination', 'discrimination', 'B3_DURATION'),
@@ -187,7 +188,7 @@ const STEPS = {
     choice('Warning', 'Warning', 'E2_EMPLOYMENT_LENGTH'), choice('Grievance', 'Grievance', 'E2_EMPLOYMENT_LENGTH'), choice('Hearing preparation', 'Hearing Prep', 'D1_HEARING_DATE'),
     choice('BCEA query', 'BCEA query', 'E2_EMPLOYMENT_LENGTH'), choice('Reference letter', 'Reference letter', 'E2_EMPLOYMENT_LENGTH'), choice('Pay dispute', 'Pay dispute', 'E2_EMPLOYMENT_LENGTH'), choice('Other', 'Other', 'E2_EMPLOYMENT_LENGTH')
   ]),
-  D1_HEARING_DATE: date('When is your disciplinary hearing scheduled?', 'hearing_date', 'D2_CHARGE_SHEET'),
+  D1_HEARING_DATE: date('When is your disciplinary hearing scheduled? Please enter it as DD/MM/YYYY, for example 17/08/2026.', 'hearing_date', 'D2_CHARGE_SHEET', { allowFuture: true }),
   D2_CHARGE_SHEET: buttons('Have you received a written charge sheet detailing the allegations?', 'charge_sheet_received', yesNo('D3_48H_NOTICE')),
   D3_48H_NOTICE: buttons('Does the charge sheet give you at least 48 hours notice?', 'proc_notice', [
     choice('Yes', true, 'D4_SUSPENSION'), choice('No', false, 'D4_SUSPENSION'), choice('Postponed already', 'Postponed already', 'D4_SUSPENSION')
@@ -209,7 +210,7 @@ const STEPS = {
   D9_PDA_NARRATIVE: text('Describe the allegation and your version of events.', 'incident_description', 'COMPANY_NAME'),
 
   E2_EMPLOYMENT_LENGTH: buttons('How long have you been employed?', 'length_of_service', serviceChoices('E3_RELEVANT_EVENT_DATE')),
-  E3_RELEVANT_EVENT_DATE: date('What is the date of the relevant event?', 'relevant_event_date', 'E4_INTERNAL_RAISED'),
+  E3_RELEVANT_EVENT_DATE: date('What is the date of the relevant event? Please enter it as DD/MM/YYYY, for example 17/08/2026.', 'relevant_event_date', 'E4_INTERNAL_RAISED'),
   E4_INTERNAL_RAISED: buttons('Have you raised this internally yet?', 'raised_internally', [
     choice('Yes', 'Yes', 'E5_SALARY'), choice('No', 'No', 'E5_SALARY'), choice('Started but not finished', 'Started but not finished', 'E5_SALARY')
   ]),
@@ -258,9 +259,6 @@ function matchChoice(input, step) {
   if (['no', 'n', 'nope'].includes(normalized)) return step.choices.find(item => normalize(item.label) === 'no');
   if (['unsure', 'not sure', 'unclear', 'i dont know'].includes(normalized)) return step.choices.find(item => /unsure|unclear/i.test(item.label));
   return null;
-}
-function validDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) || /^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(value);
 }
 function wordCount(value) { return cleanText(value).split(/\s+/).filter(Boolean).length; }
 
@@ -332,7 +330,7 @@ function stepIsAnswered(step, facts = {}) {
   const value = facts[step.saveAs];
   const meta = facts._fact_metadata?.[step.saveAs];
   if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
-  if (step.type === 'date') return validDate(String(value));
+  if (step.type === 'date') return validateAndNormaliseDate(String(value), step.dateRules || {}).ok;
   if (step.type === 'buttons') return Boolean(choiceForStoredValue(step, value));
   if (step.minWords) return wordCount(String(value)) >= step.minWords;
   return true;
@@ -374,7 +372,15 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
     if (!hasValue(value) || hasValue(merged[key])) return;
     const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
     if (confidence < AI_SKIP_CONFIDENCE) return;
-    merged[key] = value;
+
+    if (['incident_date', 'dismissal_date', 'resignation_date', 'relevant_event_date', 'hearing_date'].includes(key)) {
+      const dateResult = validateAndNormaliseDate(String(value), { allowFuture: key === 'hearing_date' });
+      if (!dateResult.ok) return;
+      merged[key] = dateResult.iso;
+    } else {
+      merged[key] = value;
+    }
+
     metadata[key] = { source: 'initial_narrative_ai', confidence, captured_at: new Date().toISOString() };
   });
 
@@ -451,9 +457,14 @@ async function processIncomingMessage(message) {
     facts = markDirectAnswer(facts, step.saveAs);
     next = resolveNextUnanswered(selected.next, facts);
   } else {
-    if (step.type === 'date' && !validDate(input)) return `Please enter the date as YYYY-MM-DD or DD/MM/YYYY.\n\n${step.prompt}`;
+    let valueToSave = input;
+    if (step.type === 'date') {
+      const dateResult = validateAndNormaliseDate(input, step.dateRules || {});
+      if (!dateResult.ok) return `${dateResult.message}\n\n${step.prompt}`;
+      valueToSave = dateResult.iso;
+    }
     if (step.minWords && wordCount(input) < step.minWords) return `Please add a little more detail, ideally at least ${step.minWords} words.\n\n${step.prompt}`;
-    facts[step.saveAs] = input;
+    facts[step.saveAs] = valueToSave;
     facts = markDirectAnswer(facts, step.saveAs);
     next = resolveNextUnanswered(step.next, facts);
   }

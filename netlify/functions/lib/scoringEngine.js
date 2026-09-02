@@ -1,4 +1,5 @@
 const { determineRecommendation } = require('./strategicMatrix');
+const { validateAndNormaliseDate } = require('./dateValidation');
 
 const TRACK_LABELS = {
   'UD-MISCONDUCT': 'Unfair Dismissal — Misconduct',
@@ -63,14 +64,29 @@ function inferTrack(facts = {}) {
 }
 
 function ccmaStatus(facts = {}) {
-  const dateValue = facts.incident_date || facts.dismissal_date || facts.resignation_date || facts.relevant_event_date;
-  if (!dateValue) return { status: 'UNKNOWN', daysElapsed: null, daysRemaining: null };
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return { status: 'UNKNOWN', daysElapsed: null, daysRemaining: null };
-  const daysElapsed = Math.floor((Date.now() - date.getTime()) / 86400000);
-  return daysElapsed <= 30
-    ? { status: 'WITHIN_WINDOW', daysElapsed, daysRemaining: 30 - daysElapsed }
-    : { status: 'LAPSED-CONDONATION', daysElapsed, daysRemaining: 30 - daysElapsed };
+  const track = inferTrack(facts);
+  const statusText = clean(facts.disc_status || facts.employment_status || facts.category);
+  const dismissalWindowApplies = track.startsWith('UD-') || track === 'CD' || (track === 'AUD' && (statusText.includes('dismiss') || statusText.includes('fire')));
+
+  if (!dismissalWindowApplies) {
+    return { status: 'NOT_APPLICABLE', daysElapsed: null, daysRemaining: null, daysOverdue: null };
+  }
+
+  const dateValue = facts.incident_date || facts.dismissal_date || facts.resignation_date;
+  if (!dateValue) return { status: 'UNKNOWN', reason: 'missing_date', daysElapsed: null, daysRemaining: null, daysOverdue: null };
+
+  const parsed = validateAndNormaliseDate(dateValue, { allowFuture: false });
+  if (!parsed.ok) return { status: 'UNKNOWN', reason: parsed.reason, daysElapsed: null, daysRemaining: null, daysOverdue: null };
+
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const daysElapsed = Math.floor((todayUtc - parsed.date.getTime()) / 86400000);
+
+  if (daysElapsed <= 30) {
+    return { status: 'WITHIN_WINDOW', eventDate: parsed.iso, daysElapsed, daysRemaining: 30 - daysElapsed, daysOverdue: 0 };
+  }
+
+  return { status: 'LAPSED-CONDONATION', eventDate: parsed.iso, daysElapsed, daysRemaining: null, daysOverdue: daysElapsed - 30 };
 }
 
 function hardDisqualifier(facts = {}, track) {
@@ -341,7 +357,7 @@ function buildAdvisory(result, facts) {
   if (result.track === 'ANC') return buildAncillaryAdvisory(result, facts);
   const positives = result.scoring_breakdown.filter(x => x.points > 0).map(x => `- ${x.label} [${x.legalHook}]`).join('\n') || '- No strong positive factors have been captured yet.';
   const risks = result.scoring_breakdown.filter(x => x.points < 0).map(x => `- ${x.label} [${x.legalHook}]`).join('\n') || '- More structured facts may be needed before an attorney can confirm the position.';
-  const deadline = result.ccma_deadline_status.status === 'WITHIN_WINDOW' ? `${result.ccma_deadline_status.daysRemaining} days remaining in the ordinary 30-day CCMA referral window.` : result.ccma_deadline_status.status === 'LAPSED-CONDONATION' ? 'The ordinary 30-day CCMA referral window appears to have lapsed. Condonation may be required.' : 'The CCMA deadline cannot be confirmed because the relevant date is missing or invalid.';
+  const deadline = result.ccma_deadline_status.status === 'WITHIN_WINDOW' ? `${result.ccma_deadline_status.daysRemaining} days remaining in the ordinary 30-day CCMA referral window.` : result.ccma_deadline_status.status === 'LAPSED-CONDONATION' ? `The ordinary 30-day CCMA referral window appears to have lapsed by ${result.ccma_deadline_status.daysOverdue} days. Condonation may be required.` : result.ccma_deadline_status.status === 'NOT_APPLICABLE' ? 'The ordinary 30-day dismissal referral calculation does not apply to this matter.' : 'The CCMA deadline cannot be confirmed because the relevant date is missing or invalid.';
   const legal = result.legal_basis.map(x => `- ${x}`).join('\n') || '- To be confirmed by attorney review.';
   const headlineMeritText = result.merit_band === 'NO MERIT' ? 'NO MERIT' : `${result.merit_band} MERIT`;
   if (result.hard_disqualifier) return `${result.track_label}: NO MERIT\n\nSubstantive Score: 0 / 10\nThe matter currently triggers a hard threshold issue: ${result.hard_disqualifier.name}.\n\nProcedural Score: 0 / 10\nNo procedural merit assessment is completed until this threshold issue is resolved.\n\nFactors in your favour:\n${positives}\n\nRisks or weaknesses:\n- ${result.hard_disqualifier.name} [${result.hard_disqualifier.legalBasis}]\n\nCCMA deadline status: ${deadline}\n\nRecommended next step: ${result.recommended_next_step}\n\nLegal basis:\n${legal}\n\nAttorney review tag: PENDING`;

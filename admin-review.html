@@ -393,7 +393,7 @@
             ${fact('Letter Status', c.letter_status)}
             ${fact('WP Eligible', f.wp_eligible === true ? 'Yes' : 'No')}
             ${fact('WP Type', f.wp_type)}
-            ${fact('CCMA Deadline', f.ccma_deadline_status ? `${f.ccma_deadline_status.status} (${f.ccma_deadline_status.daysRemaining ?? '—'} days remaining)` : '—')}
+            ${fact('CCMA Deadline', f.ccma_deadline_status ? (f.ccma_deadline_status.status === 'LAPSED-CONDONATION' ? `${f.ccma_deadline_status.status} (${f.ccma_deadline_status.daysOverdue ?? '—'} days overdue)` : f.ccma_deadline_status.status === 'WITHIN_WINDOW' ? `${f.ccma_deadline_status.status} (${f.ccma_deadline_status.daysRemaining ?? '—'} days remaining)` : f.ccma_deadline_status.status) : '—')}
             ${fact('Hard Disqualifier', f.hard_disqualifier ? `${f.hard_disqualifier.name} — ${f.hard_disqualifier.legalBasis}` : 'None')}
             ${fact('Merit Bonus Trigger', f.merit_bonus_trigger ? `${f.merit_bonus_trigger.name} — ${f.merit_bonus_trigger.legalBasis}` : 'None')}
             ${fact('Recommended Next Step', f.recommended_next_step || f.overall_viability || '—')}
