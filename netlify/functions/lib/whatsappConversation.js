@@ -4,7 +4,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I will ask a series of questions to understand your situation and prepare it for review by the VRS legal team.\n\nMy automated assessment is not a substitute for advice from a qualified attorney. Type HELP at any time for human assistance, or RESTART to begin again.`;
+const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I will ask a series of questions to understand your situation and prepare it for review by the VRS legal team.\n\nMy automated assessment helps VRS understand your situation, but a VRS consultant will make any final decision about your matter. Type HELP at any time for assistance, or RESTART to begin again.`;
 
 const choice = (label, value, next) => ({ label, value, next });
 const buttons = (prompt, saveAs, choices) => ({ type: 'buttons', prompt, saveAs, choices });
@@ -12,23 +12,23 @@ const text = (prompt, saveAs, next, extra = {}) => ({ type: 'text', prompt, save
 const date = (prompt, saveAs, next) => ({ type: 'date', prompt, saveAs, next });
 
 const STEPS = {
-  JUR_EMPLOYEE: buttons('Are you an employee, as opposed to an independent contractor?', 'worker_status', [
+  JUR_EMPLOYEE: buttons('Hi, my name is Justine and I am a VRS Labour Law Assistant. I am here to help you work through what has happened. To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?', 'worker_status', [
     choice('Yes', 'Employee', 'JUR_SA_EMPLOYER'), choice('No', 'Contractor', 'JUR_CONTRACTOR_CONTROL'), choice('Unsure', 'Unsure', 'JUR_CONTRACTOR_CONTROL')
   ]),
   JUR_CONTRACTOR_CONTROL: buttons('Does someone tell you when to start work, when to stop work, and how to do the work?', 'contractor_control_test', [
     choice('Yes', 'yes', 'JUR_SA_EMPLOYER'), choice('No', 'no', 'DEFLECT_CONTRACTOR')
   ]),
-  JUR_SA_EMPLOYER: buttons('Is your employer a South African registered entity, or operating in South Africa?', 'south_african_employer', [
+  JUR_SA_EMPLOYER: buttons('Does your employer operate or do business in South Africa?', 'south_african_employer', [
     choice('Yes', 'yes', 'JUR_PUBLIC_SERVICE'), choice('No', 'no', 'DEFLECT_CROSS_BORDER'), choice('Unsure', 'unsure', 'JUR_PUBLIC_SERVICE')
   ]),
-  JUR_PUBLIC_SERVICE: buttons('Are you employed in the public service under the Public Service Act, or by a government agency such as DOL, DPW, DOH, SAPS, or the SANDF?', 'public_service_or_excluded_agency', [
+  JUR_PUBLIC_SERVICE: buttons('Do you work for a government department or state entity, for example the Department of Labour, Health, Public Works, SAPS or the SANDF?', 'public_service_or_excluded_agency', [
     choice('Yes', 'yes', 'DEFLECT_PUBLIC_SERVICE'), choice('No', 'no', 'START'), choice('Unsure', 'unsure', 'JUR_SOE')
   ]),
   JUR_SOE: buttons('Are you a Schedule 2 SOE employee whose dispute remains CCMA-eligible?', 'schedule_2_soe_ccma_eligible', [
     choice('Yes', 'yes', 'START'), choice('No', 'no', 'START'), choice('Unclear', 'unclear', 'DEFLECT_SOE_UNCLEAR')
   ]),
 
-  START: { type: 'classify', prompt: 'Briefly tell me about the work issue you need help with. There is no right or wrong way to describe it. In your own words, what happened?' },
+  START: { type: 'classify', prompt: 'Please tell me what has happened at work and what you would like help with. There is no right or wrong way to explain it. Just tell me in your own words.' },
   START_FALLBACK: buttons('Which option best describes what happened?', 'employment_status', [
     choice('I was fired or dismissed', 'Dismissed', 'FIRED_DATE'),
     choice('I was forced to resign', 'Resigned', 'RESIGN_DATE'),
@@ -47,55 +47,55 @@ const STEPS = {
   ]),
   FIRED_REASON_OTHER_EXPLANATION: text('Please explain the reason your employer gave for dismissing you.', 'dismissal_reason_other_explanation', 'COMPANY_NAME', { minWords: 3 }),
 
-  A2_MISCONDUCT_CATEGORY: buttons('What was the stated misconduct allegation?', 'misconduct_category', [
+  A2_MISCONDUCT_CATEGORY: buttons('What did your employer say you had done wrong?', 'misconduct_category', [
     choice('Theft', 'theft', 'A3_CONDUCT_ADMISSION'), choice('Assault', 'assault', 'A3_CONDUCT_ADMISSION'),
     choice('Dishonesty', 'dishonesty', 'A3_CONDUCT_ADMISSION'), choice('Insubordination', 'insubordination', 'A3_CONDUCT_ADMISSION'),
     choice('Absenteeism', 'absenteeism', 'A3_CONDUCT_ADMISSION'), choice('Other', 'other', 'A3_CONDUCT_ADMISSION')
   ]),
-  A3_CONDUCT_ADMISSION: buttons('Do you admit or dispute the conduct alleged?', 'conduct_admission', [
+  A3_CONDUCT_ADMISSION: buttons('Do you agree with what your employer says happened, or do you dispute it?', 'conduct_admission', [
     choice('Admit', 'Admit', 'A4_HEARING_HELD'), choice('Dispute', 'Dispute', 'A4_HEARING_HELD'), choice('Partially admit', 'Partially admit', 'A4_HEARING_HELD')
   ]),
-  A4_HEARING_HELD: buttons('Did your employer hold a formal disciplinary hearing before dismissing you?', 'hearing_held', [
+  A4_HEARING_HELD: buttons('Did your employer hold a disciplinary hearing before dismissing you?', 'hearing_held', [
     choice('Yes', true, 'A5_NOTICE'), choice('No', false, 'A8_PRIOR_WARNINGS')
   ]),
-  A5_NOTICE: buttons('Were you given written notice of the hearing and charges at least 48 hours beforehand?', 'proc_notice', [
+  A5_NOTICE: buttons('Before the hearing, were you given written notice and told what the charges were at least 48 hours beforehand?', 'proc_notice', [
     choice('Yes', true, 'A6_REPRESENTATIVE'), choice('No', false, 'A6_REPRESENTATIVE'), choice('Unsure', 'unsure', 'A6_REPRESENTATIVE')
   ]),
-  A6_REPRESENTATIVE: buttons('Were you allowed a colleague or trade-union representative at the hearing?', 'proc_rep', [
+  A6_REPRESENTATIVE: buttons('Were you allowed to have a colleague or trade union representative with you at the hearing?', 'proc_rep', [
     choice('Yes', true, 'A7_CHAIRPERSON'), choice('No', false, 'A7_CHAIRPERSON')
   ]),
-  A7_CHAIRPERSON: buttons('Was the chairperson independent of the dispute?', 'proc_chair', [
+  A7_CHAIRPERSON: buttons('Was the person chairing the hearing independent, rather than someone directly involved in the issue?', 'proc_chair', [
     choice('Yes', true, 'A8_PRIOR_WARNINGS'), choice('No', false, 'A8_PRIOR_WARNINGS'), choice('Unsure', 'unsure', 'A8_PRIOR_WARNINGS')
   ]),
-  A8_PRIOR_WARNINGS: buttons('Had you received prior written warnings for the same or similar conduct?', 'prior_warnings', [
+  A8_PRIOR_WARNINGS: buttons('Before this happened, had you received any written warnings for the same or a similar issue?', 'prior_warnings', [
     choice('None', 'None', 'A9_EMPLOYMENT_LENGTH'), choice('One', 'One', 'A9_EMPLOYMENT_LENGTH'), choice('Multiple', 'Multiple', 'A9_EMPLOYMENT_LENGTH')
   ]),
   A9_EMPLOYMENT_LENGTH: buttons('How long had you been employed?', 'length_of_service', serviceChoices('A10_SALARY')),
   A10_SALARY: text('What was your gross monthly salary?', 'gross_monthly_salary', 'A11_MISCONDUCT_NARRATIVE'),
   A11_MISCONDUCT_NARRATIVE: text('In your own words, describe what happened leading up to your dismissal.', 'incident_description', 'COMPANY_NAME', { minWords: 20 }),
 
-  P2_PERFORMANCE_STANDARDS: buttons('Did your employer clearly communicate the performance standards expected of you?', 'performance_standards_communicated', yesNoUnclear('P3_PIP')),
-  P3_PIP: buttons('Were you placed on a Performance Improvement Plan or given a formal opportunity to improve?', 'pip_given', [
+  P2_PERFORMANCE_STANDARDS: buttons('Before this happened, had your employer clearly explained what was expected of you in your role?', 'performance_standards_communicated', yesNoUnclear('P3_PIP')),
+  P3_PIP: buttons('Were you given a proper chance to improve, for example a formal Performance Improvement Plan, before anything happened?', 'pip_given', [
     choice('Yes', true, 'P4_PIP_DURATION'), choice('No', false, 'P5_TRAINING')
   ]),
   P4_PIP_DURATION: buttons('How long was the improvement period?', 'pip_duration', [
     choice('Less than 2 weeks', '<2 weeks', 'P5_TRAINING'), choice('2 to 4 weeks', '2-4 weeks', 'P5_TRAINING'), choice('1 to 3 months', '1-3 months', 'P5_TRAINING'), choice('More than 3 months', '3+ months', 'P5_TRAINING')
   ]),
-  P5_TRAINING: buttons('Did the employer provide training, instruction or guidance to help you improve?', 'training_provided', [
+  P5_TRAINING: buttons('Did your employer give you training, guidance or support to help you improve?', 'training_provided', [
     choice('Yes', true, 'P6_COMPARATORS'), choice('No', false, 'P6_COMPARATORS'), choice('Inadequate', 'Inadequate', 'P6_COMPARATORS')
   ]),
-  P6_COMPARATORS: buttons('Were others on your team meeting the standards you were measured against?', 'team_meeting_standards', [
+  P6_COMPARATORS: buttons('Were other people on your team meeting the same targets or standards you were measured against?', 'team_meeting_standards', [
     choice('Yes', 'Yes', 'P7_CONTROL'), choice('No', 'No', 'P7_CONTROL'), choice('Unsure', 'Unsure', 'P7_CONTROL'), choice('Unable to compare', 'Unable to compare', 'P7_CONTROL')
   ]),
-  P7_CONTROL: buttons('Were the targets within your control, or did external factors affect them?', 'performance_control', [
+  P7_CONTROL: buttons('Do you feel the targets were realistic and achievable, or were there things outside your control making them harder to reach, like equipment issues, understaffing or workload?', 'performance_control', [
     choice('Within my control', 'Within my control', 'P8_PERFORMANCE_WARNINGS'), choice('External factors', 'External factors', 'P8_PERFORMANCE_WARNINGS'), choice('Both', 'Both', 'P8_PERFORMANCE_WARNINGS')
   ]),
-  P8_PERFORMANCE_WARNINGS: buttons('Had you received prior performance warnings?', 'prior_performance_warnings', [
+  P8_PERFORMANCE_WARNINGS: buttons('Before this happened, had you received any warnings about your performance?', 'prior_performance_warnings', [
     choice('None', 'None', 'P9_EMPLOYMENT_LENGTH'), choice('One', 'One', 'P9_EMPLOYMENT_LENGTH'), choice('Multiple', 'Multiple', 'P9_EMPLOYMENT_LENGTH')
   ]),
   P9_EMPLOYMENT_LENGTH: buttons('How long had you been employed?', 'length_of_service', serviceChoices('P10_SALARY')),
   P10_SALARY: text('What was your gross monthly salary?', 'gross_monthly_salary', 'P11_PERFORMANCE_NARRATIVE'),
-  P11_PERFORMANCE_NARRATIVE: text('Describe the performance issues raised and what happened.', 'incident_description', 'COMPANY_NAME', { minWords: 20 }),
+  P11_PERFORMANCE_NARRATIVE: text('In your own words, tell me what concerns were raised about your performance and what happened next.', 'incident_description', 'COMPANY_NAME', { minWords: 20 }),
 
   I2_INCAPACITY_NATURE: buttons('What was the nature of your incapacity?', 'incapacity_nature', [
     choice('Illness', 'Illness', 'I3_INCAPACITY_DURATION'), choice('Injury', 'Injury', 'I3_INCAPACITY_DURATION'), choice('Disability', 'Disability', 'I3_INCAPACITY_DURATION'), choice('Mental health', 'Mental health', 'I3_INCAPACITY_DURATION')
@@ -217,8 +217,8 @@ const STEPS = {
   E6_ANCILLARY_NARRATIVE: text('Describe the situation in your own words.', 'incident_description', 'COMPANY_NAME'),
   UIF_DESC: text('Briefly describe your UIF query and how you need help.', 'incident_description', 'COMPANY_NAME'),
 
-  COMPANY_NAME: text('What is the exact name of the company you work or worked for?', 'employer_name', 'COMPANY_CONTACT'),
-  COMPANY_CONTACT: text('Please provide an email address or phone number for the company HR department or your manager. Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
+  COMPANY_NAME: text('What is the name of the company you work for, or worked for?', 'employer_name', 'COMPANY_CONTACT'),
+  COMPANY_CONTACT: text('Could you share a contact email or number for your employer's HR department or your manager? This just helps us know where to send correspondence. Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
   CLIENT_NAME: text('Almost done. What is your full name?', 'client_name', 'HANDOFF'),
   HANDOFF: { type: 'evaluate' }
 };

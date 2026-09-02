@@ -123,7 +123,7 @@
 
     const scriptFlow = {
         JUR_EMPLOYEE: {
-            msg: "Are you an employee, as opposed to an independent contractor?",
+            msg: "Hi, my name is Justine and I am a VRS Labour Law Assistant. I am here to help you work through what has happened. To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?",
             type: "buttons",
             options: [
                 { label: "Yes", next: "JUR_SA_EMPLOYER", val: "Employee" },
@@ -142,7 +142,7 @@
             saveAs: "contractor_control_test"
         },
         JUR_SA_EMPLOYER: {
-            msg: "Is your employer a South African registered entity, or operating in South Africa?",
+            msg: "Does your employer operate or do business in South Africa?",
             type: "buttons",
             options: [
                 { label: "Yes", next: "JUR_PUBLIC_SERVICE", val: "yes" },
@@ -152,7 +152,7 @@
             saveAs: "south_african_employer"
         },
         JUR_PUBLIC_SERVICE: {
-            msg: "Are you employed in the public service under the Public Service Act, or by a government agency such as DOL, DPW, DOH, SAPS, or by the SANDF?",
+            msg: "Do you work for a government department or state entity, for example the Department of Labour, Health, Public Works, SAPS or the SANDF?",
             type: "buttons",
             options: [
                 { label: "Yes", next: "DEFLECT_PUBLIC_SERVICE", val: "yes" },
@@ -172,7 +172,7 @@
             saveAs: "schedule_2_soe_ccma_eligible"
         },
         START: {
-            msg: "Hi there. I am Justine, a Labour Law Assistant. Briefly tell me about the work issue you need help with so I can guide you. There is no right or wrong way to describe it. In your own words, what has happened?",
+            msg: "Thanks. Now please tell me what has happened at work and what you would like help with. There is no right or wrong way to explain it. Just tell me in your own words.",
             type: "text",
             action: "classify"
         },
@@ -208,8 +208,8 @@
                 { label: "Absenteeism", next: "A3_CONDUCT_ADMISSION", val: "absenteeism" }, { label: "Other", next: "A3_CONDUCT_ADMISSION", val: "other" }
             ], saveAs: "misconduct_category"
         },
-        A3_CONDUCT_ADMISSION: { msg: "Do you admit or dispute the conduct alleged?", type: "buttons", options: [ { label: "Admit", next: "A4_HEARING_HELD", val: "Admit" }, { label: "Dispute", next: "A4_HEARING_HELD", val: "Dispute" }, { label: "Partially admit", next: "A4_HEARING_HELD", val: "Partially admit" } ], saveAs: "conduct_admission" },
-        A4_HEARING_HELD: { msg: "Did your employer hold a formal disciplinary hearing before dismissing you?", type: "buttons", options: [ { label: "Yes", next: "A5_NOTICE", val: true }, { label: "No", next: "A8_PRIOR_WARNINGS", val: false } ], saveAs: "hearing_held" },
+        A3_CONDUCT_ADMISSION: { msg: "Do you agree with what your employer says happened, or do you dispute it?", type: "buttons", options: [ { label: "Admit", next: "A4_HEARING_HELD", val: "Admit" }, { label: "Dispute", next: "A4_HEARING_HELD", val: "Dispute" }, { label: "Partially admit", next: "A4_HEARING_HELD", val: "Partially admit" } ], saveAs: "conduct_admission" },
+        A4_HEARING_HELD: { msg: "Did your employer hold a disciplinary hearing before dismissing you?", type: "buttons", options: [ { label: "Yes", next: "A5_NOTICE", val: true }, { label: "No", next: "A8_PRIOR_WARNINGS", val: false } ], saveAs: "hearing_held" },
         A5_NOTICE: { msg: "Were you given written notice of the hearing and the charges at least 48 hours before it took place?", type: "buttons", options: [ { label: "Yes", next: "A6_REPRESENTATIVE", val: true }, { label: "No", next: "A6_REPRESENTATIVE", val: false }, { label: "Unsure", next: "A6_REPRESENTATIVE", val: "unsure" } ], saveAs: "proc_notice" },
         A6_REPRESENTATIVE: { msg: "Were you allowed to have a representative (colleague or trade union representative) present at the hearing?", type: "buttons", options: [ { label: "Yes", next: "A7_CHAIRPERSON", val: true }, { label: "No", next: "A7_CHAIRPERSON", val: false } ], saveAs: "proc_rep" },
         A7_CHAIRPERSON: { msg: "Was the chairperson of the hearing independent of the dispute (not your direct manager and not the person who laid the charge)?", type: "buttons", options: [ { label: "Yes", next: "A8_PRIOR_WARNINGS", val: true }, { label: "No", next: "A8_PRIOR_WARNINGS", val: false }, { label: "Unsure", next: "A8_PRIOR_WARNINGS", val: "unsure" } ], saveAs: "proc_chair" },
@@ -217,12 +217,12 @@
         A9_EMPLOYMENT_LENGTH: { msg: "How long had you been employed at this company?", type: "buttons", options: [ { label: "<6 months", next: "A10_SALARY", val: "<6 months" }, { label: "6m-2y", next: "A10_SALARY", val: "6m-2y" }, { label: "2-5y", next: "A10_SALARY", val: "2-5y" }, { label: "5+y", next: "A10_SALARY", val: "5 years" } ], saveAs: "length_of_service" },
         A10_SALARY: { msg: "What was your gross monthly salary?", type: "text", next: "A11_MISCONDUCT_NARRATIVE", saveAs: "gross_monthly_salary" },
         A11_MISCONDUCT_NARRATIVE: { msg: "In your own words, describe what happened leading up to your dismissal.", type: "text", next: "COMPANY_NAME", saveAs: "incident_description", minWords: 50 },
-        P2_PERFORMANCE_STANDARDS: { msg: "Did your employer clearly communicate the performance standards expected of you?", type: "buttons", options: [ { label: "Yes", next: "P3_PIP", val: true }, { label: "No", next: "P3_PIP", val: false }, { label: "Unclear", next: "P3_PIP", val: "Unclear" } ], saveAs: "performance_standards_communicated" },
-        P3_PIP: { msg: "Were you placed on a Performance Improvement Plan or given a formal opportunity to improve?", type: "buttons", options: [ { label: "Yes", next: "P4_PIP_DURATION", val: true }, { label: "No", next: "P5_TRAINING", val: false } ], saveAs: "pip_given" },
+        P2_PERFORMANCE_STANDARDS: { msg: "Before this happened, had your employer clearly explained what was expected of you in your role?", type: "buttons", options: [ { label: "Yes", next: "P3_PIP", val: true }, { label: "No", next: "P3_PIP", val: false }, { label: "Unclear", next: "P3_PIP", val: "Unclear" } ], saveAs: "performance_standards_communicated" },
+        P3_PIP: { msg: "Were you given a proper chance to improve, for example a formal Performance Improvement Plan, before anything happened?", type: "buttons", options: [ { label: "Yes", next: "P4_PIP_DURATION", val: true }, { label: "No", next: "P5_TRAINING", val: false } ], saveAs: "pip_given" },
         P4_PIP_DURATION: { msg: "How long was the improvement period?", type: "buttons", options: [ { label: "<2 weeks", next: "P5_TRAINING", val: "<2 weeks" }, { label: "2-4 weeks", next: "P5_TRAINING", val: "2-4 weeks" }, { label: "1-3 months", next: "P5_TRAINING", val: "1-3 months" }, { label: "3+ months", next: "P5_TRAINING", val: "3+ months" } ], saveAs: "pip_duration" },
-        P5_TRAINING: { msg: "Did the employer provide training, instruction or guidance to help you improve?", type: "buttons", options: [ { label: "Yes", next: "P6_COMPARATORS", val: true }, { label: "No", next: "P6_COMPARATORS", val: false }, { label: "Inadequate", next: "P6_COMPARATORS", val: "Inadequate" } ], saveAs: "training_provided" },
+        P5_TRAINING: { msg: "Did your employer give you training, guidance or support to help you improve?", type: "buttons", options: [ { label: "Yes", next: "P6_COMPARATORS", val: true }, { label: "No", next: "P6_COMPARATORS", val: false }, { label: "Inadequate", next: "P6_COMPARATORS", val: "Inadequate" } ], saveAs: "training_provided" },
         P6_COMPARATORS: { msg: "Were others on your team meeting the performance standards you were measured against?", type: "buttons", options: [ { label: "Yes", next: "P7_CONTROL", val: "Yes" }, { label: "No", next: "P7_CONTROL", val: "No" }, { label: "Unsure", next: "P7_CONTROL", val: "Unsure" }, { label: "Unable to compare", next: "P7_CONTROL", val: "Unable to compare" } ], saveAs: "team_meeting_standards" },
-        P7_CONTROL: { msg: "Were the performance targets within your control, or did external factors (broken equipment, support team failures, market conditions) affect them?", type: "buttons", options: [ { label: "Within my control", next: "P8_PERFORMANCE_WARNINGS", val: "Within my control" }, { label: "External factors", next: "P8_PERFORMANCE_WARNINGS", val: "External factors" }, { label: "Both", next: "P8_PERFORMANCE_WARNINGS", val: "Both" } ], saveAs: "performance_control" },
+        P7_CONTROL: { msg: "Do you feel the targets were realistic and achievable, or were there things outside your control making them harder to reach, like equipment issues, understaffing or workload?", type: "buttons", options: [ { label: "Within my control", next: "P8_PERFORMANCE_WARNINGS", val: "Within my control" }, { label: "External factors", next: "P8_PERFORMANCE_WARNINGS", val: "External factors" }, { label: "Both", next: "P8_PERFORMANCE_WARNINGS", val: "Both" } ], saveAs: "performance_control" },
         P8_PERFORMANCE_WARNINGS: { msg: "Had you received any prior performance warnings before this dismissal?", type: "buttons", options: [ { label: "None", next: "P9_EMPLOYMENT_LENGTH", val: "None" }, { label: "One", next: "P9_EMPLOYMENT_LENGTH", val: "One" }, { label: "Multiple", next: "P9_EMPLOYMENT_LENGTH", val: "Multiple" } ], saveAs: "prior_performance_warnings" },
         P9_EMPLOYMENT_LENGTH: { msg: "How long had you been employed?", type: "buttons", options: [ { label: "<6 months", next: "P10_SALARY", val: "<6 months" }, { label: "6m-2y", next: "P10_SALARY", val: "6m-2y" }, { label: "2-5y", next: "P10_SALARY", val: "2-5y" }, { label: "5+y", next: "P10_SALARY", val: "5 years" } ], saveAs: "length_of_service" },
         P10_SALARY: { msg: "What was your gross monthly salary?", type: "text", next: "P11_PERFORMANCE_NARRATIVE", saveAs: "gross_monthly_salary" },
@@ -308,8 +308,8 @@
             msg: "Thank you for taking the time to share this with us. Unfortunately, this falls outside the scope of what we're able to assist with through this automated service. Please note this is not a reflection of the merits of your case, it simply needs a different form of review. We'd recommend seeking advice from the relevant bargaining council or a practitioner who specialises in this area.",
             type: "end", triageOutcome: "SOE_UNCLEAR"
         },
-        COMPANY_NAME: { msg: "What is the exact name of the company you work(ed) for?", type: "text", next: "COMPANY_CONTACT", saveAs: "employer_name" },
-        COMPANY_CONTACT: { msg: "Please provide an email address or phone number for the company's HR department or your manager.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
+        COMPANY_NAME: { msg: "What is the name of the company you work for, or worked for?", type: "text", next: "COMPANY_CONTACT", saveAs: "employer_name" },
+        COMPANY_CONTACT: { msg: "Could you share a contact email or number for your employer's HR department or your manager? This just helps us know where to send correspondence.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
         CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_PHONE", saveAs: "client_name" },
         CLIENT_PHONE: { msg: "And finally, what WhatsApp cell phone number should VRS use to contact you? Please include the country code, for example +27 82 123 4567.", type: "text", next: "HANDOFF", saveAs: "whatsapp_number" },
         HANDOFF: { action: "evaluate" }
