@@ -7,8 +7,15 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 const CLIENT_EMAIL_PROMPT = 'What email address should VRS use to contact you and copy you on any approved letter sent to your employer?';
-const COMPLETION_MESSAGE = 'Thank you. Your information has been submitted securely to VRS. A VRS lawyer will review the details and Justine’s initial assessment. You will receive feedback soon confirming whether your matter has sufficient merit and whether you are eligible for a formal letter to your employer.';
+const COMPLETION_MESSAGE = 'Thank you. Your information has been submitted securely to VRS Labour Law Consultants for review. You will receive feedback on the appropriate next step for your matter.';
 const INFO_REPLY_CONFIRMATION = 'Thank you. I have added your response to your case and notified the VRS legal team for review.';
+
+const DEFLECTION_COPY = {
+  contractor: 'Thank you for sharing this with us. Based on what you have told us, it looks like you are engaged as an independent contractor rather than an employee, which means your situation falls outside the labour law framework we work within. This is not a reflection of the merits of your case, just a difference in the legal relationship involved. We recommend getting advice on your specific contract, as different rules may apply there.',
+  crossBorder: 'Thank you for sharing this with us. It looks like your employer is not registered or operating in South Africa, which places this outside the scope of South African labour law and therefore outside what we are able to assist with. This is purely a jurisdiction issue, not a reflection of the merits of your case. We suggest speaking to a labour law practitioner in the country where your employer operates.',
+  publicService: 'Thank you for sharing this with us. As a public service employee, your matter falls under a different dispute resolution framework, usually through the Public Service Coordinating Bargaining Council or the relevant sectoral bargaining council rather than the CCMA. This is not a reflection of the merits of your case, it is simply outside the scope of this service. We recommend raising it with your union or the relevant bargaining council.',
+  generic: 'Thank you for taking the time to share this with us. Unfortunately, this falls outside the scope of what we are able to assist with. Please note that this is not a reflection of the merits of your case; it simply is not a matter we are set up to handle. We recommend seeking advice from a practitioner who specialises in this area.'
+};
 
 function clean(value = '') {
   return String(value || '').trim();
@@ -16,6 +23,19 @@ function clean(value = '') {
 
 function validEmail(value = '') {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean(value));
+}
+
+function normaliseClientCopy(value) {
+  if (typeof value !== 'string') return value;
+  if (/outside ordinary employee protections|civil contract advice/i.test(value)) return DEFLECTION_COPY.contractor;
+  if (/cross-border|international employment advice/i.test(value)) return DEFLECTION_COPY.crossBorder;
+  if (/public-sector forum|bargaining council/i.test(value) && !/CCMA eligibility/i.test(value)) return DEFLECTION_COPY.publicService;
+  if (/CCMA eligibility|correct bargaining council or forum/i.test(value)) return DEFLECTION_COPY.generic;
+  return value
+    .replace(/qualified attorney/gi, 'qualified labour law professional')
+    .replace(/VRS attorney/gi, 'VRS labour law consultant')
+    .replace(/VRS lawyer/gi, 'VRS labour law consultant')
+    .replace(/attorney review/gi, 'VRS review');
 }
 
 async function getConversation(fromNumber) {
@@ -73,7 +93,8 @@ async function completeAfterEmail(conversation, message, email) {
   });
 
   const reference = evaluation.caseReference || caseReference(evaluation.caseId);
-  return `${COMPLETION_MESSAGE}\n\nYour VRS case reference is ${reference}. Please keep this reference and quote it if you contact VRS through another channel.`;
+  const outcome = evaluation.clientOutcome || COMPLETION_MESSAGE;
+  return `${outcome}\n\nYour VRS case reference is ${reference}. Please keep this reference and quote it if you contact VRS through another channel.`;
 }
 
 async function capturePendingInfoReply(conversation, message) {
@@ -175,14 +196,12 @@ async function processIncomingMessage(message) {
 
   const result = await baseConversation.processIncomingMessage(message);
 
-  // Older completed conversations may still receive the original detailed assessment.
-  // Replace it with the production client-facing confirmation without changing saved legal analysis.
   if (typeof result === 'string' && /Initial assessment:|Reference:/i.test(result) && /confidential VRS intake/i.test(result)) {
     const reference = caseReference(conversation?.case_id);
     return reference ? `${COMPLETION_MESSAGE}\n\nYour VRS case reference is ${reference}. Please quote it if you contact VRS through another channel.` : COMPLETION_MESSAGE;
   }
 
-  return result;
+  return normaliseClientCopy(result);
 }
 
 module.exports = {
