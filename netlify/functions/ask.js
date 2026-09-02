@@ -196,8 +196,8 @@ function buildTriageFacts(facts = {}, outcome = 'UNKNOWN') {
     CONTRACTOR: ['Independent contractor triage', 'Civil contract advice / dominant impression assessment', ['LRA s200A; dominant impression test']],
     CROSS_BORDER: ['Cross-border jurisdiction triage', 'International or cross-border employment advice', ['LRA s4; jurisdictional reach']],
     PUBLIC_SERVICE: ['Public service / government agency triage', 'PSCBC, GPSSBC, ELRC, SSSBC or military grievance procedures, depending on employer and sector', ['LRA s2(2)', 'LRA s9']],
-    SOE_UNCLEAR: ['Schedule 2 SOE eligibility triage', 'Attorney review to confirm CCMA eligibility or correct bargaining council/forum', ['LRA general application; case-by-case sectoral assessment']],
-    UNKNOWN: ['Jurisdiction triage', 'Attorney review required', ['Jurisdiction to be confirmed']]
+    SOE_UNCLEAR: ['Schedule 2 SOE eligibility triage', 'VRS review to confirm CCMA eligibility or correct bargaining council/forum', ['LRA general application; case-by-case sectoral assessment']],
+    UNKNOWN: ['Jurisdiction triage', 'VRS review required', ['Jurisdiction to be confirmed']]
   };
   const [label, forum, legal] = map[outcome] || map.UNKNOWN;
   return {
@@ -220,6 +220,23 @@ function buildTriageFacts(facts = {}, outcome = 'UNKNOWN') {
     attorney_review_flag: true,
     wp_letter_status: 'NOT_APPLICABLE'
   };
+}
+
+function clientOutcomeFor(facts = {}, scorecard = facts) {
+  const wpEligible = scorecard.wp_eligible === true || facts.wp_eligible === true;
+  const track = String(scorecard.track || facts.track || '').toUpperCase();
+  const employmentStatus = String(facts.employment_status || '').toLowerCase();
+  const advisoryMatter = ['ANC', 'PDA', 'ULP'].includes(track) || employmentStatus.includes('advisory') || employmentStatus.includes('still employed');
+
+  if (wpEligible) {
+    return 'Thank you for sharing your information with us. Based on what you have told us, it looks like your matter may have sufficient merit to take further and a Without Prejudice letter may be appropriate. Your information has been forwarded to VRS Labour Law Consultants for review and the next step in the letter process.';
+  }
+
+  if (advisoryMatter) {
+    return 'Thank you for your submission. This looks like something we can help guide you on, though it is not a matter that calls for a Without Prejudice letter at this stage. One of our consultants will be in touch with practical next steps.';
+  }
+
+  return 'Thank you for taking the time to share your information with us. Having carefully considered what you have told us, this is not something we are able to take further through the Without Prejudice letter process. Based on the details provided, there does not appear to be sufficient merit for that step at this stage. We are sorry we cannot assist with a letter on this occasion and we wish you all the very best.';
 }
 
 function dedupeStory(text = '') {
@@ -269,12 +286,13 @@ exports.handler = async (event) => {
       const baseScorecard = scoreCase(scoringInput);
       const scorecard = applyOverridePostProcessing(scoringInput, fullStory, baseScorecard);
       const caseFacts = buildCoreFacts(facts, fullStory, scorecard, contextText);
+      const clientOutcome = clientOutcomeFor(caseFacts, scorecard);
 
       const { data, error } = await supabase.from('cases').insert({
         client_name: facts.client_name,
         contact_info: facts.contact_info,
         issue_summary: fullStory || 'Gathered via automated intake.',
-        case_facts: caseFacts,
+        case_facts: { ...caseFacts, client_outcome_message: clientOutcome },
         status: 'new',
         letter_status: scorecard.wp_eligible ? 'not_drafted' : 'not_applicable'
       }).select().single();
@@ -283,9 +301,9 @@ exports.handler = async (event) => {
       let whatsapp = { linked: false, reason: 'not_web_intake' };
       if (facts.source === 'web' || facts.whatsapp_number) {
         try {
-          whatsapp = await linkWebCaseToWhatsApp({ caseId: data.id, facts, caseFacts });
+          whatsapp = await linkWebCaseToWhatsApp({ caseId: data.id, facts, caseFacts: { ...caseFacts, client_outcome_message: clientOutcome } });
           if (whatsapp.linked) {
-            const normalisedFacts = { ...caseFacts, contact_info: whatsapp.number, whatsapp_number: whatsapp.number, source: 'web' };
+            const normalisedFacts = { ...caseFacts, client_outcome_message: clientOutcome, contact_info: whatsapp.number, whatsapp_number: whatsapp.number, source: 'web' };
             await supabase.from('cases').update({
               contact_info: whatsapp.number,
               case_facts: normalisedFacts,
@@ -298,7 +316,7 @@ exports.handler = async (event) => {
         }
       }
 
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, caseReference: caseReference(data.id, data.created_at), scorecard, governance: caseFacts.llm_governance, whatsapp }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: scorecard.advisory_note, clientOutcome, hasMerit: scorecard.wp_eligible, caseId: data.id, caseReference: caseReference(data.id, data.created_at), scorecard, governance: caseFacts.llm_governance, whatsapp }) };
     }
 
     if (action === 'close') {
@@ -317,10 +335,10 @@ exports.handler = async (event) => {
       }
       await supabase.from('cases').update(updatePayload).eq('id', caseId);
       const closing_message = wants_letter && wpEligible
-        ? 'Excellent. I have sent your file to the legal team for attorney review. If a Without Prejudice letter is prepared, it will remain pending until a VRS attorney reviews and releases it.'
-        : wants_letter && !wpEligible
-          ? 'I have saved your file, but based on the current assessment this matter is advisory-only and a Without Prejudice demand letter is not currently recommended.'
-          : 'No problem at all. I have saved your file. If you change your mind, you can reach out to us again.';
+        ? 'Thank you. Your request for a Without Prejudice letter has been recorded and sent to VRS Labour Law Consultants for review. VRS will guide you through the next step.'
+        : wpEligible
+          ? 'Thank you. Your information has been saved. If you decide that you would like VRS to assist with a Without Prejudice letter, please contact VRS and quote your case reference.'
+          : 'Thank you. Your submission has been recorded.';
       return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ closing_message }) };
     }
 
