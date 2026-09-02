@@ -92,3 +92,4 @@ function replaceOnce(content, from, to, label) {
 }
 
 console.log('Applied date validation and CCMA deadline fixes.');
+// Trigger workflow after workflow creation.
