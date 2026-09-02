@@ -4,7 +4,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I will ask a series of questions to understand your situation and prepare it for review by the VRS legal team.\n\nMy automated assessment helps VRS understand your situation, but a VRS consultant will make any final decision about your matter. Type HELP at any time for assistance, or RESTART to begin again.`;
+const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I will ask a few questions to understand what has happened. The information you share will be used by VRS Labour Law Consultants to understand and assess your matter and will be handled as part of your VRS enquiry.\n\nJustine provides an initial automated assessment, and a VRS consultant reviews the matter and decides the next step. The automated flow is currently in English. Type HELP at any time for assistance, or RESTART to begin again.`;
 
 const choice = (label, value, next) => ({ label, value, next });
 const buttons = (prompt, saveAs, choices) => ({ type: 'buttons', prompt, saveAs, choices });
@@ -12,7 +12,7 @@ const text = (prompt, saveAs, next, extra = {}) => ({ type: 'text', prompt, save
 const date = (prompt, saveAs, next) => ({ type: 'date', prompt, saveAs, next });
 
 const STEPS = {
-  JUR_EMPLOYEE: buttons('Hi, my name is Justine and I am a VRS Labour Law Assistant. I am here to help you work through what has happened. To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?', 'worker_status', [
+  JUR_EMPLOYEE: buttons('To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?', 'worker_status', [
     choice('Yes', 'Employee', 'JUR_SA_EMPLOYER'), choice('No', 'Contractor', 'JUR_CONTRACTOR_CONTROL'), choice('Unsure', 'Unsure', 'JUR_CONTRACTOR_CONTROL')
   ]),
   JUR_CONTRACTOR_CONTROL: buttons('Does someone tell you when to start work, when to stop work, and how to do the work?', 'contractor_control_test', [
