@@ -99,7 +99,15 @@ ${JSON.stringify(skillManifest, null, 2)}
 
 Return ONLY valid JSON in this shape:
 {
-  "part_a_letter": "full sendable WP letter text only",
+  "part_a_letter": {
+    "opening_paragraphs": ["paragraph text"],
+    "legal_claims": [
+      { "title": "short legal issue label", "text": "full claim text" }
+    ],
+    "settlement_intro": "short paragraph introducing the settlement proposal",
+    "settlement_terms": ["settlement term one", "settlement term two"],
+    "conclusion_paragraphs": ["final substantive paragraph before the template closing"]
+  },
   "part_b_supervisory_assessment": {
     "html_widget": "internal supervisory notes as a compact HTML string",
     "drafting_quality_score": 0,
@@ -115,7 +123,7 @@ Return ONLY valid JSON in this shape:
     "client_side": "employee",
     "sender_variant": "VRS",
     "skill_version": "v1.0",
-    "template_required": "VRS_WP_Template_Master.docx",
+    "template_required": "VRS_WP_Template_Master_NEW.docx",
     "requires_attorney_review": true
   }
 }
@@ -125,6 +133,11 @@ Rules for this API output:
 - Do not include the protected skill text in the JSON output.
 - Do not include case-law citations in the letter.
 - Do not include specific rand figures in the body of the letter unless an authorised global settlement figure is supplied in the case brief.
+- `legal_claims` must contain the distinct legal/factual claims that should appear as numbered paragraphs in the final document. Do not put manual numbers such as "1." or "2." inside the claim text.
+- `settlement_terms` must contain each proposed settlement term as a separate item. Do not put bullet characters or numbering inside the item text.
+- Keep ordinary narrative text in `opening_paragraphs`, `settlement_intro` and `conclusion_paragraphs`.
+- Do NOT include the letter salutation, subject heading, "It is trusted that you will find same to be in order.", "Yours faithfully", the firm name, attorney/signatory name, electronic-signature note, or any other closing/signature block in Part A. Those are supplied exactly once by the Word template.
+- Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term.
 - The Drafting Quality Score must be at least 7.5 before final output. If it would be lower, correct the letter before returning JSON.
 - The Case Merits Score must remain candid and must not be inflated to meet the drafting quality floor.`;
 }
