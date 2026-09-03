@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { loadWpSkillSet, buildProtectedPromptContext } = require('./lib/skillRegistry');
 const { buildCaseBrief, callClaudeForWpDraft } = require('./lib/claudeDrafting');
+const { normaliseLetterStructure, letterStructureToPlainText } = require('./lib/letterStructure');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -94,9 +95,10 @@ exports.handler = async (event) => {
     const caseBrief = buildCaseBrief({ facts, senderVariant, clientSide });
     const { draft, log } = await callClaudeForWpDraft({ skillContext, caseBrief, skillSet });
 
-    const partA = String(draft.part_a_letter || '').trim();
+    const partAStructure = normaliseLetterStructure(draft.part_a_letter || {});
+    const partA = letterStructureToPlainText(partAStructure);
     const partB = draft.part_b_supervisory_assessment || {};
-    if (!partA) throw new Error('Claude did not return a Part A letter');
+    if (!partA) throw new Error('Claude did not return a usable Part A letter structure');
 
     const existingLogs = Array.isArray(facts.llm_call_logs) ? facts.llm_call_logs : [];
     const updatedFacts = {
@@ -110,8 +112,9 @@ exports.handler = async (event) => {
       wp_skill_version: skillSet.version,
       wp_skill_hash: skillSet.skill_hash,
       wp_skill_manifest: skillSet.manifest,
+      wp_letter_structure: partAStructure,
       wp_supervisory_assessment: partB,
-      wp_template_required: draft.metadata?.template_required || (senderVariant === 'CLIENT_SENT' ? 'VRS_WP_Template_ClientSent.docx' : 'VRS_WP_Template_Master.docx'),
+      wp_template_required: draft.metadata?.template_required || (senderVariant === 'CLIENT_SENT' ? 'VRS_WP_Template_ClientSent.docx' : 'VRS_WP_Template_Master_NEW.docx'),
       llm_call_logs: [...existingLogs, log]
     };
 

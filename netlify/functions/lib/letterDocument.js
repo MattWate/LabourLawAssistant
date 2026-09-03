@@ -3,9 +3,13 @@ const path = require('path');
 const crypto = require('crypto');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
+const { blocksForApprovedDraft } = require('./letterStructure');
 
-const TEMPLATE_NAME = 'VRS_WP_Template_Master.docx';
+const TEMPLATE_NAME = 'VRS_WP_Template_Master_NEW.docx';
 const STORAGE_BUCKET = process.env.LETTER_DOCUMENT_BUCKET || 'case-documents';
+const BODY_SENTINEL = '__VRS_STRUCTURED_BODY__';
+const BODY_FONT = 'Quicksand';
+const BODY_FONT_SIZE_HALF_POINTS = 22; // 11pt
 
 function safeText(value, fallback = '') {
   return String(value ?? fallback).trim();
@@ -43,7 +47,84 @@ function resolveTemplatePath() {
   return found;
 }
 
-function buildTemplateData({ caseId, facts = {}, draft, approvedAt }) {
+function xmlEscape(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function runProperties({ bold = false } = {}) {
+  return `<w:rPr>` +
+    `<w:rFonts w:ascii="${BODY_FONT}" w:hAnsi="${BODY_FONT}" w:eastAsia="${BODY_FONT}" w:cs="${BODY_FONT}"/>` +
+    `<w:sz w:val="${BODY_FONT_SIZE_HALF_POINTS}"/><w:szCs w:val="${BODY_FONT_SIZE_HALF_POINTS}"/>` +
+    (bold ? '<w:b/><w:bCs/>' : '') +
+    `</w:rPr>`;
+}
+
+function textRuns(value = '', options = {}) {
+  const lines = String(value || '').split('\n');
+  return lines.map((line, index) => {
+    const text = `<w:t xml:space="preserve">${xmlEscape(line)}</w:t>`;
+    return `<w:r>${runProperties(options)}${index > 0 ? '<w:br/>' : ''}${text}</w:r>`;
+  }).join('');
+}
+
+function paragraphProperties({ list = false } = {}) {
+  return `<w:pPr>` +
+    `<w:jc w:val="both"/>` +
+    `<w:spacing w:after="120" w:line="276" w:lineRule="auto"/>` +
+    (list ? '<w:ind w:left="360" w:hanging="360"/>' : '') +
+    `</w:pPr>`;
+}
+
+function paragraphXml(block) {
+  if (!block || !block.text && !block.title) return '';
+
+  if (block.type === 'numbered') {
+    const number = Number.isFinite(block.number) ? block.number : 1;
+    const title = safeText(block.title);
+    const text = safeText(block.text);
+    const body = title
+      ? textRuns(`${number}. `, { bold: true }) + textRuns(title, { bold: true }) + (text ? textRuns(`: ${text}`) : '')
+      : textRuns(`${number}. `, { bold: true }) + textRuns(text);
+    return `<w:p>${paragraphProperties({ list: true })}${body}</w:p>`;
+  }
+
+  if (block.type === 'bullet') {
+    return `<w:p>${paragraphProperties({ list: true })}${textRuns('• ', { bold: true })}${textRuns(block.text)}</w:p>`;
+  }
+
+  return `<w:p>${paragraphProperties()}${textRuns(block.text)}</w:p>`;
+}
+
+function renderStructuredBodyXml({ draft, structure }) {
+  const blocks = blocksForApprovedDraft({ draft, structure });
+  if (!blocks.length) throw new Error('Approved letter body contains no renderable paragraphs');
+  return blocks.map(paragraphXml).join('');
+}
+
+function injectStructuredBody(doc, { draft, structure }) {
+  const zip = doc.getZip();
+  const documentFile = zip.file('word/document.xml');
+  if (!documentFile) throw new Error('Word template is missing word/document.xml');
+
+  const documentXml = documentFile.asText();
+  const paragraphPattern = new RegExp(
+    `<w:p(?:\\s[^>]*)?>(?:(?!</w:p>)[\\s\\S])*?${BODY_SENTINEL}(?:(?!</w:p>)[\\s\\S])*?</w:p>`
+  );
+
+  if (!paragraphPattern.test(documentXml)) {
+    throw new Error(`Word template must contain a {letter_body} placeholder paragraph for structured body injection (${TEMPLATE_NAME})`);
+  }
+
+  const bodyXml = renderStructuredBodyXml({ draft, structure });
+  zip.file('word/document.xml', documentXml.replace(paragraphPattern, bodyXml));
+}
+
+function buildTemplateData({ caseId, facts = {}, approvedAt }) {
   const clientName = safeText(facts.client_name, 'Client');
   const employerName = safeText(facts.employer_name, 'Employer');
   const signatoryName = safeText(process.env.VRS_DEFAULT_SIGNATORY || facts.signatory_name, 'Sasha-Lee van Wyk');
@@ -63,7 +144,7 @@ function buildTemplateData({ caseId, facts = {}, draft, approvedAt }) {
     client_name: clientName.toUpperCase(),
     employer_name: employerName.toUpperCase(),
     subject_heading: subject.toUpperCase(),
-    letter_body: safeText(draft),
+    letter_body: BODY_SENTINEL,
     closing_sentence: safeText(facts.closing_sentence, 'It is trusted that you will find same to be in order.'),
     signatory_firm: safeText(process.env.VRS_FIRM_NAME, 'VAN RENSBURG SCHOON'),
     signatory_name: signatoryName,
@@ -84,8 +165,10 @@ function renderLetterDocument({ caseId, facts = {}, draft, approvedAt }) {
     nullGetter: () => ''
   });
 
-  const data = buildTemplateData({ caseId, facts, draft, approvedAt });
+  const data = buildTemplateData({ caseId, facts, approvedAt });
   doc.render(data);
+  injectStructuredBody(doc, { draft, structure: facts.wp_letter_structure || null });
+
   const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
   const filename = `VRS_WP_${safeFilename(facts.client_name)}_${String(caseId).slice(0, 8).toUpperCase()}.docx`;
 
