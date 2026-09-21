@@ -137,9 +137,9 @@ Rules for this API output:
 - Do not include case-law citations in the letter.
 - Do not include specific rand figures in the body of the letter unless an authorised global settlement figure is supplied in the case brief.
 - Apply the audience profile from VRS_HOUSE_STYLE consistently throughout Part A. Do not add contradictory tone instructions of your own.
-- `legal_claims` must contain the distinct legal/factual claims that should appear as numbered paragraphs in the final document. Do not put manual numbers such as "1." or "2." inside the claim text.
-- `settlement_terms` must contain each proposed settlement term as a separate item. Do not put bullet characters or numbering inside the item text.
-- Keep ordinary narrative text in `opening_paragraphs`, `settlement_intro` and `conclusion_paragraphs`.
+- "legal_claims" must contain the distinct legal/factual claims that should appear as numbered paragraphs in the final document. Do not put manual numbers such as "1." or "2." inside the claim text.
+- "settlement_terms" must contain each proposed settlement term as a separate item. Do not put bullet characters or numbering inside the item text.
+- Keep ordinary narrative text in "opening_paragraphs", "settlement_intro" and "conclusion_paragraphs".
 - Do NOT include the letter salutation, subject heading, "It is trusted that you will find same to be in order.", "Yours faithfully", the firm name, attorney/signatory name, electronic-signature note, or any other closing/signature block in Part A. Those are supplied exactly once by the Word template.
 - Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term.
 - The Drafting Quality Score must be at least 7.5 before final output. If it would be lower, correct the letter before returning JSON.
