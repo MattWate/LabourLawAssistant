@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { handler: runLetterGeneration } = require('./generate_letter-background');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -16,15 +17,6 @@ async function authenticate(event) {
   return authHeader;
 }
 
-function siteBaseUrl(event) {
-  const configured = process.env.URL || process.env.DEPLOY_PRIME_URL;
-  if (configured) return configured.replace(/\/$/, '');
-  const host = event.headers?.host;
-  const proto = event.headers?.['x-forwarded-proto'] || 'https';
-  if (host) return `${proto}://${host}`;
-  throw new Error('Could not determine site URL for background function');
-}
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
 
@@ -32,7 +24,7 @@ exports.handler = async (event) => {
     if (!supabase) throw new Error('Supabase is not configured for letter generation');
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
 
-    const authHeader = await authenticate(event);
+    await authenticate(event);
     const request = JSON.parse(event.body || '{}');
     if (!request.caseId) return json(400, { error: 'Case ID required' });
 
@@ -69,37 +61,28 @@ exports.handler = async (event) => {
       updated_at: new Date().toISOString()
     }).eq('id', request.caseId);
 
-    const endpoint = `${siteBaseUrl(event)}/.netlify/functions/generate_letter-background`;
-    const queued = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: authHeader
-      },
-      body: JSON.stringify(request)
-    });
+    // Run drafting in-process so generation no longer depends on a second
+    // Netlify background-function HTTP invocation.
+    const generationResult = await runLetterGeneration(event);
+    const generationStatus = Number(generationResult?.statusCode || 500);
 
-    if (!queued.ok) {
-      const text = await queued.text();
-      await supabase.from('cases').update({
-        status: 'paid_ready_for_drafting',
-        letter_status: 'generation_failed',
-        case_facts: {
-          ...facts,
-          wp_letter_status: 'QUEUE_FAILED',
-          wp_generation_error: text.slice(0, 1000),
-          wp_generation_failed_at: new Date().toISOString()
-        },
-        updated_at: new Date().toISOString()
-      }).eq('id', request.caseId);
-      throw new Error(`Could not queue background drafting: ${queued.status} ${text.slice(0, 500)}`);
+    let generationBody = {};
+    try {
+      generationBody = JSON.parse(generationResult?.body || '{}');
+    } catch (e) {
+      generationBody = {};
     }
 
-    return json(202, {
+    if (generationStatus < 200 || generationStatus >= 300) {
+      const detail = generationBody.error || 'Letter generation failed';
+      throw new Error(detail);
+    }
+
+    return json(200, {
       success: true,
-      queued: true,
+      generated: true,
       caseId: request.caseId,
-      message: 'Draft generation started. Refresh the case shortly to review the completed letter.'
+      message: 'Draft generation completed and is ready for review.'
     });
   } catch (error) {
     const message = String(error.message || 'Unknown error');
