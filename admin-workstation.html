@@ -445,10 +445,10 @@
       if (c.payment_status === 'paid' && c.status === 'paid_ready_for_drafting') return 'paid_ready_for_drafting';
       if (c.payment_status === 'pending' || c.status === 'payment_pending') return 'payment_pending';
       if (q) return 'needs_info';
-      if (f.attorney_review_flag || c.status === 'requires_attorney') return 'attorney_review';
       if (c.letter_status === 'pending_review') return 'pending_review';
       if (c.letter_status === 'sent' || c.status === 'letter_sent') return 'sent';
       if (c.letter_status === 'approved') return 'approved';
+      if (f.attorney_review_flag || c.status === 'requires_attorney') return 'attorney_review';
       if (c.letter_status === 'needs_drafting' || (f.wants_letter === true && !c.draft_letter)) return 'needs_drafting';
       return c.status || 'new';
     }
@@ -493,7 +493,7 @@
         metric('Awaiting Payment', s.payment, 'Payment link issued', "setQueueFilter('payment');setView('workstation')") +
         metric('Paid – Ready to Draft', s.paid, 'Payment confirmed', "setQueueFilter('paid');setView('workstation')") +
         metric('Drafting Queue', s.drafting, 'Drafting underway', "setQueueFilter('drafting');setView('workstation')") +
-        metric('Pending Review', s.pending, 'Drafts awaiting approval', "setQueueFilter('approved');setView('workstation')") +
+        metric('Pending Review', s.pending, 'Drafts awaiting approval', "setQueueFilter('pending');setView('workstation')") +
         metric('Approved', s.approved, 'Ready for delivery', "setQueueFilter('approved');setView('workstation')") +
         metric('WP Eligible', s.wp, 'Effective WP path', "setQueueFilter('wp');setView('workstation')") +
         metric('High Merit', s.high, 'High priority', "setQueueFilter('high');setView('workstation')") +
@@ -522,6 +522,7 @@
         if (currentQueueFilter === 'payment' && statusOf(c) !== 'payment_pending') return false;
         if (currentQueueFilter === 'paid' && statusOf(c) !== 'paid_ready_for_drafting') return false;
         if (currentQueueFilter === 'drafting' && !['needs_drafting','drafting_in_progress'].includes(statusOf(c))) return false;
+        if (currentQueueFilter === 'pending' && c.letter_status !== 'pending_review') return false;
         if (currentQueueFilter === 'approved' && c.letter_status !== 'approved') return false;
         if (currentQueueFilter === 'wp' && !bool(ed.wp_eligible)) return false;
         if (currentQueueFilter === 'high' && !['HIGH','MEDIUM-HIGH'].includes(String(ed.merit_band || '').toUpperCase())) return false;
@@ -541,7 +542,7 @@
       if (selected) selectedCaseId = selected.id;
       $('main').innerHTML =
         '<div class="workstation"><section class="panel queue"><div class="queue-controls"><input class="field" id="case-search" placeholder="Search name, reference, employer or contact..." value="' + attr(caseSearchQuery) + '" oninput="setCaseSearch(this.value, \'workstation\')"/><div class="filters">' +
-        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('payment','Awaiting Payment') + chip('paid','Paid – Ready') + chip('drafting','Drafting') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
+        chip('all','All') + chip('active','Active') + chip('review','Review') + chip('info','Needs Info') + chip('payment','Awaiting Payment') + chip('paid','Paid – Ready') + chip('drafting','Drafting') + chip('pending','Pending Review') + chip('approved','Approved') + chip('wp','WP') + chip('high','High Merit') +
         '</div></div><div class="case-list">' +
         (rows.length ? rows.map(c => caseCard(c, c.id === selectedCaseId)).join('') : '<div class="loader">No cases match this queue.</div>') +
         '</div></section><section class="centre">' +
