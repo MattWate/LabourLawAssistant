@@ -34,6 +34,20 @@ async function authenticate(event) {
   return data.user;
 }
 
+async function recordProgress(caseId, stage, extraFacts = {}) {
+  if (!supabase || !caseId) return;
+  const { data } = await supabase.from('cases').select('case_facts').eq('id', caseId).maybeSingle();
+  const facts = data?.case_facts || {};
+  await supabase.from('cases').update({
+    case_facts: {
+      ...facts,
+      ...extraFacts,
+      wp_letter_status: stage
+    },
+    updated_at: new Date().toISOString()
+  }).eq('id', caseId);
+}
+
 async function recordFailure(caseId, error) {
   if (!supabase || !caseId) return;
   const { data } = await supabase.from('cases').select('case_facts,payment_status').eq('id', caseId).maybeSingle();
@@ -54,13 +68,23 @@ async function recordFailure(caseId, error) {
 exports.handler = async (event) => {
   let caseId = null;
   try {
-    if (!supabase) throw new Error('Supabase is not configured for letter generation');
-    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
-    await authenticate(event);
-
     const request = JSON.parse(event.body || '{}');
     caseId = request.caseId;
     if (!caseId) throw new Error('Case ID required');
+
+    if (!supabase) throw new Error('Supabase is not configured for letter generation');
+
+    await recordProgress(caseId, 'BACKGROUND_STARTED', {
+      wp_background_started_at: new Date().toISOString(),
+      wp_generation_error: null
+    });
+
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
+
+    await authenticate(event);
+    await recordProgress(caseId, 'AUTHENTICATED', {
+      wp_generation_authenticated_at: new Date().toISOString()
+    });
 
     const senderVariant = normaliseSenderVariant(request.sender_variant || request.senderVariant || 'VRS');
     const clientSide = normaliseClientSide(request.client_side || request.clientSide || 'employee');
@@ -71,6 +95,10 @@ exports.handler = async (event) => {
       .eq('id', caseId)
       .single();
     if (caseErr || !caseData) throw new Error(`Case not found: ${caseErr?.message || caseId}`);
+
+    await recordProgress(caseId, 'CASE_LOADED', {
+      wp_generation_case_loaded_at: new Date().toISOString()
+    });
 
     const facts = caseData.case_facts || {};
     const isPaid = caseData.payment_status === 'paid' || facts.payment_status === 'paid';
@@ -91,9 +119,22 @@ exports.handler = async (event) => {
     }).eq('id', caseId);
 
     const skillSet = await loadWpSkillSet(supabase, { side: clientSide });
+    await recordProgress(caseId, 'SKILLS_LOADED', {
+      wp_generation_skills_loaded_at: new Date().toISOString()
+    });
+
     const skillContext = buildProtectedPromptContext(skillSet);
     const caseBrief = buildCaseBrief({ facts, senderVariant, clientSide });
+
+    await recordProgress(caseId, 'CLAUDE_STARTED', {
+      wp_generation_claude_started_at: new Date().toISOString()
+    });
+
     const { draft, log } = await callClaudeForWpDraft({ skillContext, caseBrief, skillSet });
+
+    await recordProgress(caseId, 'CLAUDE_COMPLETED', {
+      wp_generation_claude_completed_at: new Date().toISOString()
+    });
 
     const partAStructure = normaliseLetterStructure(draft.part_a_letter || {});
     const partA = letterStructureToPlainText(partAStructure);
