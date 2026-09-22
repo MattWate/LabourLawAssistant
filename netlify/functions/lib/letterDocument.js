@@ -56,11 +56,12 @@ function xmlEscape(value = '') {
     .replace(/'/g, '&apos;');
 }
 
-function runProperties({ bold = false } = {}) {
+function runProperties({ bold = false, underline = false } = {}) {
   return `<w:rPr>` +
     `<w:rFonts w:ascii="${BODY_FONT}" w:hAnsi="${BODY_FONT}" w:eastAsia="${BODY_FONT}" w:cs="${BODY_FONT}"/>` +
     `<w:sz w:val="${BODY_FONT_SIZE_HALF_POINTS}"/><w:szCs w:val="${BODY_FONT_SIZE_HALF_POINTS}"/>` +
     (bold ? '<w:b/><w:bCs/>' : '') +
+    (underline ? '<w:u w:val="single"/>' : '') +
     `</w:rPr>`;
 }
 
@@ -72,16 +73,20 @@ function textRuns(value = '', options = {}) {
   }).join('');
 }
 
-function paragraphProperties({ list = false } = {}) {
+function paragraphProperties({ list = false, alignment = 'both', before = 0, after = 120 } = {}) {
   return `<w:pPr>` +
-    `<w:jc w:val="both"/>` +
-    `<w:spacing w:after="120" w:line="276" w:lineRule="auto"/>` +
+    `<w:jc w:val="${alignment}"/>` +
+    `<w:spacing w:before="${before}" w:after="${after}" w:line="276" w:lineRule="auto"/>` +
     (list ? '<w:ind w:left="360" w:hanging="360"/>' : '') +
     `</w:pPr>`;
 }
 
 function paragraphXml(block) {
   if (!block || !block.text && !block.title) return '';
+
+  if (block.type === 'heading') {
+    return `<w:p>${paragraphProperties({ alignment: 'left', before: 120, after: 80 })}${textRuns(block.text, { bold: true, underline: true })}</w:p>`;
+  }
 
   if (block.type === 'numbered') {
     const number = Number.isFinite(block.number) ? block.number : 1;
@@ -128,25 +133,41 @@ function buildTemplateData({ caseId, facts = {}, approvedAt }) {
   const clientName = safeText(facts.client_name, 'Client');
   const employerName = safeText(facts.employer_name, 'Employer');
   const signatoryName = safeText(process.env.VRS_DEFAULT_SIGNATORY || facts.signatory_name, 'Sasha-Lee van Wyk');
-  const senderEmail = safeText(process.env.VRS_SENDER_EMAIL || facts.sender_email, 'sasha@vrsc.co.za');
-  const reference = safeText(facts.our_reference || facts.vrs_reference, `VRS/${String(caseId).slice(0, 8).toUpperCase()}`);
+  const senderEmail = safeText(process.env.VRS_SENDER_EMAIL || facts.sender_email, 'info@vrslabourlaw.co.za');
+  const reference = safeText(
+    facts.case_reference || facts.our_reference || facts.vrs_reference,
+    `VRS-${String((approvedAt ? new Date(approvedAt) : new Date()).getFullYear()).slice(-2)}-${String(caseId).replace(/-/g, '').slice(0, 12).toUpperCase()}`
+  );
   const subject = safeText(
     facts.letter_subject || facts.subject_heading,
     facts.dismissal_reason_type ? `${facts.dismissal_reason_type.toUpperCase()} EMPLOYMENT MATTER` : 'EMPLOYMENT MATTER'
   );
+  const employerEmail = safeText(facts.employer_email || facts.employer_contact_email, '');
 
   return {
-    our_reference: reference,
-    sender_email: senderEmail,
-    recipient_reference: safeText(facts.recipient_reference, 'No reference'),
+    // Current VRS WP template placeholders
+    recipient_name: safeText(facts.recipient_name || facts.employer_contact_name, ''),
+    recipient_company: employerName,
+    recipient_address_line_1: safeText(facts.recipient_address_line_1 || facts.employer_address_line_1, ''),
+    recipient_address_line_2: safeText(facts.recipient_address_line_2 || facts.employer_address_line_2, ''),
+    recipient_address_line_3: safeText(facts.recipient_address_line_3 || facts.employer_address_line_3, ''),
+    delivery_method: safeText(facts.delivery_method, employerEmail ? `BY EMAIL: ${employerEmail}` : ''),
+    case_reference: reference,
     letter_date: formatDate(approvedAt || new Date()),
     salutation: safeText(facts.letter_salutation, 'Dear Sir / Madam,'),
+    subject_line: subject.toUpperCase(),
+    letter_body: BODY_SENTINEL,
+    signature_image_or_mark: safeText(facts.signature_image_or_mark, ''),
+
+    // Legacy aliases retained for backwards-compatible templates
+    our_reference: reference,
+    sender_email: senderEmail,
+    recipient_reference: safeText(facts.recipient_reference, ''),
     client_name: clientName.toUpperCase(),
     employer_name: employerName.toUpperCase(),
     subject_heading: subject.toUpperCase(),
-    letter_body: BODY_SENTINEL,
     closing_sentence: safeText(facts.closing_sentence, 'It is trusted that you will find same to be in order.'),
-    signatory_firm: safeText(process.env.VRS_FIRM_NAME, 'VAN RENSBURG SCHOON'),
+    signatory_firm: safeText(process.env.VRS_FIRM_NAME, 'VRS LABOUR LAW CONSULTANTS'),
     signatory_name: signatoryName,
     electronic_signature_note: safeText(process.env.VRS_ELECTRONIC_SIGNATURE_NOTE, 'Not signed due to electronic submission')
   };
