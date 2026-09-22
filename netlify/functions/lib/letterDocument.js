@@ -3,7 +3,12 @@ const path = require('path');
 const crypto = require('crypto');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
-const { blocksForApprovedDraft } = require('./letterStructure');
+const {
+  blocksForApprovedDraft,
+  normaliseLetterStructure,
+  letterStructureToPlainText,
+  parsePlainDraftToBlocks
+} = require('./letterStructure');
 
 const TEMPLATE_NAME = 'VRS_WP_Template_Master_NEW.docx';
 const STORAGE_BUCKET = process.env.LETTER_DOCUMENT_BUCKET || 'case-documents';
@@ -121,15 +126,101 @@ function injectStructuredBody(doc, { draft, structure }) {
     `<w:p(?:\\s[^>]*)?>(?:(?!</w:p>)[\\s\\S])*?${BODY_SENTINEL}(?:(?!</w:p>)[\\s\\S])*?</w:p>`
   );
 
-  if (!paragraphPattern.test(documentXml)) {
-    throw new Error(`Word template must contain a {letter_body} placeholder paragraph for structured body injection (${TEMPLATE_NAME})`);
-  }
+  if (!paragraphPattern.test(documentXml)) return false;
 
   const bodyXml = renderStructuredBodyXml({ draft, structure });
   zip.file('word/document.xml', documentXml.replace(paragraphPattern, bodyXml));
+  return true;
 }
 
-function buildTemplateData({ caseId, facts = {}, approvedAt }) {
+function structureForTemplate({ draft = '', structure = null } = {}) {
+  const approvedText = safeText(draft);
+  const normalised = structure ? normaliseLetterStructure(structure) : null;
+
+  if (normalised) {
+    const canonical = letterStructureToPlainText(normalised);
+    if (canonical && canonical === approvedText) return normalised;
+  }
+
+  const blocks = parsePlainDraftToBlocks(approvedText);
+  const opening = [];
+  const claims = [];
+  const settlementTerms = [];
+  const conclusion = [];
+  let phase = 'opening';
+
+  blocks.forEach(block => {
+    if (block.type === 'numbered') {
+      phase = 'claims';
+      claims.push({ title: '', text: safeText(block.text) });
+      return;
+    }
+
+    if (block.type === 'bullet') {
+      phase = 'settlement';
+      settlementTerms.push(safeText(block.text));
+      return;
+    }
+
+    if (phase === 'opening') opening.push(safeText(block.text));
+    else if (phase === 'claims') {
+      phase = 'settlement';
+      conclusion.push(safeText(block.text));
+    } else if (phase === 'settlement') {
+      conclusion.push(safeText(block.text));
+    } else {
+      conclusion.push(safeText(block.text));
+    }
+  });
+
+  let settlementIntro = '';
+  if (conclusion.length && settlementTerms.length) settlementIntro = conclusion.shift() || '';
+
+  return {
+    opening_paragraphs: opening,
+    legal_claims: claims,
+    settlement_intro: settlementIntro,
+    settlement_terms: settlementTerms,
+    conclusion_paragraphs: conclusion
+  };
+}
+
+function legacyBodyTemplateData({ draft = '', structure = null } = {}) {
+  const body = structureForTemplate({ draft, structure });
+  const opening = body.opening_paragraphs || [];
+  const claims = body.legal_claims || [];
+  const terms = body.settlement_terms || [];
+  const conclusions = body.conclusion_paragraphs || [];
+
+  const claimsText = claims.map((claim, index) => {
+    const label = safeText(claim.title);
+    const text = safeText(claim.text);
+    if (label && text) return `${index + 1}. ${label}: ${text}`;
+    return `${index + 1}. ${label || text}`;
+  }).filter(Boolean).join('\n\n');
+
+  const termValues = [...terms];
+  if (termValues.length > 4) {
+    termValues[3] = termValues.slice(3).join('\n• ');
+    termValues.length = 4;
+  }
+
+  return {
+    introduction: opening[0] || '',
+    background: opening.slice(1).join('\n\n'),
+    legal_claims_numbered: claimsText,
+    settlement_context: body.settlement_intro || '',
+    settlement_term_1: termValues[0] || '',
+    settlement_term_2: termValues[1] || '',
+    settlement_term_3: termValues[2] || '',
+    settlement_term_4: termValues[3] || '',
+    settlement_closing: conclusions[0] || '',
+    response_deadline: conclusions[1] || '',
+    rights_reserved: conclusions.slice(2).join('\n\n')
+  };
+}
+
+function buildTemplateData({ caseId, facts = {}, draft = '', approvedAt }) {
   const clientName = safeText(facts.client_name, 'Client');
   const employerName = safeText(facts.employer_name, 'Employer');
   const signatoryName = safeText(process.env.VRS_DEFAULT_SIGNATORY || facts.signatory_name, 'Sasha-Lee van Wyk');
@@ -145,6 +236,8 @@ function buildTemplateData({ caseId, facts = {}, approvedAt }) {
   const employerEmail = safeText(facts.employer_email || facts.employer_contact_email, '');
 
   return {
+    ...legacyBodyTemplateData({ draft, structure: facts.wp_letter_structure || null }),
+
     // Current VRS WP template placeholders
     recipient_name: safeText(facts.recipient_name || facts.employer_contact_name, ''),
     recipient_company: employerName,
@@ -186,7 +279,7 @@ function renderLetterDocument({ caseId, facts = {}, draft, approvedAt }) {
     nullGetter: () => ''
   });
 
-  const data = buildTemplateData({ caseId, facts, approvedAt });
+  const data = buildTemplateData({ caseId, facts, draft, approvedAt });
   doc.render(data);
   injectStructuredBody(doc, { draft, structure: facts.wp_letter_structure || null });
 
