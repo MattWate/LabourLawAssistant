@@ -219,7 +219,7 @@ const STEPS = {
   UIF_DESC: text('Briefly describe your UIF query and how you need help.', 'incident_description', 'COMPANY_NAME'),
 
   COMPANY_NAME: text('What is the name of the company you work for, or worked for?', 'employer_name', 'COMPANY_CONTACT'),
-  COMPANY_CONTACT: text('Could you share a contact email or number for your employer's HR department or your manager? This just helps us know where to send correspondence. Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
+  COMPANY_CONTACT: text('Could you share a contact email or number for your employer\'s HR department or your manager? This just helps us know where to send correspondence. Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
   CLIENT_NAME: text('Almost done. What is your full name?', 'client_name', 'HANDOFF'),
   HANDOFF: { type: 'evaluate' }
 };
