@@ -114,13 +114,47 @@ function structureToBlocks(value = {}) {
   return blocks;
 }
 
+function addSectionHeadings(blocks = []) {
+  const source = Array.isArray(blocks) ? blocks.filter(Boolean) : [];
+  if (!source.length) return [];
+
+  const firstNumbered = source.findIndex(block => block.type === 'numbered');
+  let lastNumbered = -1;
+  source.forEach((block, index) => {
+    if (block.type === 'numbered') lastNumbered = index;
+  });
+
+  let settlementStart = -1;
+  if (lastNumbered >= 0) {
+    settlementStart = source.findIndex((block, index) => index > lastNumbered && block.type !== 'numbered');
+  } else {
+    settlementStart = source.findIndex(block => block.type === 'bullet');
+    if (settlementStart > 0 && source[settlementStart - 1]?.type === 'paragraph') settlementStart -= 1;
+  }
+
+  const result = [];
+  if (firstNumbered !== 0) result.push({ type: 'heading', text: 'Background' });
+
+  source.forEach((block, index) => {
+    if (index === firstNumbered) result.push({ type: 'heading', text: 'Legal Claims' });
+    if (index === settlementStart) result.push({ type: 'heading', text: 'Without Prejudice Settlement Proposal' });
+    result.push(block);
+  });
+
+  return result;
+}
+
 function blocksForApprovedDraft({ draft = '', structure = null } = {}) {
   const approvedText = cleanBodyText(draft);
+  let blocks;
+
   if (structure) {
     const canonical = letterStructureToPlainText(structure);
-    if (canonical && canonical === approvedText) return structureToBlocks(structure);
+    if (canonical && canonical === approvedText) blocks = structureToBlocks(structure);
   }
-  return parsePlainDraftToBlocks(approvedText);
+
+  if (!blocks) blocks = parsePlainDraftToBlocks(approvedText);
+  return addSectionHeadings(blocks);
 }
 
 module.exports = {
@@ -129,5 +163,6 @@ module.exports = {
   letterStructureToPlainText,
   parsePlainDraftToBlocks,
   structureToBlocks,
-  blocksForApprovedDraft
+  blocksForApprovedDraft,
+  addSectionHeadings
 };
