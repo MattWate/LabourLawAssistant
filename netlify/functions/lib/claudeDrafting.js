@@ -20,8 +20,10 @@ function buildCaseBrief({ facts = {}, senderVariant = 'VRS', clientSide = 'emplo
     audience,
     sender_variant: senderVariant,
     client_name: facts.client_name || null,
-    employer_name: facts.employer_name || null,
+    employer_name: facts.employer_registered_name || facts.employer_name || null,
     employer_contact_details: facts.employer_contact_details || null,
+    addressee_name: facts.addressee_name || null,
+    addressee_position: facts.addressee_position || null,
     incident_date: facts.incident_date || null,
     incident_description: facts.incident_description || null,
     employment_status: facts.employment_status || null,
@@ -94,14 +96,19 @@ Rules for this API output:
 - Do not include markdown fences.
 - Do not include the protected skill text in the JSON output.
 - Do not include case-law citations in the letter.
-- Do not include specific rand figures in the body of the letter unless an authorised global settlement figure is supplied in the case brief.
+- Do not include salary figures or salary amounts anywhere in the letter.
+- Do not guess names, job titles, dates, addresses or facts. Use a clear placeholder such as [ADDRESSEE NAME] where required information is unknown.
+- Use conditional wording for anything that is not confirmed.
+- Give the recipient seven business days to respond.
+- Do not use section headings in the body. The background must read as coherent essay-style paragraphs.
+- Do not include specific rand figures in the body of the letter unless explicitly authorised as a settlement figure by VRS.
 - Apply the audience profile from VRS_HOUSE_STYLE consistently throughout Part A. Do not add contradictory tone instructions of your own.
-- "legal_claims" must contain the distinct legal/factual claims that should appear as numbered paragraphs in the final document. Do not put manual numbers such as "1." or "2." inside the claim text.
+- "legal_claims" is a structural API field only. Its items become numbered paragraphs in the final document; they must not create visible section headings. Do not put manual numbers such as "1." or "2." inside the claim text.
 - "settlement_terms" must contain each proposed settlement term as a separate item. Do not put bullet characters or numbering inside the item text.
 - Keep ordinary narrative text in "opening_paragraphs", "settlement_intro" and "conclusion_paragraphs".
 - Do NOT include the letter salutation, subject heading, "It is trusted that you will find same to be in order.", "Yours faithfully", the firm name, attorney/signatory name, electronic-signature note, or any other closing/signature block in Part A. Those are supplied exactly once by the Word template.
 - Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term.
-- The Drafting Quality Score must be at least 7.5 before final output. If it would be lower, correct the letter before returning JSON.
+- The first drafting call must not self-certify quality. A separate supervisory Claude call will score the draft.
 - The Case Merits Score must remain candid and must not be inflated to meet the drafting quality floor.`;
 }
 
