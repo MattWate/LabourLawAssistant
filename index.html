@@ -345,6 +345,19 @@
         return ["employer_name", "addressee_name", "addressee_position", "client_name", "incident_description"]
             .filter(key => !hasKnownValue(collectedFacts[key]));
     }
+    function queueUnconfirmedNarrativeFacts() {
+        const metadata = collectedFacts._fact_metadata || {};
+        const items = Object.entries(metadata)
+            .filter(([key, meta]) => meta?.source === "initial_narrative_ai" && meta.confirmed !== true && hasKnownValue(collectedFacts[key]))
+            .slice(0, 3)
+            .map(([key, meta]) => ({
+                field: key,
+                value: collectedFacts[key],
+                confidence: Number(meta.confidence || 0),
+                question: null
+            }));
+        if (items.length) collectedFacts._pending_confirmation = { items };
+    }
     function mergeConversationalInferences(turn) {
         if (!turn?.enabled || !Array.isArray(turn.inferences)) return;
         const metadata = { ...(collectedFacts._fact_metadata || {}) };
@@ -448,8 +461,8 @@
     async function handleInferenceConfirmation(confirmed) {
         buttonContainer.style.display = 'none';
         appendMessage(confirmed ? "Yes" : "No", "user");
+        const confirmationQuestion = pendingConfirmationText();
         const pending = collectedFacts._pending_confirmation?.items || [];
-        await processWebTurn({ msg: pendingConfirmationText(), saveAs: null }, confirmed ? "Yes" : "No", currentState);
         const metadata = { ...(collectedFacts._fact_metadata || {}) };
         pending.forEach(item => {
             if (confirmed) {
@@ -461,6 +474,7 @@
         });
         collectedFacts._fact_metadata = metadata;
         delete collectedFacts._pending_confirmation;
+        await processWebTurn({ msg: confirmationQuestion, saveAs: null }, confirmed ? "Yes" : "No", currentState);
         renderState();
     }
     function hasKnownValue(value) { return value !== null && value !== undefined && !(typeof value === "string" && value.trim() === ""); }
@@ -575,6 +589,7 @@
                 if (finalCategory === "Ambiguous") currentState = "START_FALLBACK";
                 else {
                     mergeAIExtractedFacts(data);
+                    queueUnconfirmedNarrativeFacts();
                     if (!hasKnownValue(collectedFacts["employment_status"])) collectedFacts["employment_status"] = finalCategory;
                     if (!hasKnownValue(collectedFacts["dismissal_reason_type"]) && data.dismissal_reason_type) collectedFacts["dismissal_reason_type"] = data.dismissal_reason_type;
                     if (!hasKnownValue(collectedFacts["advisory_topic"]) && data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
