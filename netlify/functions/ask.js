@@ -278,6 +278,36 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) };
     }
 
+    if (action === 'intake_handoff') {
+      const facts = body.facts || {};
+      const reason = String(body.reason || 'intake_incomplete');
+      const missing = Array.isArray(body.missing) ? body.missing : [];
+      const { data, error } = await supabase.from('cases').insert({
+        client_name: facts.client_name || 'Intake follow-up required',
+        contact_info: facts.contact_info || facts.whatsapp_number || null,
+        issue_summary: 'Automated intake requires VRS follow-up before assessment can be completed.',
+        case_facts: {
+          ...facts,
+          intake_handoff_reason: reason,
+          intake_missing_fields: missing,
+          attorney_review_flag: true
+        },
+        status: 'needs_more_info',
+        letter_status: 'not_drafted'
+      }).select().single();
+      if (error) throw error;
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          caseId: data.id,
+          caseReference: caseReference(data.id, data.created_at),
+          message: 'Thanks. I have saved what you have told me and sent it to VRS so a person can continue with you.'
+        })
+      };
+    }
+
     if (action === 'triage') {
       const triage = buildTriageFacts(body.facts || {}, body.outcome || 'UNKNOWN');
       const { data, error } = await supabase.from('cases').insert({
