@@ -154,7 +154,7 @@ function blocksForApprovedDraft({ draft = '', structure = null } = {}) {
   }
 
   if (!blocks) blocks = parsePlainDraftToBlocks(approvedText);
-  return addSectionHeadings(blocks);
+  return blocks;
 }
 
 module.exports = {
