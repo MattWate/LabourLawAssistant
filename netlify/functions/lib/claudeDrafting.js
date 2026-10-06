@@ -1,13 +1,6 @@
 const { getClaudeModel, anthropicHeaders, modelAuditMetadata } = require('./claudeConfig');
 const MAX_OUTPUT_TOKENS = Number(process.env.CLAUDE_DRAFT_MAX_TOKENS || 12000);
 
-function anthropicHeaders() {
-  return {
-    'content-type': 'application/json',
-    'x-api-key': process.env.ANTHROPIC_API_KEY,
-    'anthropic-version': ANTHROPIC_VERSION
-  };
-}
 
 function parseJsonOnly(text = '') {
   const cleaned = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
