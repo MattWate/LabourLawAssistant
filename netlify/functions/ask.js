@@ -6,6 +6,7 @@ const { applyOverridePostProcessing } = require('./lib/overridePostProcessor');
 const { classifyAndHydrateMatter, mergeGovernanceFacts } = require('./lib/llmGovernance');
 const { caseReference } = require('./lib/caseReference');
 const { factsForDeterministicDecision, buildFactTrace } = require('./lib/factProvenance');
+const { processClientTurn } = require('./lib/intakeConversation');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -259,6 +260,21 @@ exports.handler = async (event) => {
 
     if (action === 'classify') {
       const result = await classifyText(body.text || '');
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) };
+    }
+
+    if (action === 'intake_turn') {
+      const result = await processClientTurn({
+        supabase,
+        channel: body.channel || 'web',
+        currentQuestion: body.currentQuestion || '',
+        answer: body.answer || '',
+        currentField: body.currentField || null,
+        plannedNextQuestion: body.plannedNextQuestion || '',
+        existingFacts: body.facts || {},
+        promptCount: Number(body.promptCount || 0),
+        promptLimit: Number(body.promptLimit || 0)
+      });
       return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) };
     }
 
