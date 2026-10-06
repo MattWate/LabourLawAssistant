@@ -7,6 +7,7 @@ const { classifyAndHydrateMatter, mergeGovernanceFacts } = require('./lib/llmGov
 const { caseReference } = require('./lib/caseReference');
 const { factsForDeterministicDecision, buildFactTrace } = require('./lib/factProvenance');
 const { processClientTurn } = require('./lib/intakeConversation');
+const { explainDeterministicDetermination } = require('./lib/determinationExplanation');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -151,7 +152,10 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     client_name: facts.client_name || null,
     contact_info: facts.contact_info || null,
     employer_name: facts.employer_name || null,
+    employer_registered_name: facts.employer_registered_name || facts.employer_name || null,
     employer_contact_details: facts.employer_contact_details || null,
+    addressee_name: facts.addressee_name || null,
+    addressee_position: facts.addressee_position || null,
     incident_date: facts.incident_date || null,
     incident_description: story || null,
     employment_status: facts.employment_status || null,
@@ -334,9 +338,16 @@ exports.handler = async (event) => {
       const scoringInput = { ...scoringFacts, incident_description: scoringStory };
       const baseScorecard = scoreCase(scoringInput);
       const scorecard = applyOverridePostProcessing(scoringInput, scoringStory, baseScorecard);
+      const determination = await explainDeterministicDetermination({
+        facts,
+        scorecard,
+        sourceLinks: facts.verified_legal_sources || facts.legal_source_links || []
+      });
       const caseFacts = {
         ...buildCoreFacts(facts, fullStory, scorecard, contextText),
-        fact_trace: buildFactTrace(facts)
+        fact_trace: buildFactTrace(facts),
+        admin_determination: determination,
+        recommended_forum: determination.forum || facts.recommended_forum || null
       };
       const clientOutcome = clientOutcomeFor(caseFacts, scorecard);
 
