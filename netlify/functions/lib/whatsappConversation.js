@@ -314,6 +314,7 @@ async function restartConversation(conversation, message) {
   return `${INTRO}\n\n${renderPrompt('JUR_EMPLOYEE')}`;
 }
 const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
+const { markClientConfirmedFact } = require('./factProvenance');
 
 function hasValue(value) {
   return value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
@@ -329,6 +330,7 @@ function stepIsAnswered(step, facts = {}) {
   if (!step?.saveAs || !hasValue(facts[step.saveAs])) return false;
   const value = facts[step.saveAs];
   const meta = facts._fact_metadata?.[step.saveAs];
+  if (meta?.source === 'initial_narrative_ai' && meta.confirmed !== true) return false;
   if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
   if (step.type === 'date') return validateAndNormaliseDate(String(value), step.dateRules || {}).ok;
   if (step.type === 'buttons') return Boolean(choiceForStoredValue(step, value));
@@ -381,7 +383,7 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
       merged[key] = value;
     }
 
-    metadata[key] = { source: 'initial_narrative_ai', confidence, captured_at: new Date().toISOString() };
+    metadata[key] = { source: 'initial_narrative_ai', confidence, confirmed: false, captured_at: new Date().toISOString() };
   });
 
   merged._fact_metadata = metadata;
@@ -391,13 +393,7 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
 
 function markDirectAnswer(facts, key) {
   if (!key) return facts;
-  return {
-    ...facts,
-    _fact_metadata: {
-      ...(facts._fact_metadata || {}),
-      [key]: { source: 'user_answer', confidence: 1, captured_at: new Date().toISOString() }
-    }
-  };
+  return markClientConfirmedFact(facts, key, { source: 'user_answer' });
 }
 
 function routeClassification(classification = {}) {

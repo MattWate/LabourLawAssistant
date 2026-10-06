@@ -1,5 +1,4 @@
-const REQUESTED_CLAUDE_MODEL = process.env.CLAUDE_MODEL || null;
-const ANTHROPIC_VERSION = '2023-06-01';
+const { getClaudeModel, anthropicHeaders, modelAuditMetadata } = require('./claudeConfig');
 const MAX_OUTPUT_TOKENS = Number(process.env.CLAUDE_DRAFT_MAX_TOKENS || 12000);
 
 function anthropicHeaders() {
@@ -8,39 +7,6 @@ function anthropicHeaders() {
     'x-api-key': process.env.ANTHROPIC_API_KEY,
     'anthropic-version': ANTHROPIC_VERSION
   };
-}
-
-async function resolveClaudeModel() {
-  const response = await fetch('https://api.anthropic.com/v1/models?limit=100', {
-    method: 'GET',
-    headers: anthropicHeaders()
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Could not list Anthropic models: ${response.status} ${text.slice(0, 500)}`);
-  }
-
-  const payload = await response.json();
-  const models = Array.isArray(payload.data) ? payload.data : [];
-  const ids = models.map(model => model.id).filter(Boolean);
-
-  if (REQUESTED_CLAUDE_MODEL && ids.includes(REQUESTED_CLAUDE_MODEL)) {
-    return REQUESTED_CLAUDE_MODEL;
-  }
-
-  const sonnetModels = models
-    .filter(model => /sonnet/i.test(`${model.id || ''} ${model.display_name || ''}`))
-    .sort((a, b) => {
-      const aDate = new Date(a.created_at || 0).getTime();
-      const bDate = new Date(b.created_at || 0).getTime();
-      return bDate - aDate || String(b.id || '').localeCompare(String(a.id || ''));
-    });
-
-  if (sonnetModels[0]?.id) return sonnetModels[0].id;
-  if (models[0]?.id) return models[0].id;
-
-  throw new Error('No Anthropic models are available to this API key');
 }
 
 function parseJsonOnly(text = '') {
@@ -157,7 +123,7 @@ function extractTextBlocks(content = []) {
 async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
 
-  const model = await resolveClaudeModel();
+  const model = getClaudeModel();
   const prompt = buildDraftingPrompt({
     skillContext,
     caseBrief,
@@ -207,7 +173,7 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
     log: {
       provider: 'anthropic',
       model,
-      requested_model: REQUESTED_CLAUDE_MODEL,
+      ...modelAuditMetadata(),
       max_tokens: MAX_OUTPUT_TOKENS,
       thinking: requestBody.thinking?.type || 'model_default',
       stop_reason: data.stop_reason || null,

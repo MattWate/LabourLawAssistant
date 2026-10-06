@@ -1,5 +1,5 @@
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-sonnet-20241022';
-const ANTHROPIC_VERSION = '2023-06-01';
+const { getClaudeModel, anthropicHeaders, modelAuditMetadata } = require('./claudeConfig');
+const { markClaudeInference } = require('./factProvenance');
 
 const TRACK_TO_CATEGORY = {
   'UD-MISCONDUCT': 'Dismissed',
@@ -278,13 +278,9 @@ async function callClaude(prompt) {
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': ANTHROPIC_VERSION
-    },
+    headers: anthropicHeaders(),
     body: JSON.stringify({
-      model: CLAUDE_MODEL,
+      model: getClaudeModel(),
       max_tokens: 1800,
       temperature: 0.2,
       system: 'Return valid JSON only. You are a legal intake classification and data extraction layer, not a legal adviser.',
@@ -311,7 +307,7 @@ async function classifyAndHydrateMatter({ narrative = '', existingFacts = {} }) 
     const governance = normaliseGovernance(raw, 'claude');
     governance.log = {
       provider: 'anthropic',
-      model: CLAUDE_MODEL,
+      model: getClaudeModel(),
       temperature: 0.2,
       started_at: startedAt,
       completed_at: new Date().toISOString(),
@@ -335,7 +331,7 @@ async function classifyAndHydrateMatter({ narrative = '', existingFacts = {} }) 
       compatibility: { category: 'Ambiguous', dismissal_reason_type: null, advisory_topic: null, confidence: 0 },
       log: {
         provider: 'anthropic',
-        model: CLAUDE_MODEL,
+        model: getClaudeModel(),
         temperature: 0.2,
         started_at: startedAt,
         completed_at: new Date().toISOString(),
@@ -355,14 +351,27 @@ function mergeGovernanceFacts(existingFacts = {}, governance = {}) {
     if (value === undefined || value === '' || value === null) return;
     if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
       merged[key] = value;
+      const confidence = Number(governance.confidence_per_field?.[key] ?? governance.confidence ?? 0);
+      Object.assign(merged, markClaudeInference(merged, key, {
+        source: 'claude_inference',
+        confidence
+      }));
     }
   });
 
-  if (governance.primary_track && !merged.track) merged.track = governance.primary_track;
-  if (governance.secondary_track && !merged.secondary_track) merged.secondary_track = governance.secondary_track;
+  if (governance.primary_track && !merged.track) {
+    merged.track = governance.primary_track;
+    Object.assign(merged, markClaudeInference(merged, 'track', { confidence: governance.confidence }));
+  }
+  if (governance.secondary_track && !merged.secondary_track) {
+    merged.secondary_track = governance.secondary_track;
+    Object.assign(merged, markClaudeInference(merged, 'secondary_track', { confidence: governance.confidence }));
+  }
   if (governance.advisory_topic && !merged.advisory_topic) {
     merged.advisory_topic = ADVISORY_TOPIC_MAP[governance.advisory_topic] || governance.advisory_topic;
     merged.ancillary_topic = merged.advisory_topic;
+    Object.assign(merged, markClaudeInference(merged, 'advisory_topic', { confidence: governance.confidence }));
+    Object.assign(merged, markClaudeInference(merged, 'ancillary_topic', { confidence: governance.confidence }));
   }
 
   const flags = [...(Array.isArray(merged.override_flags) ? merged.override_flags : []), ...(governance.override_flags || [])];

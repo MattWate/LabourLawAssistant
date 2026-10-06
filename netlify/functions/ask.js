@@ -5,6 +5,7 @@ const { scoreCase } = require('./lib/scoringEngine');
 const { applyOverridePostProcessing } = require('./lib/overridePostProcessor');
 const { classifyAndHydrateMatter, mergeGovernanceFacts } = require('./lib/llmGovernance');
 const { caseReference } = require('./lib/caseReference');
+const { factsForDeterministicDecision, buildFactTrace } = require('./lib/factProvenance');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -282,10 +283,15 @@ exports.handler = async (event) => {
       const facts = mergeGovernanceFacts(originalFacts, governance);
       const fullStory = dedupeStory(`${facts.initial_query ? `${facts.initial_query} ` : ''}${facts.incident_description || ''}`.trim());
       const contextText = await searchLegalContext(buildLegalKeywords(facts, fullStory));
-      const scoringInput = { ...facts, incident_description: fullStory };
+      const scoringFacts = factsForDeterministicDecision(facts);
+      const scoringStory = dedupeStory(`${scoringFacts.initial_query ? `${scoringFacts.initial_query} ` : ''}${scoringFacts.incident_description || ''}`.trim());
+      const scoringInput = { ...scoringFacts, incident_description: scoringStory };
       const baseScorecard = scoreCase(scoringInput);
-      const scorecard = applyOverridePostProcessing(scoringInput, fullStory, baseScorecard);
-      const caseFacts = buildCoreFacts(facts, fullStory, scorecard, contextText);
+      const scorecard = applyOverridePostProcessing(scoringInput, scoringStory, baseScorecard);
+      const caseFacts = {
+        ...buildCoreFacts(facts, fullStory, scorecard, contextText),
+        fact_trace: buildFactTrace(facts)
+      };
       const clientOutcome = clientOutcomeFor(caseFacts, scorecard);
 
       const { data, error } = await supabase.from('cases').insert({
