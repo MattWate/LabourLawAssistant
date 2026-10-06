@@ -218,8 +218,10 @@ const STEPS = {
   E6_ANCILLARY_NARRATIVE: text('Describe the situation in your own words.', 'incident_description', 'COMPANY_NAME'),
   UIF_DESC: text('Briefly describe your UIF query and how you need help.', 'incident_description', 'COMPANY_NAME'),
 
-  COMPANY_NAME: text('What is the name of the company you work for, or worked for?', 'employer_name', 'COMPANY_CONTACT'),
-  COMPANY_CONTACT: text('Could you share a contact email or number for your employer\'s HR department or your manager? This just helps us know where to send correspondence. Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
+  COMPANY_NAME: text('What is the employer\'s full registered name?', 'employer_name', 'ADDRESSEE_NAME'),
+  ADDRESSEE_NAME: text('Who should any letter be addressed to? Please give their full name, or type UNKNOWN if you do not know it.', 'addressee_name', 'ADDRESSEE_POSITION'),
+  ADDRESSEE_POSITION: text('What is that person\'s job title or position? Type UNKNOWN if you do not know it.', 'addressee_position', 'COMPANY_CONTACT'),
+  COMPANY_CONTACT: text('Could you share a contact email or number for the employer\'s HR department or the addressee? Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
   CLIENT_NAME: text('Almost done. What is your full name?', 'client_name', 'HANDOFF'),
   HANDOFF: { type: 'evaluate' }
 };
@@ -234,7 +236,9 @@ const DEFLECTIONS = {
   DEFLECT_CONTRACTOR: 'Your answers suggest that this may fall outside ordinary employee protections. Civil contract advice may be required before a labour-law merits assessment.',
   DEFLECT_CROSS_BORDER: 'This matter may require cross-border or international employment advice before a South African labour-law assessment.',
   DEFLECT_PUBLIC_SERVICE: 'This matter should be triaged to the correct public-sector forum or bargaining council.',
-  DEFLECT_SOE_UNCLEAR: 'Attorney review is required to confirm CCMA eligibility or the correct bargaining council or forum.'
+  DEFLECT_SOE_UNCLEAR: 'Attorney review is required to confirm CCMA eligibility or the correct bargaining council or forum.',
+  PROMPT_LIMIT_INCOMPLETE: 'I have reached the WhatsApp question limit and still need a few details. I have sent your intake to VRS for a person to continue with you.',
+  INCOMPLETE_LETTER_FACTS: 'I still need a few details before this intake can be treated as complete. I have sent it to VRS for follow-up.'
 };
 
 function cleanText(value = '') { return String(value || '').trim(); }
@@ -279,7 +283,7 @@ async function createConversation(message) {
   const { data, error } = await supabase.from('whatsapp_conversations').insert({
     from_number: message.from_number, contact_name: message.contact_name || null, phone_number_id: message.phone_number_id || null,
     current_step: 'JUR_EMPLOYEE', status: 'active',
-    collected_facts: { client_name: message.contact_name || null, contact_info: message.from_number, source: 'whatsapp' },
+    collected_facts: { client_name: message.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 1, _intake_prompt_history: ['step:JUR_EMPLOYEE'] },
     processed_message_ids: message.whatsapp_message_id ? [message.whatsapp_message_id] : [], last_inbound_at: now, updated_at: now
   }).select().single();
   if (error) throw error;
@@ -308,13 +312,88 @@ async function markHandoff(conversation, message, reason, facts = {}) {
   return `${issueSummary}\n\nReference: ${caseRow.id}`;
 }
 async function restartConversation(conversation, message) {
-  const facts = { client_name: message.contact_name || conversation.contact_name || null, contact_info: message.from_number, source: 'whatsapp' };
+  const facts = { client_name: message.contact_name || conversation.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 1, _intake_prompt_history: ['step:JUR_EMPLOYEE'] };
   await updateConversation(conversation.id, { current_step: 'JUR_EMPLOYEE', status: 'active', collected_facts: facts, classification: null,
     case_id: null, handoff_reason: null, error_message: null, processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
   return `${INTRO}\n\n${renderPrompt('JUR_EMPLOYEE')}`;
 }
 const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
 const { markClientConfirmedFact } = require('./factProvenance');
+
+const WHATSAPP_PROMPT_LIMIT = 10;
+
+function promptCount(facts = {}) {
+  return Number(facts._intake_prompt_count || 0);
+}
+
+function withPromptRecorded(facts = {}, promptKey = '') {
+  const history = Array.isArray(facts._intake_prompt_history) ? facts._intake_prompt_history : [];
+  if (!promptKey || history.includes(promptKey)) return facts;
+  return {
+    ...facts,
+    _intake_prompt_count: history.length + 1,
+    _intake_prompt_history: [...history, promptKey]
+  };
+}
+
+function requiredLetterFieldsMissing(facts = {}) {
+  return ['employer_name', 'addressee_name', 'addressee_position', 'client_name', 'incident_description']
+    .filter(key => !hasValue(facts[key]));
+}
+
+function mergeIntakeInferences(facts = {}, turn = {}) {
+  if (!turn?.enabled || !Array.isArray(turn.inferences) || !turn.inferences.length) return facts;
+  const metadata = { ...(facts._fact_metadata || {}) };
+  const merged = { ...facts };
+  const pending = [];
+
+  turn.inferences.forEach(item => {
+    if (!item?.field || hasValue(merged[item.field])) return;
+    merged[item.field] = item.value;
+    metadata[item.field] = {
+      source: 'claude_inference',
+      confidence: Number(item.confidence || 0),
+      confirmed: false,
+      captured_at: new Date().toISOString()
+    };
+    pending.push({
+      field: item.field,
+      value: item.value,
+      confidence: Number(item.confidence || 0),
+      question: item.confirmation_question || null
+    });
+  });
+
+  merged._fact_metadata = metadata;
+  if (pending.length) merged._pending_confirmation = { items: pending.slice(0, 3) };
+  return merged;
+}
+
+function confirmationPrompt(pending = {}) {
+  const items = Array.isArray(pending.items) ? pending.items : [];
+  if (!items.length) return null;
+  if (items.length === 1 && items[0].question) return items[0].question + ' Reply YES or NO.';
+  const summary = items.map(item => `${String(item.field || '').replace(/_/g, ' ')}: ${String(item.value)}`).join('; ');
+  return `Just to check I understood you correctly: ${summary}. Is that right? Reply YES or NO.`;
+}
+
+async function runConversationalTurn({ facts, stepName, step, answer, nextStep }) {
+  try {
+    return await invokeAsk('intake_turn', {
+      channel: 'whatsapp',
+      currentQuestion: step?.prompt || '',
+      currentField: step?.saveAs || null,
+      answer,
+      plannedNextQuestion: renderPrompt(nextStep) || '',
+      facts,
+      promptCount: promptCount(facts),
+      promptLimit: WHATSAPP_PROMPT_LIMIT
+    });
+  } catch (error) {
+    console.warn('Conversational intake layer failed; using controlled flow:', error.message);
+    return { enabled: false, error: error.message };
+  }
+}
 
 function hasValue(value) {
   return value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
@@ -432,6 +511,51 @@ async function processIncomingMessage(message) {
   if (!step) return restartConversation(conversation, message);
   let facts = { ...(conversation.collected_facts || {}) };
 
+  if (facts._pending_confirmation?.items?.length) {
+    const pending = facts._pending_confirmation;
+    const answer = normalize(input);
+    if (!['yes', 'y', 'yeah', 'yep', 'no', 'n', 'nope'].includes(answer)) {
+      return `${confirmationPrompt(pending)}`;
+    }
+
+    // Claude still receives the confirmation answer, but cannot control the state transition.
+    await runConversationalTurn({
+      facts,
+      stepName: 'CONFIRM_INFERENCE',
+      step: { prompt: confirmationPrompt(pending), saveAs: null },
+      answer: input,
+      nextStep: stepName
+    });
+
+    if (['yes', 'y', 'yeah', 'yep'].includes(answer)) {
+      for (const item of pending.items) {
+        facts = markClientConfirmedFact(facts, item.field, { source: 'client_confirmed' });
+      }
+    } else {
+      const metadata = { ...(facts._fact_metadata || {}) };
+      for (const item of pending.items) {
+        delete facts[item.field];
+        delete metadata[item.field];
+      }
+      facts._fact_metadata = metadata;
+    }
+    delete facts._pending_confirmation;
+
+    if (promptCount(facts) >= WHATSAPP_PROMPT_LIMIT) {
+      const missing = requiredLetterFieldsMissing(facts);
+      if (missing.length) return markHandoff(conversation, message, 'PROMPT_LIMIT_INCOMPLETE', facts);
+    }
+
+    facts = withPromptRecorded(facts, `step:${stepName}`);
+    await updateConversation(conversation.id, {
+      current_step: stepName,
+      collected_facts: facts,
+      processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id),
+      last_inbound_at: new Date().toISOString()
+    });
+    return renderPrompt(stepName);
+  }
+
   if (step.type === 'classify') {
     const classification = await invokeAsk('classify', { text: input });
     facts = mergeNarrativeFacts({ ...facts, initial_query: input }, classification);
@@ -439,9 +563,25 @@ async function processIncomingMessage(message) {
     if (!hasValue(facts.dismissal_reason_type) && classification.dismissal_reason_type) facts.dismissal_reason_type = classification.dismissal_reason_type;
     if (!hasValue(facts.advisory_topic) && classification.advisory_topic) facts.advisory_topic = classification.advisory_topic;
     const next = resolveNextUnanswered(routeClassification(classification), facts);
+    const turn = await runConversationalTurn({ facts, stepName, step, answer: input, nextStep: next });
+    facts = mergeIntakeInferences(facts, turn);
+
+    if (facts._pending_confirmation?.items?.length && promptCount(facts) < WHATSAPP_PROMPT_LIMIT) {
+      facts = withPromptRecorded(facts, `confirm:${facts._pending_confirmation.items.map(x => x.field).join(',')}`);
+      await updateConversation(conversation.id, { current_step: next, collected_facts: facts, classification,
+        processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
+      return [turn.acknowledgement, confirmationPrompt(facts._pending_confirmation)].filter(Boolean).join('\n\n');
+    }
+
+    if (promptCount(facts) >= WHATSAPP_PROMPT_LIMIT) {
+      const missing = requiredLetterFieldsMissing(facts);
+      if (missing.length) return markHandoff(conversation, message, 'PROMPT_LIMIT_INCOMPLETE', facts);
+    }
+
+    facts = withPromptRecorded(facts, `step:${next}`);
     await updateConversation(conversation.id, { current_step: next, collected_facts: facts, classification,
       processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
-    return renderPrompt(next);
+    return [turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
   }
   if (step.type === 'evaluate') return completeEvaluation(conversation, message, facts);
 
@@ -466,10 +606,31 @@ async function processIncomingMessage(message) {
   }
 
   if (DEFLECTIONS[next]) return markHandoff(conversation, message, next, facts);
-  if (next === 'HANDOFF') return completeEvaluation(conversation, message, facts);
+
+  const turn = await runConversationalTurn({ facts, stepName, step, answer: input, nextStep: next });
+  facts = mergeIntakeInferences(facts, turn);
+
+  if (facts._pending_confirmation?.items?.length && promptCount(facts) < WHATSAPP_PROMPT_LIMIT) {
+    facts = withPromptRecorded(facts, `confirm:${facts._pending_confirmation.items.map(x => x.field).join(',')}`);
+    await updateConversation(conversation.id, { current_step: next, collected_facts: facts,
+      processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
+    return [turn.acknowledgement, confirmationPrompt(facts._pending_confirmation)].filter(Boolean).join('\n\n');
+  }
+
+  if (next === 'HANDOFF') {
+    const missing = requiredLetterFieldsMissing(facts);
+    if (!missing.length) return completeEvaluation(conversation, message, facts);
+    return markHandoff(conversation, message, 'INCOMPLETE_LETTER_FACTS', facts);
+  }
+
+  if (promptCount(facts) >= WHATSAPP_PROMPT_LIMIT) {
+    return markHandoff(conversation, message, 'PROMPT_LIMIT_INCOMPLETE', facts);
+  }
+
+  facts = withPromptRecorded(facts, `step:${next}`);
   await updateConversation(conversation.id, { current_step: next, collected_facts: facts,
     processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
-  return renderPrompt(next);
+  return [turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
 }
 
 module.exports = { processIncomingMessage, STEPS, renderPrompt };
