@@ -416,6 +416,7 @@
           </div>
         </div>
 
+        ${renderDetermination(f)}
         ${renderScoringBreakdown(f)}
         ${renderLegalBasis(f)}
         ${renderAdvisory(f)}
@@ -428,6 +429,45 @@
       return `<div class="fact" style="${wide ? 'grid-column:1/-1;' : ''}"><span class="label">${escapeHtml(label)}</span><div class="value">${escapeHtml(safe(value))}</div></div>`;
     }
 
+    function renderDetermination(f) {
+      const d = f.admin_determination || {};
+      const trace = Array.isArray(d.fact_trace) ? d.fact_trace : (Array.isArray(f.fact_trace) ? f.fact_trace : []);
+      const verified = Array.isArray(d.verified_references) ? d.verified_references : [];
+      const unverified = Array.isArray(d.unverified_references) ? d.unverified_references : [];
+      const claims = Array.isArray(d.claims_or_issues) ? d.claims_or_issues : [];
+      const supporting = Array.isArray(d.supporting_facts) ? d.supporting_facts : [];
+      const uncertainties = Array.isArray(d.uncertainties) ? d.uncertainties : [];
+      const time = d.time_bar || {};
+      const posture = d.posture || f.wp_type || (f.wp_eligible ? 'WP ELIGIBLE' : 'NO WP');
+      const forum = d.forum || f.recommended_forum || '—';
+      const reviewText = d.review_flag === false ? 'No' : 'Yes';
+      const traceRows = trace.length ? trace.map(item => {
+        const source = item.confirmed === false ? 'Claude inference – unconfirmed' : item.source === 'client_confirmed' || item.source === 'user_answer' ? 'Client confirmed' : (item.source || 'Recorded fact');
+        return `<tr><td>${escapeHtml(item.key)}</td><td>${escapeHtml(safe(item.value))}</td><td>${escapeHtml(source)}</td><td>${item.confirmed === false ? '<span class="badge low">Excluded</span>' : '<span class="badge high">Usable</span>'}</td></tr>`;
+      }).join('') : '<tr><td colspan="4">No fact provenance recorded for this case.</td></tr>';
+
+      return `<div class="card"><h2>Claude Determination</h2>
+        <div class="grid" style="margin-bottom:16px">
+          <div class="metric"><div class="label">Band</div><div class="value small">${escapeHtml(d.band || f.merit_band || '—')}</div></div>
+          <div class="metric"><div class="label">Posture</div><div class="value small">${escapeHtml(posture)}</div></div>
+          <div class="metric"><div class="label">Time Bar</div><div class="value small">${escapeHtml(time.label || '—')}</div></div>
+          <div class="metric"><div class="label">Forum</div><div class="value small">${escapeHtml(forum)}</div></div>
+        </div>
+        <div class="fact-grid">
+          ${fact('Review Flag', reviewText)}
+          ${fact('Review Reason', d.review_flag_reason || '—')}
+          ${fact('Claude Explanation', d.explanation || 'No Claude explanation recorded.', true)}
+          ${fact('Claims / Issues', claims.length ? claims.join('\n') : '—', true)}
+          ${fact('Uncertainties', uncertainties.length ? uncertainties.join('\n') : '—', true)}
+          ${fact('Supporting Confirmed Facts', supporting.length ? supporting.map(x => `${x.key}: ${safe(x.value)}`).join('\n') : '—', true)}
+        </div>
+        <h3 style="margin-top:18px">Fact Provenance</h3>
+        <table><thead><tr><th>Fact</th><th>Value</th><th>Source</th><th>Decision Use</th></tr></thead><tbody>${traceRows}</tbody></table>
+        <h3 style="margin-top:18px">References</h3>
+        ${verified.length ? '<ul>' + verified.map(x => `<li><a href="${escapeHtml(x.url)}" target="_blank" rel="noopener">${escapeHtml(x.label)}</a> <span class="badge high">Verified</span></li>`).join('') + '</ul>' : '<p>No source-linked references recorded.</p>'}
+        ${unverified.length ? '<p><strong>Unverified references excluded from Claude reasoning:</strong></p><ul>' + unverified.map(x => `<li>${escapeHtml(x.label)} <span class="badge low">Unverified</span></li>`).join('') + '</ul>' : ''}
+      </div>`;
+    }
     function renderScoringBreakdown(f) {
       const rows = f.scoring_breakdown || [];
       if (!rows.length) return '<div class="card"><h2>Scoring Breakdown</h2><p>No scoring breakdown recorded for this matter.</p></div>';
