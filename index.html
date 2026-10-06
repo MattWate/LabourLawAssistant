@@ -308,8 +308,10 @@
             msg: "Thank you for taking the time to share this with us. Unfortunately, this falls outside the scope of what we're able to assist with through this automated service. Please note this is not a reflection of the merits of your case, it simply needs a different form of review. We'd recommend seeking advice from the relevant bargaining council or a practitioner who specialises in this area.",
             type: "end", triageOutcome: "SOE_UNCLEAR"
         },
-        COMPANY_NAME: { msg: "What is the name of the company you work for, or worked for?", type: "text", next: "COMPANY_CONTACT", saveAs: "employer_name" },
-        COMPANY_CONTACT: { msg: "Could you share a contact email or number for your employer's HR department or your manager? This just helps us know where to send correspondence.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
+        COMPANY_NAME: { msg: "What is the employer's full registered name?", type: "text", next: "ADDRESSEE_NAME", saveAs: "employer_name" },
+        ADDRESSEE_NAME: { msg: "Who should any letter be addressed to? Please give their full name, or type UNKNOWN if you do not know it.", type: "text", next: "ADDRESSEE_POSITION", saveAs: "addressee_name" },
+        ADDRESSEE_POSITION: { msg: "What is that person's job title or position? Type UNKNOWN if you do not know it.", type: "text", next: "COMPANY_CONTACT", saveAs: "addressee_position" },
+        COMPANY_CONTACT: { msg: "Could you share a contact email or number for the employer's HR department or the addressee? Type UNKNOWN if you do not have it.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
         CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_PHONE", saveAs: "client_name" },
         CLIENT_PHONE: { msg: "And finally, what WhatsApp cell phone number should VRS use to contact you? Please include the country code, for example +27 82 123 4567.", type: "text", next: "HANDOFF", saveAs: "whatsapp_number" },
         HANDOFF: { action: "evaluate" }
@@ -328,6 +330,139 @@
     }
 
     const AI_SKIP_CONFIDENCE = 0.8;
+    const WEB_PROMPT_LIMIT = 15;
+
+    function webPromptCount() { return Number(collectedFacts._intake_prompt_count || 0); }
+    function recordWebPrompt(key) {
+        const history = Array.isArray(collectedFacts._intake_prompt_history) ? collectedFacts._intake_prompt_history : [];
+        if (!key || history.includes(key)) return true;
+        if (history.length >= WEB_PROMPT_LIMIT) return false;
+        collectedFacts._intake_prompt_history = [...history, key];
+        collectedFacts._intake_prompt_count = history.length + 1;
+        return true;
+    }
+    function requiredLetterFieldsMissing() {
+        return ["employer_name", "addressee_name", "addressee_position", "client_name", "incident_description"]
+            .filter(key => !hasKnownValue(collectedFacts[key]));
+    }
+    function mergeConversationalInferences(turn) {
+        if (!turn?.enabled || !Array.isArray(turn.inferences)) return;
+        const metadata = { ...(collectedFacts._fact_metadata || {}) };
+        const pending = [];
+        turn.inferences.forEach(item => {
+            if (!item?.field || hasKnownValue(collectedFacts[item.field])) return;
+            collectedFacts[item.field] = item.value;
+            metadata[item.field] = {
+                source: "claude_inference",
+                confidence: Number(item.confidence || 0),
+                confirmed: false,
+                captured_at: new Date().toISOString()
+            };
+            pending.push({
+                field: item.field,
+                value: item.value,
+                confidence: Number(item.confidence || 0),
+                question: item.confirmation_question || null
+            });
+        });
+        collectedFacts._fact_metadata = metadata;
+        if (pending.length) collectedFacts._pending_confirmation = { items: pending.slice(0, 3) };
+    }
+    function pendingConfirmationText() {
+        const items = collectedFacts._pending_confirmation?.items || [];
+        if (!items.length) return null;
+        if (items.length === 1 && items[0].question) return items[0].question;
+        const summary = items.map(item => `${String(item.field || "").replace(/_/g, " ")}: ${String(item.value)}`).join("; ");
+        return `Just to check I understood you correctly: ${summary}. Is that right?`;
+    }
+    async function processWebTurn(step, answer, nextStateKey) {
+        try {
+            const planned = scriptFlow[nextStateKey]?.msg || "";
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "intake_turn",
+                    channel: "web",
+                    currentQuestion: step?.msg || "",
+                    currentField: step?.saveAs || null,
+                    answer,
+                    plannedNextQuestion: planned,
+                    facts: collectedFacts,
+                    promptCount: webPromptCount(),
+                    promptLimit: WEB_PROMPT_LIMIT
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || "intake turn failed");
+            mergeConversationalInferences(data);
+            if (data.next_question && nextStateKey) collectedFacts._next_question_override = { state: nextStateKey, text: data.next_question };
+            return data;
+        } catch (error) {
+            console.warn("Conversational intake unavailable; using controlled flow:", error);
+            return { enabled: false };
+        }
+    }
+    async function handleWebPromptLimit(reason = "prompt_limit_incomplete") {
+        if (collectedFacts._handoff_started) return;
+        collectedFacts._handoff_started = true;
+        textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
+        showLoading();
+        try {
+            const missing = requiredLetterFieldsMissing();
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "intake_handoff", reason, missing, facts: collectedFacts })
+            });
+            const data = await res.json(); hideLoading();
+            appendMessage(data.message || "Thanks. I have saved your information and sent it to VRS for follow-up.", "bot");
+            if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}.`, "bot");
+        } catch (error) {
+            hideLoading();
+            appendMessage("Thanks. I have reached the end of the automated questions. Please contact VRS so a person can continue with you.", "bot");
+            console.error(error);
+        }
+    }
+    function renderPendingConfirmation() {
+        const text = pendingConfirmationText();
+        if (!text) return false;
+        const key = "confirm:" + collectedFacts._pending_confirmation.items.map(x => x.field).join(",");
+        if (!recordWebPrompt(key)) { handleWebPromptLimit(); return true; }
+        textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
+        setTimeout(() => {
+            appendMessage(text, "bot");
+            buttonContainer.innerHTML = '';
+            [["Yes", true], ["No", false]].forEach(([label, value]) => {
+                const btn = document.createElement('button');
+                btn.className = 'action-btn';
+                btn.innerText = label;
+                btn.onclick = () => handleInferenceConfirmation(value);
+                buttonContainer.appendChild(btn);
+            });
+            buttonContainer.style.display = 'flex';
+            scrollToBottom();
+        }, 300);
+        return true;
+    }
+    async function handleInferenceConfirmation(confirmed) {
+        buttonContainer.style.display = 'none';
+        appendMessage(confirmed ? "Yes" : "No", "user");
+        const pending = collectedFacts._pending_confirmation?.items || [];
+        await processWebTurn({ msg: pendingConfirmationText(), saveAs: null }, confirmed ? "Yes" : "No", currentState);
+        const metadata = { ...(collectedFacts._fact_metadata || {}) };
+        pending.forEach(item => {
+            if (confirmed) {
+                metadata[item.field] = { ...(metadata[item.field] || {}), source: "client_confirmed", confirmed: true, confidence: 1, captured_at: new Date().toISOString() };
+            } else {
+                delete collectedFacts[item.field];
+                delete metadata[item.field];
+            }
+        });
+        collectedFacts._fact_metadata = metadata;
+        delete collectedFacts._pending_confirmation;
+        renderState();
+    }
     function hasKnownValue(value) { return value !== null && value !== undefined && !(typeof value === "string" && value.trim() === ""); }
     function normaliseChoice(value) { return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9+<>\- ]/g, " ").replace(/\s+/g, " "); }
     function matchedStoredOption(step, value) {
@@ -338,6 +473,7 @@
     function canSkipStep(step) {
         if (!step || !step.saveAs || !hasKnownValue(collectedFacts[step.saveAs])) return false;
         const meta = collectedFacts._fact_metadata?.[step.saveAs];
+        if (meta?.source === "initial_narrative_ai" && meta.confirmed !== true) return false;
         if (meta?.source === "initial_narrative_ai" && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
         if (step.type === "buttons") return Boolean(matchedStoredOption(step, collectedFacts[step.saveAs]));
         if (step.type === "date") return /^\d{4}-\d{2}-\d{2}$/.test(String(collectedFacts[step.saveAs]));
@@ -359,7 +495,7 @@
             const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
             if (confidence < AI_SKIP_CONFIDENCE) return;
             collectedFacts[key] = value;
-            metadata[key] = { source: "initial_narrative_ai", confidence, captured_at: new Date().toISOString() };
+            metadata[key] = { source: "initial_narrative_ai", confidence, confirmed: false, captured_at: new Date().toISOString() };
         });
         collectedFacts._fact_metadata = metadata;
         collectedFacts.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === "initial_narrative_ai");
@@ -373,6 +509,7 @@
     }
 
     function renderState() {
+        if (renderPendingConfirmation()) return;
         let step = scriptFlow[currentState];
         if (!step) { appendMessage("An error occurred in the intake flow. Please refresh and try again.", "bot"); console.error("Unknown state:", currentState); return; }
         while (step && canSkipStep(step)) {
@@ -382,7 +519,11 @@
             currentState = nextState; step = scriptFlow[currentState];
         }
         textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
-        if (step.action === "evaluate") { appendMessage("Thank you! Give me just a moment to review your details against South African Labour Law...", "bot"); triggerAIEvaluation(); return; }
+        if (step.action === "evaluate") {
+            const missing = requiredLetterFieldsMissing();
+            if (missing.length) { handleWebPromptLimit("incomplete_letter_facts"); return; }
+            appendMessage("Thank you. Give me a moment to prepare this for VRS review.", "bot"); triggerAIEvaluation(); return;
+        }
         if (step.type === "end") {
             setTimeout(async () => {
                 if (step.triageOutcome) await triggerJurisdictionTriage(step.triageOutcome);
@@ -390,8 +531,13 @@
             }, 500);
             return;
         }
+        const promptKey = "step:" + currentState;
+        if (!recordWebPrompt(promptKey)) { handleWebPromptLimit(); return; }
         setTimeout(() => {
-            appendMessage(step.msg, "bot");
+            const override = collectedFacts._next_question_override;
+            const promptText = override?.state === currentState ? override.text : step.msg;
+            if (override?.state === currentState) delete collectedFacts._next_question_override;
+            appendMessage(promptText, "bot");
             if (step.type === "buttons") {
                 buttonContainer.innerHTML = '';
                 step.options.forEach(opt => { const btn = document.createElement('button'); btn.className = 'action-btn'; btn.innerText = opt.label; btn.onclick = () => handleUserInput(opt.val, opt.label, step.saveAs, opt.next); buttonContainer.appendChild(btn); });
@@ -412,7 +558,9 @@
             if (wordCount < step.minWords) { appendMessage(val, "user"); appendMessage(`Please add a little more detail. This answer needs at least ${step.minWords} words.`, "bot"); inputEl.value = val; textContainer.style.display = 'flex'; inputEl.focus(); return; }
         }
         if (step.action === "classify") {
-            textContainer.style.display = 'none'; appendMessage(val, "user"); collectedFacts["initial_query"] = val; showLoading();
+            textContainer.style.display = 'none'; appendMessage(val, "user"); collectedFacts["initial_query"] = val;
+            collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), initial_query: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } };
+            showLoading();
             try {
                 const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "classify", text: val }) });
                 const data = await res.json(); hideLoading();
@@ -432,6 +580,7 @@
                     if (!hasKnownValue(collectedFacts["advisory_topic"]) && data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
                     const routeMap = { "Dismissed": "FIRED_DATE", "Resigned": "RESIGN_DATE", "Discrimination": "DISC_STATUS", "Advisory": "ADV_ISSUE", "UIF": "UIF_DESC" };
                     currentState = routeMap[finalCategory] || "START_FALLBACK";
+                    await processWebTurn(step, val, currentState);
                 }
                 renderState();
             } catch(error) { hideLoading(); console.error("Classification error:", error); currentState = "START_FALLBACK"; renderState(); }
@@ -440,9 +589,9 @@
         handleUserInput(val, val, step.saveAs, step.next);
     };
 
-    function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
+    async function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
         textContainer.style.display = 'none'; buttonContainer.style.display = 'none'; appendMessage(displayValue, "user");
-        if (saveKey) { collectedFacts[saveKey] = actualValue; collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), [saveKey]: { source: "user_answer", confidence: 1, captured_at: new Date().toISOString() } }; }
+        if (saveKey) { collectedFacts[saveKey] = actualValue; collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), [saveKey]: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } }; }
         if (saveKey === "whatsapp_number") {
             const normalised = normaliseWhatsAppNumber(actualValue);
             if (!normalised) { appendMessage("Please enter a valid WhatsApp number, including the country code where possible.", "bot"); currentState = "CLIENT_PHONE"; renderState(); return; }
@@ -467,12 +616,16 @@
         if (saveKey === "retrenchment_consultation") collectedFacts["proc_consultation"] = actualValue;
         if (saveKey === "retrenchment_alternatives") collectedFacts["retrenchment_alternatives_offered"] = actualValue;
         if (saveKey === "hearing_date") { collectedFacts["incident_date"] = actualValue; collectedFacts["event_type"] = "pre_dismissal_advisory"; }
+        if (saveKey === "employer_name") collectedFacts["employer_registered_name"] = actualValue;
         if (saveKey === "charge_sheet_received") collectedFacts["charge_sheet_received"] = actualValue;
         if (saveKey === "allegation_nature") collectedFacts["misconduct_category"] = actualValue;
         if (saveKey === "advisory_topic") { collectedFacts["ancillary_topic"] = actualValue; if (actualValue !== "Hearing Prep") { collectedFacts["employment_status"] = "Advisory"; collectedFacts["wp_eligible"] = false; collectedFacts["wp_type"] = null; } }
         if (saveKey === "relevant_event_date") collectedFacts["incident_date"] = actualValue;
         if (saveKey === "raised_internally") collectedFacts["internal_escalation"] = actualValue;
-        currentState = nextStateKey; renderState();
+        const currentStep = scriptFlow[currentState];
+        await processWebTurn(currentStep, String(displayValue ?? actualValue), nextStateKey);
+        currentState = nextStateKey;
+        renderState();
     }
 
     async function triggerJurisdictionTriage(outcome) {
