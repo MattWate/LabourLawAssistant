@@ -304,7 +304,8 @@ async function markHandoff(conversation, message, reason, facts = {}) {
   const { data: caseRow, error } = await supabase.from('cases').insert({
     client_name: facts.client_name || conversation.contact_name || 'WhatsApp enquiry', contact_info: conversation.from_number,
     issue_summary: issueSummary, case_facts: { ...facts, source: 'whatsapp', jurisdiction_outcome: reason, attorney_review_flag: true },
-    status: 'jurisdiction_triage', letter_status: 'not_applicable'
+    status: ['PROMPT_LIMIT_INCOMPLETE', 'INCOMPLETE_LETTER_FACTS'].includes(reason) ? 'needs_more_info' : 'jurisdiction_triage',
+    letter_status: ['PROMPT_LIMIT_INCOMPLETE', 'INCOMPLETE_LETTER_FACTS'].includes(reason) ? 'not_drafted' : 'not_applicable'
   }).select().single();
   if (error) throw error;
   await updateConversation(conversation.id, { status: 'handoff', current_step: reason, handoff_reason: reason, case_id: caseRow.id,
@@ -339,6 +340,21 @@ function withPromptRecorded(facts = {}, promptKey = '') {
 function requiredLetterFieldsMissing(facts = {}) {
   return ['employer_name', 'addressee_name', 'addressee_position', 'client_name', 'incident_description']
     .filter(key => !hasValue(facts[key]));
+}
+
+function queueUnconfirmedNarrativeFacts(facts = {}) {
+  const metadata = facts._fact_metadata || {};
+  const items = Object.entries(metadata)
+    .filter(([key, meta]) => meta?.source === 'initial_narrative_ai' && meta.confirmed !== true && hasValue(facts[key]))
+    .slice(0, 3)
+    .map(([key, meta]) => ({
+      field: key,
+      value: facts[key],
+      confidence: Number(meta.confidence || 0),
+      question: null
+    }));
+  if (!items.length) return facts;
+  return { ...facts, _pending_confirmation: { items } };
 }
 
 function mergeIntakeInferences(facts = {}, turn = {}) {
@@ -559,6 +575,7 @@ async function processIncomingMessage(message) {
   if (step.type === 'classify') {
     const classification = await invokeAsk('classify', { text: input });
     facts = mergeNarrativeFacts({ ...facts, initial_query: input }, classification);
+    facts = queueUnconfirmedNarrativeFacts(facts);
     if (!hasValue(facts.employment_status)) facts.employment_status = classification.category || 'Ambiguous';
     if (!hasValue(facts.dismissal_reason_type) && classification.dismissal_reason_type) facts.dismissal_reason_type = classification.dismissal_reason_type;
     if (!hasValue(facts.advisory_topic) && classification.advisory_topic) facts.advisory_topic = classification.advisory_topic;
@@ -591,6 +608,10 @@ async function processIncomingMessage(message) {
     if (!selected) return `I did not understand that answer. Reply with the number or wording shown.\n\n${renderPrompt(stepName)}`;
     facts[step.saveAs] = selected.value;
     facts = markDirectAnswer(facts, step.saveAs);
+    if (step.saveAs === 'employer_name') {
+      facts.employer_registered_name = selected.value;
+      facts = markDirectAnswer(facts, 'employer_registered_name');
+    }
     next = resolveNextUnanswered(selected.next, facts);
   } else {
     let valueToSave = input;
@@ -602,6 +623,10 @@ async function processIncomingMessage(message) {
     if (step.minWords && wordCount(input) < step.minWords) return `Please add a little more detail, ideally at least ${step.minWords} words.\n\n${step.prompt}`;
     facts[step.saveAs] = valueToSave;
     facts = markDirectAnswer(facts, step.saveAs);
+    if (step.saveAs === 'employer_name') {
+      facts.employer_registered_name = valueToSave;
+      facts = markDirectAnswer(facts, 'employer_registered_name');
+    }
     next = resolveNextUnanswered(step.next, facts);
   }
 
