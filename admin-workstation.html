@@ -604,7 +604,7 @@
       const ed = effective(c);
       return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id"><strong>Reference: ' + esc(f.case_reference || c.case_reference || '—') + '</strong> · Internal ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions">' + paymentAction(c) + '<button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\'' + c.id + '\')">Save Facts</button></div></div><div class="fact-grid">' +
         fact('Employer', f.employer_name) + fact('Contact', f.contact_info || c.contact_info) + fact('Incident Date', f.incident_date) + fact('Employment Status', f.employment_status) + fact('Incident Description', f.incident_description || c.issue_summary, true) +
-        '</div></div><div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\'' + c.id + '\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\'' + c.id + '\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
+        '</div></div>' + determinationCard(f) + '<div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\'' + c.id + '\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\'' + c.id + '\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
     }
 
     function paymentAction(c) {
@@ -621,13 +621,13 @@
 
     function editableFacts(c) {
       const f = facts(c);
-      const keys = ['client_name','contact_info','employer_name','employer_contact_details','incident_date','employment_status','dismissal_reason_type','contract_type','sector','hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter','incident_description'];
+      const keys = ['client_name','contact_info','employer_name','addressee_name','addressee_position','employer_contact_details','incident_date','employment_status','dismissal_reason_type','contract_type','sector','hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter','incident_description'];
       return '<div class="edit-grid">' + keys.map(k => editField(k, f[k])).join('') + '</div>';
     }
 
     function editField(k, v) {
       const labels = {
-        client_name:'Client Name',contact_info:'Client Contact',employer_name:'Employer Name',employer_contact_details:'Employer Contact',incident_date:'Incident Date',employment_status:'Employment Status',dismissal_reason_type:'Dismissal Reason',contract_type:'Contract Type',sector:'Sector',
+        client_name:'Client Name',contact_info:'Client Contact',employer_name:'Employer Registered Name',addressee_name:'Addressee Name',addressee_position:'Addressee Position',employer_contact_details:'Employer Contact',incident_date:'Incident Date',employment_status:'Employment Status',dismissal_reason_type:'Dismissal Reason',contract_type:'Contract Type',sector:'Sector',
         hearing_held:'Hearing Held?',proc_notice:'48h Notice Given?',proc_rep:'Representation Allowed?',proc_chair:'Independent Chair?',proc_consultation:'Consultation Held?',paid_suspension:'Paid Suspension?',constructive_dismissal:'Constructive Dismissal?',wants_letter:'Wants Letter?',incident_description:'Incident Description'
       };
       const bools = ['hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter'];
@@ -640,6 +640,26 @@
       return '<div class="block"><label>' + labels[k] + '</label><input class="field fact-input" data-key="' + k + '" value="' + attr(txt(v, '')) + '"/></div>';
     }
 
+    function determinationCard(f) {
+      const d = f.admin_determination || {};
+      if (!f.admin_determination) return '';
+      const time = d.time_bar || {};
+      const trace = Array.isArray(d.fact_trace) ? d.fact_trace : (Array.isArray(f.fact_trace) ? f.fact_trace : []);
+      const verified = Array.isArray(d.verified_references) ? d.verified_references : [];
+      const unverified = Array.isArray(d.unverified_references) ? d.unverified_references : [];
+      const issues = Array.isArray(d.claims_or_issues) ? d.claims_or_issues : [];
+      const uncertainties = Array.isArray(d.uncertainties) ? d.uncertainties : [];
+      const rows = trace.map(item => '<div class="timeline-item"><strong>' + esc(item.key) + ' · ' + (item.confirmed === false ? 'Claude inference / excluded' : 'Confirmed / usable') + '</strong>' + esc(txt(item.value)) + '</div>').join('');
+      return '<div class="card"><h3>Claude Determination</h3>' +
+        '<div class="badges" style="margin-bottom:12px"><span class="badge ' + meritClass(d.band || f.merit_band) + '">' + esc(d.band || f.merit_band || 'REVIEW') + '</span><span class="badge purple">' + esc(d.posture || f.wp_type || (f.wp_eligible ? 'WP ELIGIBLE' : 'NO WP')) + '</span><span class="badge blue">' + esc(time.label || 'Time bar unknown') + '</span>' + (d.review_flag === false ? '' : '<span class="badge amber">Review</span>') + '</div>' +
+        '<div class="score-grid"><div class="score"><span>Substantive</span><strong>' + esc(txt(d.substantive_score ?? f.substantive_score)) + '</strong></div><div class="score"><span>Procedural</span><strong>' + esc(txt(d.procedural_score ?? f.procedural_score)) + '</strong></div></div>' +
+        '<div class="timeline"><div class="timeline-item"><strong>Forum</strong>' + esc(txt(d.forum || f.recommended_forum)) + '</div><div class="timeline-item"><strong>Claude explanation</strong>' + esc(txt(d.explanation, 'No Claude explanation recorded.')) + '</div><div class="timeline-item"><strong>Claims / issues</strong>' + esc(issues.length ? issues.join('; ') : '—') + '</div><div class="timeline-item"><strong>Uncertainties</strong>' + esc(uncertainties.length ? uncertainties.join('; ') : '—') + '</div></div>' +
+        '<h4 style="margin:16px 0 8px">Fact provenance</h4><div class="timeline">' + (rows || '<div class="timeline-item">No provenance recorded.</div>') + '</div>' +
+        '<h4 style="margin:16px 0 8px">References</h4><div class="timeline">' +
+          (verified.length ? verified.map(x => '<div class="timeline-item"><strong>Verified</strong><a href="' + attr(x.url) + '" target="_blank" rel="noopener">' + esc(x.label) + '</a></div>').join('') : '<div class="timeline-item"><strong>Verified</strong>No source-linked references recorded.</div>') +
+          (unverified.length ? unverified.map(x => '<div class="timeline-item"><strong>Unverified – excluded from Claude reasoning</strong>' + esc(x.label) + '</div>').join('') : '') +
+        '</div></div>';
+    }
     function decisionSummary(d) {
       return '<div class="badges" style="margin-bottom:12px"><span class="badge blue">' + esc(d.track || 'UNCLASSIFIED') + '</span><span class="badge ' + meritClass(d.merit_band) + '">' + esc(d.merit_band || d.overall_viability || 'REVIEW') + '</span>' + (bool(d.wp_eligible) ? '<span class="badge green">WP ELIGIBLE</span>' : '<span class="badge">WP N/A</span>') + '</div><div class="score-grid"><div class="score"><span>Substantive</span><strong>' + esc(txt(d.substantive_score)) + '</strong></div><div class="score"><span>Procedural</span><strong>' + esc(txt(d.procedural_score)) + '</strong></div></div><div class="timeline-item" style="margin-top:12px"><strong>Next step</strong>' + esc(txt(d.recommended_next_step || d.overall_viability, 'Review matter')) + '</div>';
     }
