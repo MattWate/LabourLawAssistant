@@ -527,7 +527,7 @@
         if (currentQueueFilter === 'wp' && !bool(ed.wp_eligible)) return false;
         if (currentQueueFilter === 'high' && !['HIGH','MEDIUM-HIGH'].includes(String(ed.merit_band || '').toUpperCase())) return false;
         if (!search) return true;
-        return [f.case_reference,c.case_reference,c.id,f.client_name,c.client_name,f.contact_info,c.contact_info,f.employer_name,f.employer_contact_details,f.incident_description,c.issue_summary,ed.track,ed.merit_band].join(' ').toLowerCase().includes(search);
+        return [c.client_reference,f.case_reference,c.case_reference,c.id,f.client_name,c.client_name,f.contact_info,c.contact_info,f.employer_name,f.employer_contact_details,f.incident_description,c.issue_summary,ed.track,ed.merit_band].join(' ').toLowerCase().includes(search);
       });
     }
 
