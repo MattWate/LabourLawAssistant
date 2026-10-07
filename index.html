@@ -120,8 +120,26 @@
 
     let collectedFacts = { source: "web" };
     let activeCaseId = null;
+    let consentConfig = {
+        version: "placeholder-2026-10-07",
+        is_placeholder: true,
+        text: "PLACEHOLDER – VRS APPROVED WORDING TO BE INSERTED. By continuing, you accept the VRS terms, privacy notice, disclaimer, sensitive-information processing, cross-border processing and AI-assisted processing."
+    };
 
     const scriptFlow = {
+        CONSENT: {
+            msg: consentConfig.text,
+            type: "buttons",
+            options: [
+                { label: "I accept and consent", next: "JUR_EMPLOYEE", val: true },
+                { label: "I do not accept", next: "CONSENT_DECLINED", val: false }
+            ],
+            saveAs: "consent_accepted"
+        },
+        CONSENT_DECLINED: {
+            msg: "Thanks. I cannot continue the automated intake without your consent. Please contact VRS directly if you would like to discuss another way to provide your information.",
+            type: "end"
+        },
         JUR_EMPLOYEE: {
             msg: "Hi, my name is Justine and I am a VRS Labour Law Assistant. I am here to help you work through what has happened. Before we start, the information you share will be used by VRS Labour Law Consultants to understand and assess your matter and will be handled as part of your VRS enquiry. Justine provides an initial automated assessment, and a VRS consultant reviews the matter and decides the next step. The automated flow is currently in English. To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?",
             type: "buttons",
@@ -312,12 +330,13 @@
         ADDRESSEE_NAME: { msg: "Who should any letter be addressed to? Please give their full name, or type UNKNOWN if you do not know it.", type: "text", next: "ADDRESSEE_POSITION", saveAs: "addressee_name" },
         ADDRESSEE_POSITION: { msg: "What is that person's job title or position? Type UNKNOWN if you do not know it.", type: "text", next: "COMPANY_CONTACT", saveAs: "addressee_position" },
         COMPANY_CONTACT: { msg: "Could you share a contact email or number for the employer's HR department or the addressee? Type UNKNOWN if you do not have it.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
-        CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_PHONE", saveAs: "client_name" },
+        CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_EMAIL", saveAs: "client_name" },
+        CLIENT_EMAIL: { msg: "What personal email address should VRS use for confidential correspondence? Please do not use an employer-controlled work email address.", type: "text", next: "CLIENT_PHONE", saveAs: "client_email" },
         CLIENT_PHONE: { msg: "And finally, what WhatsApp cell phone number should VRS use to contact you? Please include the country code, for example +27 82 123 4567.", type: "text", next: "HANDOFF", saveAs: "whatsapp_number" },
         HANDOFF: { action: "evaluate" }
     };
 
-    let currentState = "JUR_EMPLOYEE";
+    let currentState = "CONSENT";
 
     function scrollToBottom() { setTimeout(() => { historyEl.scrollTop = historyEl.scrollHeight; }, 50); }
     function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
@@ -546,7 +565,7 @@
             return;
         }
         const promptKey = "step:" + currentState;
-        if (!recordWebPrompt(promptKey)) { handleWebPromptLimit(); return; }
+        if (currentState !== "CONSENT" && !recordWebPrompt(promptKey)) { handleWebPromptLimit(); return; }
         setTimeout(() => {
             const override = collectedFacts._next_question_override;
             const promptText = override?.state === currentState ? override.text : step.msg;
@@ -606,7 +625,62 @@
 
     async function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
         textContainer.style.display = 'none'; buttonContainer.style.display = 'none'; appendMessage(displayValue, "user");
+
+        if (saveKey === "consent_accepted") {
+            if (actualValue !== true) {
+                collectedFacts.consent = {
+                    accepted: false,
+                    version: consentConfig.version,
+                    declined_at: new Date().toISOString(),
+                    channel: "web",
+                    placeholder_wording: consentConfig.is_placeholder === true
+                };
+                currentState = nextStateKey;
+                renderState();
+                return;
+            }
+            collectedFacts.consent = {
+                accepted: true,
+                version: consentConfig.version,
+                accepted_at: new Date().toISOString(),
+                channel: "web",
+                placeholder_wording: consentConfig.is_placeholder === true
+            };
+        }
+
+        if (saveKey === "client_email") {
+            showLoading();
+            try {
+                const res = await fetch('/.netlify/functions/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: "validate_client_email",
+                        clientEmail: actualValue,
+                        employerEmail: collectedFacts.employer_contact_details || ""
+                    })
+                });
+                const data = await res.json();
+                hideLoading();
+                if (!res.ok || data.ok === false) {
+                    appendMessage(data.reason === "matches_employer_domain"
+                        ? "Please use a personal email address that is not controlled by your employer."
+                        : "Please enter a valid personal email address.", "bot");
+                    currentState = "CLIENT_EMAIL";
+                    renderState();
+                    return;
+                }
+                actualValue = data.client_email || actualValue;
+            } catch (error) {
+                hideLoading();
+                appendMessage("Please enter a valid personal email address.", "bot");
+                currentState = "CLIENT_EMAIL";
+                renderState();
+                return;
+            }
+        }
         if (saveKey) { collectedFacts[saveKey] = actualValue; collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), [saveKey]: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } }; }
+        if (saveKey === "client_email") collectedFacts.contact_email = actualValue;
         if (saveKey === "whatsapp_number") {
             const normalised = normaliseWhatsAppNumber(actualValue);
             if (!normalised) { appendMessage("Please enter a valid WhatsApp number, including the country code where possible.", "bot"); currentState = "CLIENT_PHONE"; renderState(); return; }
@@ -692,7 +766,27 @@
         historyEl.appendChild(row); scrollToBottom();
     }
     function hideLoading() { const el = document.getElementById('loading-row'); if(el) el.remove(); }
-    renderState();
+    async function initialiseIntake() {
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "consent_config" })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                consentConfig = data;
+                scriptFlow.CONSENT.msg = data.text || scriptFlow.CONSENT.msg;
+                if (data.accept_label) scriptFlow.CONSENT.options[0].label = data.accept_label;
+                if (data.decline_label) scriptFlow.CONSENT.options[1].label = data.decline_label;
+            }
+        } catch (error) {
+            console.warn("Consent configuration unavailable; using placeholder fallback.", error);
+        }
+        renderState();
+    }
+
+    initialiseIntake();
 </script>
 
 </body>
