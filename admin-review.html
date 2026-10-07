@@ -388,6 +388,8 @@
         <div class="card">
           <h2>Decision Summary</h2>
           <div class="fact-grid">
+            ${fact('Client Reference', c.client_reference || '—')}
+            ${fact('VRS Reference', f.case_reference || c.case_reference || '—')}
             ${fact('Case ID', c.id)}
             ${fact('Created', displayDate(c.created_at))}
             ${fact('Letter Status', c.letter_status)}
