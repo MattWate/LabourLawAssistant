@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { validateAndNormaliseDate } = require('./dateValidation');
 const { CONSENT_CONFIG, consentSnapshot } = require('./consentConfig');
 const { compareClientEmployerEmail } = require('./emailPrivacy');
+const { retentionMetadata } = require('./privacyGovernance');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -291,7 +292,7 @@ async function createConversation(message) {
   const { data, error } = await supabase.from('whatsapp_conversations').insert({
     from_number: message.from_number, contact_name: message.contact_name || null, phone_number_id: message.phone_number_id || null,
     current_step: 'CONSENT', status: 'active',
-    collected_facts: { client_name: message.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 0, _intake_prompt_history: [] },
+    collected_facts: { client_name: message.contact_name || null, contact_info: message.from_number, source: 'whatsapp', privacy_governance: retentionMetadata({ channel: 'whatsapp' }), _intake_prompt_count: 0, _intake_prompt_history: [] },
     processed_message_ids: message.whatsapp_message_id ? [message.whatsapp_message_id] : [], last_inbound_at: now, updated_at: now
   }).select().single();
   if (error) throw error;
@@ -321,7 +322,7 @@ async function markHandoff(conversation, message, reason, facts = {}) {
   return `${issueSummary}\n\nReference: ${caseRow.id}`;
 }
 async function restartConversation(conversation, message) {
-  const facts = { client_name: message.contact_name || conversation.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 0, _intake_prompt_history: [] };
+  const facts = { client_name: message.contact_name || conversation.contact_name || null, contact_info: message.from_number, source: 'whatsapp', privacy_governance: retentionMetadata({ channel: 'whatsapp' }), _intake_prompt_count: 0, _intake_prompt_history: [] };
   await updateConversation(conversation.id, { current_step: 'CONSENT', status: 'active', collected_facts: facts, classification: null,
     case_id: null, handoff_reason: null, error_message: null, processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
   return `${INTRO}\n\n${renderPrompt('CONSENT')}`;
