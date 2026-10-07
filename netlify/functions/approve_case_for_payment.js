@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
+const { determineProductRoute } = require('./lib/productRouting');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -115,6 +116,10 @@ exports.handler = async (event) => {
     }
 
     const facts = caseData.case_facts || {};
+    const productRoute = determineProductRoute(facts);
+    if (!productRoute.payment_allowed || productRoute.product_code !== 'WP_LETTER') {
+      return json(409, { error: productRoute.reason || 'No payable product is available for this case', product_route: productRoute });
+    }
     const employerEmail = facts.employer_email || extractEmail(facts.employer_contact_details);
     const clientEmail = facts.client_email || extractEmail(facts.contact_info || caseData.contact_info);
 
