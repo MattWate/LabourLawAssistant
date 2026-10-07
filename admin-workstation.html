@@ -695,9 +695,34 @@
       const ed = effective(c);
       const questions = f.client_questions || [];
       const legal = ed.legal_basis || f.legal_basis || [];
-      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge ' + (c.payment_status === 'paid' ? 'green' : c.payment_status === 'pending' ? 'amber' : 'blue') + '">Payment: ' + esc(c.payment_status || 'not requested') + '</span><span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div><div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
+      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge ' + (c.payment_status === 'paid' ? 'green' : c.payment_status === 'pending' ? 'amber' : 'blue') + '">Payment: ' + esc(c.payment_status || 'not requested') + '</span><span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div>' + paymentResolutionCard(c) + '<div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
     }
 
+    function paymentResolutionCard(c) {
+      if (c.payment_status !== 'paid') return '';
+      const f = facts(c);
+      const current = f.payment_resolution || {};
+      const currentText = current.resolution ? current.resolution.replace(/_/g, ' ') + ' · ' + date(current.recorded_at) : 'No refund or credit action recorded.';
+      return '<div class="card"><h3>Refund / Credit Route</h3><p style="color:var(--muted);line-height:1.5">Use this only when VRS declines to release a paid letter or resolves the paid service by refund or credit. This records the operational action; it does not move money automatically.</p><div class="timeline-item"><strong>Current status</strong>' + esc(currentText) + '</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn warn" onclick="recordPaymentResolution(\'' + c.id + '\',\'refund_required\')">Refund Required</button><button class="btn ghost" onclick="recordPaymentResolution(\'' + c.id + '\',\'refund_processed\')">Refund Processed</button><button class="btn ghost" onclick="recordPaymentResolution(\'' + c.id + '\',\'credit_offered\')">Credit Offered</button><button class="btn ghost" onclick="recordPaymentResolution(\'' + c.id + '\',\'credit_issued\')">Credit Issued</button></div></div>';
+    }
+
+    async function recordPaymentResolution(id, resolution) {
+      const note = window.prompt('Optional note for this refund/credit action:', '') || '';
+      if (!window.confirm('Record ' + resolution.replace(/_/g, ' ') + ' for this paid case?')) return;
+      try {
+        const res = await authFetch('/.netlify/functions/manage_payment_resolution', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ caseId: id, resolution, note })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not record refund/credit action.');
+        toast('Payment resolution recorded.');
+        await fetchCases();
+      } catch (e) {
+        toast(e.message || 'Could not record refund/credit action.');
+      }
+    }
     async function approveCaseForPayment(id) {
       const c = casesData.find(x => x.id === id);
       if (!c) return toast('Case not found.');
