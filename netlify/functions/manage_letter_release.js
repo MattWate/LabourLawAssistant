@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendApprovedLetter } = require('./lib/email');
+const { compareClientEmployerEmail } = require('./lib/emailPrivacy');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
 const {
   sha256,
@@ -185,6 +186,12 @@ exports.handler = async (event) => {
     const to = employerEmail(caseData, facts);
     if (!to) return json(400, { error: 'A valid employer email address is required before release' });
     const cc = clientEmail(caseData, facts);
+    if (cc) {
+      const privacy = compareClientEmployerEmail({ clientEmail: cc, employerEmail: to });
+      if (!privacy.ok) {
+        return json(400, { error: 'The recorded client email appears to be employer-controlled. Add a personal client email before release.' });
+      }
+    }
     const documentBuffer = await downloadStoredLetter({
       supabase,
       bucket: facts.letter_document_bucket || process.env.LETTER_DOCUMENT_BUCKET || 'case-documents',
@@ -209,7 +216,7 @@ exports.handler = async (event) => {
       letter_sent_at: sentAt,
       letter_sent_by: user.email || user.id,
       letter_sent_to: to,
-      letter_sent_cc: cc || null,
+      letter_sent_bcc: cc || null,
       resend_message_id: emailResult?.id || null,
       letter_sent_notification: notification
     };
@@ -227,7 +234,7 @@ exports.handler = async (event) => {
       action: 'send',
       letter_status: 'sent',
       sent_to: to,
-      copied_to: cc,
+      blind_copied_to: cc,
       document_filename: facts.letter_document_filename,
       resend_message_id: emailResult?.id || null,
       whatsapp_notification: notification
