@@ -8,6 +8,8 @@ const { caseReference } = require('./lib/caseReference');
 const { factsForDeterministicDecision, buildFactTrace } = require('./lib/factProvenance');
 const { processClientTurn } = require('./lib/intakeConversation');
 const { explainDeterministicDetermination } = require('./lib/determinationExplanation');
+const { CONSENT_CONFIG, consentSnapshot } = require('./lib/consentConfig');
+const { compareClientEmployerEmail, cleanEmail } = require('./lib/emailPrivacy');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -151,6 +153,8 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
   return {
     client_name: facts.client_name || null,
     contact_info: facts.contact_info || null,
+    client_email: facts.client_email || null,
+    consent: facts.consent || null,
     employer_name: facts.employer_name || null,
     employer_registered_name: facts.employer_registered_name || facts.employer_name || null,
     employer_contact_details: facts.employer_contact_details || null,
@@ -261,6 +265,26 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
     const action = body.action;
+
+    if (action === 'consent_config') {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(CONSENT_CONFIG)
+      };
+    }
+
+    if (action === 'validate_client_email') {
+      const result = compareClientEmployerEmail({
+        clientEmail: body.clientEmail,
+        employerEmail: body.employerEmail
+      });
+      return {
+        statusCode: result.ok ? 200 : 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result)
+      };
+    }
 
     if (action === 'classify') {
       const result = await classifyText(body.text || '');
