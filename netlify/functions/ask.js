@@ -10,6 +10,7 @@ const { processClientTurn } = require('./lib/intakeConversation');
 const { explainDeterministicDetermination } = require('./lib/determinationExplanation');
 const { CONSENT_CONFIG, consentSnapshot } = require('./lib/consentConfig');
 const { compareClientEmployerEmail, cleanEmail } = require('./lib/emailPrivacy');
+const { retentionMetadata } = require('./lib/privacyGovernance');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -197,7 +198,8 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     attorney_review_flag: true,
     legal_context_snapshot: contextText,
     llm_governance: facts.llm_governance || null,
-    llm_call_logs: facts.llm_call_logs || []
+    llm_call_logs: facts.llm_call_logs || [],
+    privacy_governance: facts.privacy_governance || retentionMetadata({ channel: facts.source || 'web' })
   };
 }
 
@@ -228,7 +230,8 @@ function buildTriageFacts(facts = {}, outcome = 'UNKNOWN') {
     merit_band: 'NO MERIT',
     recommended_next_step: `Jurisdiction triage captured. Recommended forum: ${forum}.`,
     attorney_review_flag: true,
-    wp_letter_status: 'NOT_APPLICABLE'
+    wp_letter_status: 'NOT_APPLICABLE',
+    privacy_governance: facts.privacy_governance || retentionMetadata({ channel: facts.source || 'web' })
   };
 }
 
@@ -318,7 +321,8 @@ exports.handler = async (event) => {
           ...facts,
           intake_handoff_reason: reason,
           intake_missing_fields: missing,
-          attorney_review_flag: true
+          attorney_review_flag: true,
+          privacy_governance: facts.privacy_governance || retentionMetadata({ channel: facts.source || 'web' })
         },
         status: 'needs_more_info',
         letter_status: 'not_drafted'
