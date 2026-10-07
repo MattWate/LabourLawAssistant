@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
-const { sendApprovedLetter } = require('./lib/email');
+const { sendApprovedLetter, sendEmail } = require('./lib/email');
 const { compareClientEmployerEmail } = require('./lib/emailPrivacy');
+const { assertReleaseAuthorised } = require('./lib/releaseAuthorization');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
 const {
   sha256,
@@ -55,7 +56,19 @@ async function notifyLetterSent(caseData, facts) {
 
   try {
     if (templateName) {
-      await sendWhatsAppTemplate({ to: conversation.from_number, phoneNumberId, templateName, languageCode, bodyParameters: [clientName, employerName] });
+      await sendWhatsAppTemplate({
+        to: conversation.from_number,
+        phoneNumberId,
+        templateName,
+        languageCode,
+        components: [{
+          type: 'body',
+          parameters: [
+            { type: 'text', text: clientName },
+            { type: 'text', text: employerName }
+          ]
+        }]
+      });
       return { sent: true, mode: 'template', template_name: templateName, language_code: languageCode };
     }
     await sendWhatsAppText({
@@ -86,6 +99,26 @@ async function generateApprovedDocument({ caseData, facts, draft, user, approved
       letter_document_generated_by: user.email || user.id
     }
   };
+}
+
+async function alertVrsSendFailure({ caseData, facts, error, user }) {
+  const recipients = String(process.env.VRS_ALERT_EMAILS || '')
+    .split(',')
+    .map(x => x.trim())
+    .filter(Boolean);
+  if (!recipients.length) return { sent: false, reason: 'VRS_ALERT_EMAILS not configured' };
+
+  try {
+    const result = await sendEmail({
+      to: recipients,
+      subject: `Justine alert: letter send failed for ${facts.case_reference || caseData.id}`,
+      text: `A released letter failed to send.\n\nCase: ${facts.case_reference || caseData.id}\nClient: ${facts.client_name || caseData.client_name || 'Unknown'}\nAttempted by: ${user.email || user.id}\nError: ${String(error.message || error)}\n\nPlease review the case in Justine.`
+    });
+    return { sent: true, message_id: result?.id || null };
+  } catch (alertError) {
+    console.error('VRS send-failure alert could not be delivered:', alertError.message);
+    return { sent: false, error: alertError.message };
+  }
 }
 
 exports.handler = async (event) => {
@@ -177,6 +210,15 @@ exports.handler = async (event) => {
       return json(200, { success: true, action: 'regenerate', document_ready: true, document_filename: generated.document.filename });
     }
 
+    const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+    let releaseAuth;
+    try {
+      releaseAuth = assertReleaseAuthorised({ user, authHeader });
+    } catch (authError) {
+      const status = authError.code === 'MFA_REQUIRED' ? 403 : 403;
+      return json(status, { error: authError.message, code: authError.code || 'RELEASE_NOT_AUTHORISED' });
+    }
+
     if (caseData.letter_status !== 'approved') return json(409, { error: 'Approve the letter before sending it' });
     if (!draft) return json(400, { error: 'The approved letter is empty' });
     if (draft !== String(caseData.draft_letter || '').trim()) return json(409, { error: 'The letter has changed since approval. Save and approve the revised version before sending.' });
@@ -198,15 +240,43 @@ exports.handler = async (event) => {
       storagePath: facts.letter_document_path
     });
 
-    const emailResult = await sendApprovedLetter({
-      employerEmail: to,
-      clientEmail: cc,
-      clientName: facts.client_name || caseData.client_name,
-      employerName: facts.employer_name,
-      letter: draft,
-      caseId,
-      document: { filename: facts.letter_document_filename, buffer: documentBuffer }
-    });
+    let emailResult;
+    try {
+      emailResult = await sendApprovedLetter({
+        employerEmail: to,
+        clientEmail: cc,
+        clientName: facts.client_name || caseData.client_name,
+        employerName: facts.employer_name,
+        letter: draft,
+        caseId,
+        document: { filename: facts.letter_document_filename, buffer: documentBuffer }
+      });
+    } catch (sendError) {
+      const failedAt = new Date().toISOString();
+      const alert = await alertVrsSendFailure({ caseData, facts, error: sendError, user });
+      const failedFacts = {
+        ...facts,
+        wp_letter_status: 'SEND_FAILED',
+        letter_send_failed_at: failedAt,
+        letter_send_failed_by: user.email || user.id,
+        letter_send_failed_to: to,
+        letter_send_failure_error: String(sendError.message || sendError),
+        letter_send_failure_alert: alert,
+        release_aal: releaseAuth?.aal || null,
+        release_permission_source: releaseAuth?.permission_source || null
+      };
+      await supabase.from('cases').update({
+        status: 'letter_send_failed',
+        letter_status: 'send_failed',
+        case_facts: failedFacts,
+        updated_at: failedAt
+      }).eq('id', caseId);
+      return json(502, {
+        error: 'The letter was not sent. The case has been marked as failed and VRS has been alerted where configured.',
+        send_failed: true,
+        alert
+      });
+    }
 
     const notification = await notifyLetterSent(caseData, facts);
     const sentAt = new Date().toISOString();
@@ -218,7 +288,9 @@ exports.handler = async (event) => {
       letter_sent_to: to,
       letter_sent_bcc: cc || null,
       resend_message_id: emailResult?.id || null,
-      letter_sent_notification: notification
+      letter_sent_notification: notification,
+      release_aal: releaseAuth?.aal || null,
+      release_permission_source: releaseAuth?.permission_source || null
     };
 
     const { error: updateError } = await supabase.from('cases').update({
