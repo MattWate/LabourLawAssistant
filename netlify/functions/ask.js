@@ -11,6 +11,7 @@ const { explainDeterministicDetermination } = require('./lib/determinationExplan
 const { CONSENT_CONFIG, consentSnapshot } = require('./lib/consentConfig');
 const { compareClientEmployerEmail, cleanEmail } = require('./lib/emailPrivacy');
 const { retentionMetadata } = require('./lib/privacyGovernance');
+const { determineProductRoute } = require('./lib/productRouting');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -371,11 +372,15 @@ exports.handler = async (event) => {
         scorecard,
         sourceLinks: facts.verified_legal_sources || facts.legal_source_links || []
       });
-      const caseFacts = {
+      const preliminaryFacts = {
         ...buildCoreFacts(facts, fullStory, scorecard, contextText),
         fact_trace: buildFactTrace(facts),
         admin_determination: determination,
         recommended_forum: determination.forum || facts.recommended_forum || null
+      };
+      const caseFacts = {
+        ...preliminaryFacts,
+        product_route: determineProductRoute(preliminaryFacts)
       };
       const clientOutcome = clientOutcomeFor(caseFacts, scorecard);
 
@@ -415,7 +420,7 @@ exports.handler = async (event) => {
       const { data: existing, error: readErr } = await supabase.from('cases').select('case_facts').eq('id', caseId).single();
       if (readErr) throw readErr;
       const caseFacts = existing?.case_facts || {};
-      const wpEligible = caseFacts.wp_eligible === true;
+      const wpEligible = caseFacts.wp_eligible === true && caseFacts.product_route?.wp_letter_allowed !== false;
       const updatePayload = { updated_at: new Date().toISOString(), case_facts: { ...caseFacts, wants_letter } };
       if (wants_letter && wpEligible) {
         updatePayload.status = 'requires_attorney';
