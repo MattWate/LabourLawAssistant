@@ -586,7 +586,7 @@
     function selectCase(id) { selectedCaseId = id; currentView = 'workstation'; render(); }
 
     function statusBadge(s) {
-      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved – Ready to Send','green'], sent:['Letter Sent','green'], letter_sent:['Letter Sent','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
+      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved – Ready to Send','green'], send_failed:['Send Failed','red'], letter_send_failed:['Send Failed','red'], sent:['Letter Sent','green'], letter_sent:['Letter Sent','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
       const item = map[s] || [s, 'blue'];
       return '<span class="badge ' + item[1] + '">' + esc(item[0]) + '</span>';
     }
