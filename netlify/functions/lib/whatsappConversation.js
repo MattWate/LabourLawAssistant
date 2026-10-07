@@ -1,11 +1,13 @@
 const { createClient } = require('@supabase/supabase-js');
 const { validateAndNormaliseDate } = require('./dateValidation');
+const { CONSENT_CONFIG, consentSnapshot } = require('./consentConfig');
+const { compareClientEmployerEmail } = require('./emailPrivacy');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I will ask a few questions to understand what has happened. The information you share will be used by VRS Labour Law Consultants to understand and assess your matter and will be handled as part of your VRS enquiry.\n\nJustine provides an initial automated assessment, and a VRS consultant reviews the matter and decides the next step. The automated flow is currently in English. Type HELP at any time for assistance, or RESTART to begin again.`;
+const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I can help collect the information VRS needs to assess your matter. Type HELP at any time for assistance, or RESTART to begin again.`;
 
 const choice = (label, value, next) => ({ label, value, next });
 const buttons = (prompt, saveAs, choices) => ({ type: 'buttons', prompt, saveAs, choices });
@@ -13,6 +15,11 @@ const text = (prompt, saveAs, next, extra = {}) => ({ type: 'text', prompt, save
 const date = (prompt, saveAs, next, dateRules = {}) => ({ type: 'date', prompt, saveAs, next, dateRules });
 
 const STEPS = {
+  CONSENT: buttons(CONSENT_CONFIG.text, 'consent_accepted', [
+    choice(CONSENT_CONFIG.accept_label, true, 'JUR_EMPLOYEE'),
+    choice(CONSENT_CONFIG.decline_label, false, 'CONSENT_DECLINED')
+  ]),
+  CONSENT_DECLINED: { type: 'end', prompt: 'Thanks. I cannot continue the automated intake without your consent. Please contact VRS directly if you would like to provide your information another way.' },
   JUR_EMPLOYEE: buttons('To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?', 'worker_status', [
     choice('Yes', 'Employee', 'JUR_SA_EMPLOYER'), choice('No', 'Contractor', 'JUR_CONTRACTOR_CONTROL'), choice('Unsure', 'Unsure', 'JUR_CONTRACTOR_CONTROL')
   ]),
@@ -222,7 +229,8 @@ const STEPS = {
   ADDRESSEE_NAME: text('Who should any letter be addressed to? Please give their full name, or type UNKNOWN if you do not know it.', 'addressee_name', 'ADDRESSEE_POSITION'),
   ADDRESSEE_POSITION: text('What is that person\'s job title or position? Type UNKNOWN if you do not know it.', 'addressee_position', 'COMPANY_CONTACT'),
   COMPANY_CONTACT: text('Could you share a contact email or number for the employer\'s HR department or the addressee? Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
-  CLIENT_NAME: text('Almost done. What is your full name?', 'client_name', 'HANDOFF'),
+  CLIENT_NAME: text('Almost done. What is your full name?', 'client_name', 'CLIENT_EMAIL'),
+  CLIENT_EMAIL: text('What personal email address should VRS use for confidential correspondence? Please do not use an employer-controlled work email address.', 'client_email', 'HANDOFF'),
   HANDOFF: { type: 'evaluate' }
 };
 
@@ -282,8 +290,8 @@ async function createConversation(message) {
   const now = new Date().toISOString();
   const { data, error } = await supabase.from('whatsapp_conversations').insert({
     from_number: message.from_number, contact_name: message.contact_name || null, phone_number_id: message.phone_number_id || null,
-    current_step: 'JUR_EMPLOYEE', status: 'active',
-    collected_facts: { client_name: message.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 1, _intake_prompt_history: ['step:JUR_EMPLOYEE'] },
+    current_step: 'CONSENT', status: 'active',
+    collected_facts: { client_name: message.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 0, _intake_prompt_history: [] },
     processed_message_ids: message.whatsapp_message_id ? [message.whatsapp_message_id] : [], last_inbound_at: now, updated_at: now
   }).select().single();
   if (error) throw error;
@@ -313,10 +321,10 @@ async function markHandoff(conversation, message, reason, facts = {}) {
   return `${issueSummary}\n\nReference: ${caseRow.id}`;
 }
 async function restartConversation(conversation, message) {
-  const facts = { client_name: message.contact_name || conversation.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 1, _intake_prompt_history: ['step:JUR_EMPLOYEE'] };
-  await updateConversation(conversation.id, { current_step: 'JUR_EMPLOYEE', status: 'active', collected_facts: facts, classification: null,
+  const facts = { client_name: message.contact_name || conversation.contact_name || null, contact_info: message.from_number, source: 'whatsapp', _intake_prompt_count: 0, _intake_prompt_history: [] };
+  await updateConversation(conversation.id, { current_step: 'CONSENT', status: 'active', collected_facts: facts, classification: null,
     case_id: null, handoff_reason: null, error_message: null, processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
-  return `${INTRO}\n\n${renderPrompt('JUR_EMPLOYEE')}`;
+  return `${INTRO}\n\n${renderPrompt('CONSENT')}`;
 }
 const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
 const { markClientConfirmedFact } = require('./factProvenance');
@@ -513,7 +521,7 @@ async function processIncomingMessage(message) {
   const input = cleanText(message.text_body);
   if (!input) return 'I can currently process text messages only. Please type a response.';
   let conversation = await getConversation(message.from_number);
-  if (!conversation) { await createConversation(message); return `${INTRO}\n\n${renderPrompt('JUR_EMPLOYEE')}`; }
+  if (!conversation) { await createConversation(message); return `${INTRO}\n\n${renderPrompt('CONSENT')}`; }
   const processed = Array.isArray(conversation.processed_message_ids) ? conversation.processed_message_ids : [];
   if (message.whatsapp_message_id && processed.includes(message.whatsapp_message_id)) return null;
   const command = normalize(input);
@@ -521,11 +529,49 @@ async function processIncomingMessage(message) {
   if (['help', 'human', 'agent', 'attorney', 'lawyer'].includes(command)) return markHandoff(conversation, message, 'USER_REQUESTED_HELP', conversation.collected_facts || {});
   if (conversation.status === 'completed') return 'Your intake has already been submitted. Type RESTART for a new matter, or HELP for assistance.';
   if (conversation.status === 'handoff') return 'Your enquiry is already waiting for human review. Type RESTART only for a different matter.';
+  if (conversation.status === 'consent_declined') return 'I cannot continue the automated intake without consent. Type RESTART if you would like to review the consent notice again.';
 
-  const stepName = conversation.current_step || 'JUR_EMPLOYEE';
+  const stepName = conversation.current_step || 'CONSENT';
   const step = STEPS[stepName];
   if (!step) return restartConversation(conversation, message);
   let facts = { ...(conversation.collected_facts || {}) };
+
+  if (stepName === 'CONSENT') {
+    const selected = matchChoice(input, step);
+    if (!selected) return `Please choose one of the options shown.\n\n${renderPrompt('CONSENT')}`;
+
+    facts.consent_accepted = selected.value === true;
+    facts = markDirectAnswer(facts, 'consent_accepted');
+
+    if (selected.value !== true) {
+      facts.consent = {
+        accepted: false,
+        version: CONSENT_CONFIG.version,
+        declined_at: new Date().toISOString(),
+        channel: 'whatsapp',
+        placeholder_wording: CONSENT_CONFIG.is_placeholder === true
+      };
+      await updateConversation(conversation.id, {
+        status: 'consent_declined',
+        current_step: 'CONSENT_DECLINED',
+        collected_facts: facts,
+        processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id),
+        last_inbound_at: new Date().toISOString()
+      });
+      return STEPS.CONSENT_DECLINED.prompt;
+    }
+
+    facts.consent = consentSnapshot('whatsapp');
+    facts = withPromptRecorded(facts, 'step:JUR_EMPLOYEE');
+    await updateConversation(conversation.id, {
+      status: 'active',
+      current_step: 'JUR_EMPLOYEE',
+      collected_facts: facts,
+      processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id),
+      last_inbound_at: new Date().toISOString()
+    });
+    return renderPrompt('JUR_EMPLOYEE');
+  }
 
   if (facts._pending_confirmation?.items?.length) {
     const pending = facts._pending_confirmation;
@@ -615,6 +661,18 @@ async function processIncomingMessage(message) {
     next = resolveNextUnanswered(selected.next, facts);
   } else {
     let valueToSave = input;
+    if (step.saveAs === 'client_email') {
+      const privacy = compareClientEmployerEmail({
+        clientEmail: input,
+        employerEmail: facts.employer_contact_details || facts.employer_email || ''
+      });
+      if (!privacy.ok) {
+        return privacy.reason === 'matches_employer_domain'
+          ? `Please use a personal email address that is not controlled by your employer.\n\n${step.prompt}`
+          : `Please enter a valid personal email address.\n\n${step.prompt}`;
+      }
+      valueToSave = privacy.client_email;
+    }
     if (step.type === 'date') {
       const dateResult = validateAndNormaliseDate(input, step.dateRules || {});
       if (!dateResult.ok) return `${dateResult.message}\n\n${step.prompt}`;
@@ -627,6 +685,7 @@ async function processIncomingMessage(message) {
       facts.employer_registered_name = valueToSave;
       facts = markDirectAnswer(facts, 'employer_registered_name');
     }
+    if (step.saveAs === 'client_email') facts.contact_email = valueToSave;
     next = resolveNextUnanswered(step.next, facts);
   }
 
