@@ -347,7 +347,7 @@ function withPromptRecorded(facts = {}, promptKey = '') {
 }
 
 function requiredLetterFieldsMissing(facts = {}) {
-  return ['employer_name', 'addressee_name', 'addressee_position', 'client_name', 'incident_description']
+  return ['employer_name', 'addressee_name', 'addressee_position', 'client_name', 'client_email', 'incident_description']
     .filter(key => !hasValue(facts[key]));
 }
 
