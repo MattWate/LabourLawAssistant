@@ -416,12 +416,19 @@ exports.handler = async (event) => {
     }
 
     if (action === 'close') {
-      const { caseId, wants_letter } = body;
+      const { caseId, wants_letter, payment_start_consent } = body;
       const { data: existing, error: readErr } = await supabase.from('cases').select('case_facts').eq('id', caseId).single();
       if (readErr) throw readErr;
       const caseFacts = existing?.case_facts || {};
       const wpEligible = caseFacts.wp_eligible === true && caseFacts.product_route?.wp_letter_allowed !== false;
-      const updatePayload = { updated_at: new Date().toISOString(), case_facts: { ...caseFacts, wants_letter } };
+      const updatePayload = {
+        updated_at: new Date().toISOString(),
+        case_facts: {
+          ...caseFacts,
+          wants_letter,
+          ...(wants_letter && payment_start_consent?.accepted === true ? { payment_start_consent } : {})
+        }
+      };
       if (wants_letter && wpEligible) {
         updatePayload.status = 'requires_attorney';
         updatePayload.letter_status = 'needs_drafting';
