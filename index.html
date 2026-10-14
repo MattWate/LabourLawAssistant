@@ -121,20 +121,28 @@
     let collectedFacts = { source: "web" };
     let activeCaseId = null;
     let consentConfig = {
-        version: "placeholder-2026-10-07",
-        is_placeholder: true,
-        text: "PLACEHOLDER – VRS APPROVED WORDING TO BE INSERTED. By continuing, you accept the VRS terms, privacy notice, disclaimer, sensitive-information processing, cross-border processing and AI-assisted processing."
+        version: "1.0",
+        issued_date: "2026-10-12",
+        is_placeholder: false,
+        notice_url: "/terms.html",
+        website: {
+            heading: "Before we start",
+            intro: [
+                "I’m Justine, the AI assistant of VRS Labour Law Consultants. I’m not a person and I don’t give legal advice. I’ll help you set out what happened at work and give you a first, general view, and a VRS consultant checks every matter before any letter is sent.",
+                "AI can get things wrong, so please don’t rely on my answers alone. Talking to me also doesn’t stop legal deadlines: a dismissal dispute must usually be referred to the CCMA within 30 days."
+            ],
+            terms_label: "I am 18 or older and I accept Justine’s Terms of Use and Privacy Notice, including clause 13, which limits VRS’s responsibility.",
+            sensitive_label: "I agree that VRS may use sensitive information I choose to share, such as my health, union membership or an allegation made against me, and that its service providers may process my information outside South Africa.",
+            link_label: "Read the full Terms of Use and Privacy Notice"
+        },
+        pre_payment: {
+            text: "Please start work on my matter as soon as I pay. I understand that once work has started the seven-day cooling-off right for online purchases no longer applies, and that VRS will refund my fee in full if it declines to act or does not release a letter."
+        }
     };
 
     const scriptFlow = {
         CONSENT: {
-            msg: consentConfig.text,
-            type: "buttons",
-            options: [
-                { label: "I accept and consent", next: "JUR_EMPLOYEE", val: true },
-                { label: "I do not accept", next: "CONSENT_DECLINED", val: false }
-            ],
-            saveAs: "consent_accepted"
+            type: "consent"
         },
         CONSENT_DECLINED: {
             msg: "Thanks. I cannot continue the automated intake without your consent. Please contact VRS directly if you would like to discuss another way to provide your information.",
@@ -543,6 +551,58 @@
 
     function renderState() {
         if (renderPendingConfirmation()) return;
+
+        if (currentState === "CONSENT") {
+            textContainer.style.display = 'none';
+            buttonContainer.style.display = 'none';
+            const cfg = consentConfig.website || {};
+            appendMessage((cfg.heading || "Before we start") + "\n\n" + (cfg.intro || []).join("\n\n"), "bot");
+            buttonContainer.innerHTML = `
+                <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+                  <input type="checkbox" id="consent-terms" style="margin-top:4px">
+                  <span>${escapeHtml(cfg.terms_label || "")}</span>
+                </label>
+                <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+                  <input type="checkbox" id="consent-sensitive" style="margin-top:4px">
+                  <span>${escapeHtml(cfg.sensitive_label || "")}</span>
+                </label>
+                <a href="${escapeHtml(consentConfig.notice_url || "/terms.html")}" target="_blank" rel="noopener" style="padding:8px 2px">${escapeHtml(cfg.link_label || "Read the full Terms of Use and Privacy Notice")}</a>
+                <button class="action-btn" id="consent-continue">Continue</button>`;
+            buttonContainer.style.display = 'flex';
+            setTimeout(() => {
+                const btn = document.getElementById('consent-continue');
+                if (btn) btn.onclick = () => {
+                    const terms = document.getElementById('consent-terms')?.checked === true;
+                    const sensitive = document.getElementById('consent-sensitive')?.checked === true;
+                    if (!terms || !sensitive) {
+                        appendMessage("Please tick both consent boxes before we continue.", "bot");
+                        return;
+                    }
+                    collectedFacts.consent_accepted = true;
+                    collectedFacts.consent = {
+                        accepted: true,
+                        terms_accepted: true,
+                        sensitive_information_consent: true,
+                        cross_border_processing_consent: true,
+                        age_18_or_over_confirmed: true,
+                        version: consentConfig.version,
+                        issued_date: consentConfig.issued_date || null,
+                        accepted_at: new Date().toISOString(),
+                        channel: "web"
+                    };
+                    collectedFacts._fact_metadata = {
+                        ...(collectedFacts._fact_metadata || {}),
+                        consent_accepted: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() }
+                    };
+                    buttonContainer.style.display = 'none';
+                    appendMessage("I accept and consent.", "user");
+                    currentState = "JUR_EMPLOYEE";
+                    renderState();
+                };
+            }, 0);
+            return;
+        }
+
         let step = scriptFlow[currentState];
         if (!step) { appendMessage("An error occurred in the intake flow. Please refresh and try again.", "bot"); console.error("Unknown state:", currentState); return; }
         while (step && canSkipStep(step)) {
@@ -625,28 +685,6 @@
 
     async function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
         textContainer.style.display = 'none'; buttonContainer.style.display = 'none'; appendMessage(displayValue, "user");
-
-        if (saveKey === "consent_accepted") {
-            if (actualValue !== true) {
-                collectedFacts.consent = {
-                    accepted: false,
-                    version: consentConfig.version,
-                    declined_at: new Date().toISOString(),
-                    channel: "web",
-                    placeholder_wording: consentConfig.is_placeholder === true
-                };
-                currentState = nextStateKey;
-                renderState();
-                return;
-            }
-            collectedFacts.consent = {
-                accepted: true,
-                version: consentConfig.version,
-                accepted_at: new Date().toISOString(),
-                channel: "web",
-                placeholder_wording: consentConfig.is_placeholder === true
-            };
-        }
 
         if (saveKey === "client_email") {
             showLoading();
@@ -776,9 +814,6 @@
             if (res.ok) {
                 const data = await res.json();
                 consentConfig = data;
-                scriptFlow.CONSENT.msg = data.text || scriptFlow.CONSENT.msg;
-                if (data.accept_label) scriptFlow.CONSENT.options[0].label = data.accept_label;
-                if (data.decline_label) scriptFlow.CONSENT.options[1].label = data.decline_label;
             }
         } catch (error) {
             console.warn("Consent configuration unavailable; using placeholder fallback.", error);
