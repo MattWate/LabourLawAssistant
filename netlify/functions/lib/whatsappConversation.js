@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { validateAndNormaliseDate } = require('./dateValidation');
-const { CONSENT_CONFIG, consentSnapshot } = require('./consentConfig');
+const { CONSENT_CONFIG, consentSnapshot, paymentConsentSnapshot, whatsappConsentText } = require('./consentConfig');
 const { compareClientEmployerEmail } = require('./emailPrivacy');
 const { retentionMetadata } = require('./privacyGovernance');
 
@@ -8,7 +8,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-const INTRO = `Hi, I am Justine, the VRS Labour Law Assistant. I can help collect the information VRS needs to assess your matter. Type HELP at any time for assistance, or RESTART to begin again.`;
+const INTRO = '';
 
 const choice = (label, value, next) => ({ label, value, next });
 const buttons = (prompt, saveAs, choices) => ({ type: 'buttons', prompt, saveAs, choices });
@@ -16,10 +16,7 @@ const text = (prompt, saveAs, next, extra = {}) => ({ type: 'text', prompt, save
 const date = (prompt, saveAs, next, dateRules = {}) => ({ type: 'date', prompt, saveAs, next, dateRules });
 
 const STEPS = {
-  CONSENT: buttons(CONSENT_CONFIG.text, 'consent_accepted', [
-    choice(CONSENT_CONFIG.accept_label, true, 'JUR_EMPLOYEE'),
-    choice(CONSENT_CONFIG.decline_label, false, 'CONSENT_DECLINED')
-  ]),
+  CONSENT: { type: 'consent', prompt: whatsappConsentText(), saveAs: 'consent_accepted', next: 'JUR_EMPLOYEE' },
   CONSENT_DECLINED: { type: 'end', prompt: 'Thanks. I cannot continue the automated intake without your consent. Please contact VRS directly if you would like to provide your information another way.' },
   JUR_EMPLOYEE: buttons('To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?', 'worker_status', [
     choice('Yes', 'Employee', 'JUR_SA_EMPLOYER'), choice('No', 'Contractor', 'JUR_CONTRACTOR_CONTROL'), choice('Unsure', 'Unsure', 'JUR_CONTRACTOR_CONTROL')
@@ -325,7 +322,7 @@ async function restartConversation(conversation, message) {
   const facts = { client_name: message.contact_name || conversation.contact_name || null, contact_info: message.from_number, source: 'whatsapp', privacy_governance: retentionMetadata({ channel: 'whatsapp' }), _intake_prompt_count: 0, _intake_prompt_history: [] };
   await updateConversation(conversation.id, { current_step: 'CONSENT', status: 'active', collected_facts: facts, classification: null,
     case_id: null, handoff_reason: null, error_message: null, processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
-  return `${INTRO}\n\n${renderPrompt('CONSENT')}`;
+  return renderPrompt('CONSENT');
 }
 const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
 const { markClientConfirmedFact } = require('./factProvenance');
@@ -522,12 +519,49 @@ async function processIncomingMessage(message) {
   const input = cleanText(message.text_body);
   if (!input) return 'I can currently process text messages only. Please type a response.';
   let conversation = await getConversation(message.from_number);
-  if (!conversation) { await createConversation(message); return `${INTRO}\n\n${renderPrompt('CONSENT')}`; }
+  if (!conversation) { await createConversation(message); return renderPrompt('CONSENT'); }
   const processed = Array.isArray(conversation.processed_message_ids) ? conversation.processed_message_ids : [];
   if (message.whatsapp_message_id && processed.includes(message.whatsapp_message_id)) return null;
   const command = normalize(input);
   if (['restart', 'start again', 'reset'].includes(command)) return restartConversation(conversation, message);
   if (['help', 'human', 'agent', 'attorney', 'lawyer'].includes(command)) return markHandoff(conversation, message, 'USER_REQUESTED_HELP', conversation.collected_facts || {});
+  if (conversation.status === 'awaiting_payment_consent') {
+    const answer = normalize(input);
+    if (answer !== 'yes') {
+      return `${CONSENT_CONFIG.pre_payment.text}\n\nReply YES to confirm.`;
+    }
+
+    const { data: caseRow, error: caseError } = await supabase
+      .from('cases')
+      .select('case_facts')
+      .eq('id', conversation.case_id)
+      .single();
+    if (caseError || !caseRow) throw new Error('Could not load the case for payment consent');
+
+    const consent = paymentConsentSnapshot('whatsapp');
+    const updatedFacts = {
+      ...(caseRow.case_facts || {}),
+      payment_start_consent: consent
+    };
+    const now = new Date().toISOString();
+    const { error: updateError } = await supabase.from('cases').update({
+      case_facts: updatedFacts,
+      status: 'approved_for_payment',
+      updated_at: now
+    }).eq('id', conversation.case_id);
+    if (updateError) throw updateError;
+
+    await updateConversation(conversation.id, {
+      status: 'completed',
+      current_step: 'COMPLETE',
+      collected_facts: { ...(conversation.collected_facts || {}), payment_start_consent: consent },
+      processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id),
+      last_inbound_at: now
+    });
+
+    return 'Thank you. VRS has recorded your instruction to start work once you pay. Your payment link can now be issued.';
+  }
+
   if (conversation.status === 'completed') return 'Your intake has already been submitted. Type RESTART for a new matter, or HELP for assistance.';
   if (conversation.status === 'handoff') return 'Your enquiry is already waiting for human review. Type RESTART only for a different matter.';
   if (conversation.status === 'consent_declined') return 'I cannot continue the automated intake without consent. Type RESTART if you would like to review the consent notice again.';
@@ -538,30 +572,13 @@ async function processIncomingMessage(message) {
   let facts = { ...(conversation.collected_facts || {}) };
 
   if (stepName === 'CONSENT') {
-    const selected = matchChoice(input, step);
-    if (!selected) return `Please choose one of the options shown.\n\n${renderPrompt('CONSENT')}`;
-
-    facts.consent_accepted = selected.value === true;
-    facts = markDirectAnswer(facts, 'consent_accepted');
-
-    if (selected.value !== true) {
-      facts.consent = {
-        accepted: false,
-        version: CONSENT_CONFIG.version,
-        declined_at: new Date().toISOString(),
-        channel: 'whatsapp',
-        placeholder_wording: CONSENT_CONFIG.is_placeholder === true
-      };
-      await updateConversation(conversation.id, {
-        status: 'consent_declined',
-        current_step: 'CONSENT_DECLINED',
-        collected_facts: facts,
-        processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id),
-        last_inbound_at: new Date().toISOString()
-      });
-      return STEPS.CONSENT_DECLINED.prompt;
+    const answer = normalize(input);
+    if (answer !== 'yes') {
+      return renderPrompt('CONSENT');
     }
 
+    facts.consent_accepted = true;
+    facts = markDirectAnswer(facts, 'consent_accepted');
     facts.consent = consentSnapshot('whatsapp');
     facts = withPromptRecorded(facts, 'step:JUR_EMPLOYEE');
     await updateConversation(conversation.id, {
