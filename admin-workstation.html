@@ -586,7 +586,7 @@
     function selectCase(id) { selectedCaseId = id; currentView = 'workstation'; render(); }
 
     function statusBadge(s) {
-      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved – Ready to Send','green'], send_failed:['Send Failed','red'], letter_send_failed:['Send Failed','red'], sent:['Letter Sent','green'], letter_sent:['Letter Sent','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
+      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], awaiting_payment_consent:['Awaiting Client Consent','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved – Ready to Send','green'], send_failed:['Send Failed','red'], letter_send_failed:['Send Failed','red'], sent:['Letter Sent','green'], letter_sent:['Letter Sent','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
       const item = map[s] || [s, 'blue'];
       return '<span class="badge ' + item[1] + '">' + esc(item[0]) + '</span>';
     }
@@ -610,6 +610,7 @@
     function paymentAction(c) {
       const ed = effective(c);
       if (c.payment_status === 'paid') return '<span class="badge green">Payment received ' + esc(date(c.paid_at)) + '</span>';
+      if (c.status === 'awaiting_payment_consent') return '<button class="btn ghost" disabled>Awaiting Client Consent</button>';
       if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button>';
       const route = f.product_route || {};
       if (!bool(ed.wp_eligible) || route.payment_allowed === false || (route.product_code && route.product_code !== 'WP_LETTER')) return '';
