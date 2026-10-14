@@ -1,18 +1,45 @@
 const crypto = require('crypto');
 
-const DEFAULT_RETENTION_DAYS = Number(process.env.VRS_CONVERSATION_RETENTION_DAYS || 365);
+const UNPAID_RETENTION_MONTHS = 12;
+const PAID_FILE_RETENTION_YEARS = 5;
 
-function retentionMetadata({ channel = 'unknown', from = new Date() } = {}) {
-  const days = Number.isFinite(DEFAULT_RETENTION_DAYS) && DEFAULT_RETENTION_DAYS > 0 ? DEFAULT_RETENTION_DAYS : 365;
+function addMonths(date, months) {
+  const value = new Date(date);
+  const originalDay = value.getUTCDate();
+  value.setUTCDate(1);
+  value.setUTCMonth(value.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + 1, 0)).getUTCDate();
+  value.setUTCDate(Math.min(originalDay, lastDay));
+  return value;
+}
+
+function addYears(date, years) {
+  const value = new Date(date);
+  value.setUTCFullYear(value.getUTCFullYear() + years);
+  return value;
+}
+
+function retentionMetadata({ channel = 'unknown', from = new Date(), paid = false, matterClosedAt = null } = {}) {
   const start = new Date(from);
-  const expires = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
+  const unpaidDeadline = addMonths(start, UNPAID_RETENTION_MONTHS);
+  const closed = matterClosedAt ? new Date(matterClosedAt) : null;
+  const paidDeadline = paid && closed ? addYears(closed, PAID_FILE_RETENTION_YEARS) : null;
+
   return {
-    retention_days: days,
-    retention_started_at: start.toISOString(),
-    retention_expires_at: expires.toISOString(),
+    notice_version: '1.0',
     channel,
+    policy: {
+      unpaid_service: 'Delete the conversation or remove identifying information within 12 months if no paid service is taken.',
+      paid_service: 'Keep the file for five years after the matter closes unless the law requires longer.',
+      anonymised_improvement_use: true
+    },
+    retention_started_at: start.toISOString(),
+    unpaid_identifiable_until: unpaidDeadline.toISOString(),
+    paid_service: paid === true,
+    matter_closed_at: closed ? closed.toISOString() : null,
+    paid_file_retention_until: paidDeadline ? paidDeadline.toISOString() : null,
     pseudonymise_before_analysis: true,
-    policy_source: process.env.VRS_CONVERSATION_RETENTION_DAYS ? 'environment' : 'temporary_default'
+    policy_source: 'VRS Justine Terms of Use, Privacy Notice and AI Disclosure v1.0 clause 10'
   };
 }
 
@@ -49,6 +76,8 @@ function pseudonymiseFactsForAnalysis(facts = {}) {
 }
 
 module.exports = {
+  UNPAID_RETENTION_MONTHS,
+  PAID_FILE_RETENTION_YEARS,
   retentionMetadata,
   pseudonymiseFactsForAnalysis
 };
