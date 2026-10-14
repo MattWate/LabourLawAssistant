@@ -776,7 +776,7 @@
             if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}. Please keep this and quote it if you contact VRS through another channel.`, "bot");
             buttonContainer.innerHTML = '';
             if (data.hasMerit) {
-                const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => closeCase(true, false);
+                const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => showPrePaymentConsent();
                 const btnNo = document.createElement('button'); btnNo.className = 'action-btn'; btnNo.innerText = "No thank you."; btnNo.onclick = () => closeCase(false, false);
                 buttonContainer.appendChild(btnYes); buttonContainer.appendChild(btnNo);
             } else {
@@ -786,13 +786,39 @@
         } catch (e) { hideLoading(); appendMessage("Sorry, I had trouble connecting to the legal database. Please refresh and try again.", "bot"); console.error(e); }
     }
 
+    function showPrePaymentConsent() {
+        buttonContainer.innerHTML = `
+            <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+              <input type="checkbox" id="prepay-consent" style="margin-top:4px">
+              <span>${escapeHtml(consentConfig.pre_payment?.text || "")}</span>
+            </label>
+            <button class="action-btn" id="prepay-continue">Continue to VRS review</button>
+            <button class="action-btn" id="prepay-cancel">Not now</button>`;
+        buttonContainer.style.display = 'flex';
+        document.getElementById('prepay-continue').onclick = () => {
+            if (document.getElementById('prepay-consent')?.checked !== true) {
+                appendMessage("Please tick the box before continuing.", "bot");
+                return;
+            }
+            collectedFacts.payment_start_consent = {
+                accepted: true,
+                version: consentConfig.version,
+                accepted_at: new Date().toISOString(),
+                channel: "web",
+                wording: consentConfig.pre_payment?.text || ""
+            };
+            closeCase(true, false);
+        };
+        document.getElementById('prepay-cancel').onclick = () => closeCase(false, false);
+    }
+
     async function closeCase(wantsLetter, isLowMerit) {
         buttonContainer.style.display = 'none';
         let userMsg = wantsLetter ? "Yes, please draft the letter." : "No thank you.";
         if (isLowMerit) userMsg = "Okay, thank you.";
         appendMessage(userMsg, "user"); showLoading();
         try {
-            const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter }) });
+            const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter, payment_start_consent: wantsLetter ? collectedFacts.payment_start_consent : null }) });
             const data = await res.json(); hideLoading();
             if (data.error) appendMessage("An error occurred: " + data.error, "bot"); else appendMessage(data.closing_message, "bot");
         } catch(e) { hideLoading(); appendMessage("An error occurred trying to close the case.", "bot"); console.error(e); }
