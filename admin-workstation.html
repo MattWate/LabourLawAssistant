@@ -740,6 +740,11 @@
         let result = {};
         try { result = await res.json(); } catch (e) {}
         if (!res.ok) throw new Error(result.error || 'Could not approve case for payment.');
+        if (result.consent_required) {
+          toast(result.message || 'Pre-payment consent has been requested from the client. Ask them to reply YES, then request payment again.');
+          await fetchCases();
+          return;
+        }
         const channel = result.whatsapp_mode === 'template' ? 'WhatsApp template' : result.whatsapp_sent ? 'WhatsApp message' : 'payment link';
         toast('Case approved. The ' + channel + ' was created successfully.');
         await fetchCases();
