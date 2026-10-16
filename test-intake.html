@@ -305,6 +305,14 @@ async function runScenario(key,{batch=false}={}){
 
     const current=intakeState();const prompt=currentPrompt(doc);
     if(!current||current==='HANDOFF'||current==='COMPLETE'){lastPrompt=prompt;continue}
+
+    // The intake changes currentState before renderState's delayed UI update completes.
+    // If the state has advanced but the visible prompt is still the previous prompt,
+    // wait rather than clicking a stale Yes/No button from the prior question.
+    if(current!==lastState && lastPrompt && prompt===lastPrompt){
+      await sleep(300);
+      continue;
+    }
     if(current===lastState&&prompt===lastPrompt)continue;
 
     const rule=s.answers[current];
@@ -324,7 +332,7 @@ async function runScenario(key,{batch=false}={}){
     let answered=rule.type==='button'?clickButtonByText(doc,rule.answer):answerText(doc,rule.answer);
     if(answered){
       state.promptLog.push('[State] '+current);state.promptLog.push('[Harness answered] '+rule.answer);
-      lastState=current;lastPrompt=prompt;renderReview();await sleep(350);
+      lastState=current;lastPrompt=prompt;renderReview();await sleep(650);
     }else{
       const wait='[Waiting for controls] state='+current;
       if(state.promptLog[state.promptLog.length-1]!==wait)state.promptLog.push(wait);
