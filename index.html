@@ -464,8 +464,28 @@
             if (!res.ok || data.error) throw new Error(data.error || "intake turn failed");
             mergeDirectExtractions(data);
             mergeConversationalInferences(data);
-            if (data.next_question && nextStateKey) collectedFacts._next_question_override = { state: nextStateKey, text: data.next_question };
-            return data;
+
+            let resolvedNextState = nextStateKey;
+            let guard = 0;
+            while (resolvedNextState && scriptFlow[resolvedNextState] && canSkipStep(scriptFlow[resolvedNextState]) && guard < 40) {
+                const answeredStep = scriptFlow[resolvedNextState];
+                let candidate = answeredStep.next;
+                if (answeredStep.type === "buttons") {
+                    const matched = matchedStoredOption(answeredStep, collectedFacts[answeredStep.saveAs]);
+                    if (matched?.next) candidate = matched.next;
+                }
+                if (!candidate || candidate === resolvedNextState) break;
+                resolvedNextState = candidate;
+                guard += 1;
+            }
+
+            if (resolvedNextState && resolvedNextState !== nextStateKey) {
+                collectedFacts._resolved_next_state = resolvedNextState;
+            }
+            if (data.next_question && resolvedNextState) {
+                collectedFacts._next_question_override = { state: resolvedNextState, text: scriptFlow[resolvedNextState]?.msg || data.next_question };
+            }
+            return { ...data, resolved_next_state: resolvedNextState };
         } catch (error) {
             console.warn("Conversational intake unavailable; using controlled flow:", error);
             return { enabled: false };
@@ -702,7 +722,8 @@
                     if (!hasKnownValue(collectedFacts["advisory_topic"]) && data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
                     const routeMap = { "Dismissed": "FIRED_DATE", "Resigned": "RESIGN_DATE", "Discrimination": "DISC_STATUS", "Advisory": "ADV_ISSUE", "UIF": "UIF_DESC" };
                     currentState = routeMap[finalCategory] || "START_FALLBACK";
-                    await processWebTurn(step, val, currentState);
+                    const turn = await processWebTurn(step, val, currentState);
+                    if (turn?.resolved_next_state) currentState = turn.resolved_next_state;
                 }
                 renderState();
             } catch(error) { hideLoading(); console.error("Classification error:", error); currentState = "START_FALLBACK"; renderState(); }
@@ -778,8 +799,8 @@
         if (saveKey === "relevant_event_date") collectedFacts["incident_date"] = actualValue;
         if (saveKey === "raised_internally") collectedFacts["internal_escalation"] = actualValue;
         const currentStep = scriptFlow[currentState];
-        await processWebTurn(currentStep, String(displayValue ?? actualValue), nextStateKey);
-        currentState = nextStateKey;
+        const turn = await processWebTurn(currentStep, String(displayValue ?? actualValue), nextStateKey);
+        currentState = turn?.resolved_next_state || nextStateKey;
         renderState();
     }
 
