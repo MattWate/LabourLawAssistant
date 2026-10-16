@@ -2,6 +2,10 @@ const { getClaudeModel, anthropicHeaders, modelAuditMetadata } = require('./clau
 const { loadSkillAsset } = require('./skillRegistry');
 
 const MAX_INFERENCES = 4;
+const MAX_DIRECT_EXTRACTIONS = 8;
+const DIRECT_EXTRACTION_FIELDS = new Set([
+  'employment_status','dismissal_reason_type','misconduct_category','conduct_admission','hearing_held','prior_warnings','length_of_service','gross_monthly_salary','incident_description','employer_name','employer_registered_name','addressee_name','addressee_position','employer_contact_details','client_name','client_email','south_african_employer','public_service_or_excluded_agency','contractor_control_test','advisory_topic','protected_ground'
+]);
 
 function enabled() {
   return String(process.env.CLAUDE_CONVERSATIONAL_INTAKE || '').toLowerCase() === 'true';
@@ -62,9 +66,15 @@ SECURITY AND CONTROL RULES:
 - Do not tell the client what score, band or WP posture they may receive.
 - Keep client-facing wording short, plain and warm.
 - The hardcoded intake flow is the structural guide. You may make the next planned question sound more natural, but do not invent a different legal process.
+- Review EVERY client answer for facts that make later questions unnecessary.
+- Distinguish DIRECT EXTRACTION from INFERENCE:
+  * A direct extraction is a fact the client explicitly stated in their own words. Example: "my boss fired me because he said I stole stock, but I did not steal it" directly states employment_status=Dismissed, dismissal_reason_type=Misconduct, misconduct_category=theft and conduct_admission=Dispute.
+  * An inference is a fact you derive or assume rather than one the client actually stated.
+- Directly stated facts can be extracted without asking the client to repeat them. Do not turn explicit statements into confirmation questions.
 - Infer facts only where the answer supports them. An inference is never confirmed merely because you inferred it.
 - If you infer a material fact that is not already directly confirmed, propose ONE short confirmation question.
 - Never overwrite an existing directly answered fact.
+- Prefer saving the client from repetitive questions. If the answer already contains the answer to the planned next question, extract it so the controlled flow can skip that question.
 - Do not repeat sensitive personal information unnecessarily.
 
 CHANNEL: ${channel || 'web'}
@@ -86,6 +96,13 @@ ${houseStyle || 'Short, plain and warm.'}
 Return ONLY valid JSON in this shape:
 {
   "acknowledgement": "optional short acknowledgement, maximum 12 words",
+  "direct_extractions": [
+    {
+      "field": "field_name",
+      "value": "value explicitly stated by the client",
+      "evidence": "short exact or near-exact phrase from the client answer"
+    }
+  ],
   "inferences": [
     {
       "field": "field_name",
@@ -102,7 +119,11 @@ Return ONLY valid JSON in this shape:
 }
 
 Rules for JSON:
-- Return no more than ${MAX_INFERENCES} inferences.
+- Return no more than 8 direct_extractions and 4 inferences.
+- direct_extractions may only use these fields: employment_status, dismissal_reason_type, misconduct_category, conduct_admission, hearing_held, prior_warnings, length_of_service, gross_monthly_salary, incident_description, employer_name, employer_registered_name, addressee_name, addressee_position, employer_contact_details, client_name, client_email, south_african_employer, public_service_or_excluded_agency, contractor_control_test, advisory_topic, protected_ground.
+- Only use direct_extractions where the client clearly and explicitly stated the fact. Do not use them for guesses, legal conclusions or implications.
+- Normalise direct values to the controlled-flow values where obvious. Examples: stealing/theft -> misconduct_category="theft"; fired/sacked -> employment_status="Dismissed"; "I never stole it" -> conduct_admission="Dispute"; "there was no hearing" -> hearing_held=false.
+- If the client's current narrative is already a sufficiently detailed account of the incident (roughly 50+ words), direct_extractions may set incident_description to that narrative so they are not asked to tell the same story twice.
 - Do not include the field the client just answered as an inference.
 - Only include inferences at confidence 0.75 or above.
 - next_question must preserve the meaning of the planned next question.
@@ -158,6 +179,21 @@ async function processClientTurn({
   const parsed = parseJsonOnly(responseText);
 
   const existing = cleanObject(existingFacts);
+  const direct_extractions = (Array.isArray(parsed.direct_extractions) ? parsed.direct_extractions : [])
+    .filter(item => item && DIRECT_EXTRACTION_FIELDS.has(String(item.field || '')))
+    .filter(item => item.field !== currentField)
+    .filter(item => {
+      if (!(item.field in existing)) return true;
+      const meta = existingFacts?._fact_metadata?.[item.field];
+      return meta && meta.confirmed !== true;
+    })
+    .slice(0, MAX_DIRECT_EXTRACTIONS)
+    .map(item => ({
+      field: String(item.field),
+      value: item.value,
+      evidence: String(item.evidence || '').trim().slice(0, 240)
+    }));
+
   const inferences = (Array.isArray(parsed.inferences) ? parsed.inferences : [])
     .filter(item => item && item.field && item.field !== currentField)
     .filter(item => !(item.field in existing))
@@ -173,6 +209,7 @@ async function processClientTurn({
   return {
     enabled: true,
     acknowledgement: String(parsed.acknowledgement || '').trim().slice(0, 160) || null,
+    direct_extractions,
     inferences,
     confirmation: inferences[0] || null,
     next_question: plannedNextQuestion ? (String(parsed.next_question || '').trim() || plannedNextQuestion) : null,
