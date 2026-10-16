@@ -341,15 +341,22 @@ async function runScenario(key,{batch=false}={}){
   if(state.checks[routeKey].passed===null)setCheck(routeKey,false,s.expect.wp?'Expected WP option was not observed.':'Expected a non-WP route.');
   if(s.expect.prepay&&continueLetter.checked&&state.checks['Pre-payment consent displayed']?.passed===null)setCheck('Pre-payment consent displayed',false,'Pre-payment consent was not observed.');
 
-  const failed=Object.values(state.checks).some(x=>x.passed===false);
-  state.result={passed:!failed,reference:(botMessages(doc).join('\n').match(/CNTB\d{6}/)||[])[0]||null};
+  const failedEntries=Object.entries(state.checks).filter(([,v])=>v.passed===false);
+  const failed=failedEntries.length>0;
+  const failureDetail=failedEntries.map(([k,v])=>k+(v.detail?': '+v.detail:'')).join(' | ');
+  state.result={
+    passed:!failed,
+    reference:(botMessages(doc).join('\n').match(/CNTB\d{6}/)||[])[0]||null,
+    failureDetail,
+    stoppedStatus:statusEl.textContent.startsWith('Stopped:')?statusEl.textContent:null
+  };
   statusEl.textContent=(failed?'FAILED: ':'PASSED: ')+s.label;
   return state.result;
 }
 
 function renderBatch(results){
-  batchEl.innerHTML='<h3>Batch summary</h3><table><thead><tr><th>Scenario</th><th>Result</th><th>Reference</th></tr></thead><tbody>'+
-    results.map(r=>'<tr><td>'+esc(r.label)+'</td><td><span class="tag '+(r.passed?'pass':'fail')+'">'+(r.passed?'PASS':'FAIL')+'</span></td><td>'+(esc(r.reference||'—'))+'</td></tr>').join('')+
+  batchEl.innerHTML='<h3>Batch summary</h3><table><thead><tr><th>Scenario</th><th>Result</th><th>Reference</th><th>Details</th></tr></thead><tbody>'+
+    results.map(r=>'<tr><td>'+esc(r.label)+'</td><td><span class="tag '+(r.passed?'pass':'fail')+'">'+(r.passed?'PASS':'FAIL')+'</span></td><td>'+(esc(r.reference||'—'))+'</td><td class="muted">'+esc(r.stoppedStatus||r.failureDetail||'—')+'</td></tr>').join('')+
     '</tbody></table>';
 }
 
