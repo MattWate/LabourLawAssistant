@@ -21,6 +21,44 @@ function cleanObject(input = {}) {
   return result;
 }
 
+function normaliseDirectExtractionValue(field, value) {
+  const text = String(value ?? '').trim();
+  const lower = text.toLowerCase();
+
+  if (['hearing_held', 'south_african_employer', 'public_service_or_excluded_agency'].includes(field)) {
+    if (['yes','true','held','did'].includes(lower)) return true;
+    if (['no','false','none','not held','did not'].includes(lower)) return false;
+  }
+  if (field === 'employment_status') {
+    if (/(dismiss|fired|sacked|terminated)/i.test(text)) return 'Dismissed';
+    if (/(resign|quit)/i.test(text)) return 'Resigned';
+  }
+  if (field === 'dismissal_reason_type') {
+    if (/(theft|steal|stole|dishonest|assault|insubordin|absen|misconduct)/i.test(text)) return 'Misconduct';
+    if (/performance/i.test(text)) return 'Poor Performance';
+    if (/(illness|injury|incapacity|disability)/i.test(text)) return 'Incapacity';
+    if (/(retrench|operational)/i.test(text)) return 'Retrenchment';
+  }
+  if (field === 'misconduct_category') {
+    if (/(theft|steal|stole)/i.test(text)) return 'theft';
+    if (/assault/i.test(text)) return 'assault';
+    if (/dishonest/i.test(text)) return 'dishonesty';
+    if (/insubordin/i.test(text)) return 'insubordination';
+    if (/absen/i.test(text)) return 'absenteeism';
+  }
+  if (field === 'conduct_admission') {
+    if (/(dispute|deny|did not|didn't|never)/i.test(text)) return 'Dispute';
+    if (/partial/i.test(text)) return 'Partially admit';
+    if (/(admit|accept)/i.test(text)) return 'Admit';
+  }
+  if (field === 'prior_warnings') {
+    if (['none','no','never'].includes(lower)) return 'None';
+    if (['one','1'].includes(lower)) return 'One';
+    if (/(multiple|more than one|several|2|3|4|5)/i.test(text)) return 'Multiple';
+  }
+  return value;
+}
+
 function parseJsonOnly(text = '') {
   const cleaned = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
   try {
@@ -190,12 +228,14 @@ async function processClientTurn({
     .slice(0, MAX_DIRECT_EXTRACTIONS)
     .map(item => ({
       field: String(item.field),
-      value: item.value,
+      value: normaliseDirectExtractionValue(String(item.field), item.value),
       evidence: String(item.evidence || '').trim().slice(0, 240)
     }));
 
+  const directlyExtractedFields = new Set(direct_extractions.map(item => item.field));
   const inferences = (Array.isArray(parsed.inferences) ? parsed.inferences : [])
     .filter(item => item && item.field && item.field !== currentField)
+    .filter(item => !directlyExtractedFields.has(String(item.field)))
     .filter(item => !(item.field in existing))
     .filter(item => Number(item.confidence || 0) >= 0.75)
     .slice(0, MAX_INFERENCES)
