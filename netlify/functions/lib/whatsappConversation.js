@@ -327,7 +327,7 @@ async function restartConversation(conversation, message) {
 const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
 const { markClientConfirmedFact } = require('./factProvenance');
 
-const WHATSAPP_PROMPT_LIMIT = 10;
+const WHATSAPP_PROMPT_LIMIT = 18;
 
 function promptCount(facts = {}) {
   return Number(facts._intake_prompt_count || 0);
@@ -361,6 +361,34 @@ function queueUnconfirmedNarrativeFacts(facts = {}) {
     }));
   if (!items.length) return facts;
   return { ...facts, _pending_confirmation: { items } };
+}
+
+function mergeDirectExtractions(facts = {}, turn = {}) {
+  if (!turn?.enabled || !Array.isArray(turn.direct_extractions) || !turn.direct_extractions.length) return facts;
+  const metadata = { ...(facts._fact_metadata || {}) };
+  const merged = { ...facts };
+
+  turn.direct_extractions.forEach(item => {
+    if (!item?.field || !hasValue(item.value)) return;
+    const existingMeta = metadata[item.field];
+    if (hasValue(merged[item.field]) && existingMeta?.confirmed === true) return;
+
+    merged[item.field] = item.value;
+    metadata[item.field] = {
+      source: 'client_explicit_extraction',
+      confidence: 1,
+      confirmed: true,
+      evidence: item.evidence || null,
+      captured_at: new Date().toISOString()
+    };
+  });
+
+  merged._fact_metadata = metadata;
+  const pending = merged._pending_confirmation?.items || [];
+  const remaining = pending.filter(item => metadata[item.field]?.confirmed !== true);
+  if (remaining.length) merged._pending_confirmation = { items: remaining };
+  else delete merged._pending_confirmation;
+  return merged;
 }
 
 function mergeIntakeInferences(facts = {}, turn = {}) {
@@ -643,9 +671,11 @@ async function processIncomingMessage(message) {
     if (!hasValue(facts.employment_status)) facts.employment_status = classification.category || 'Ambiguous';
     if (!hasValue(facts.dismissal_reason_type) && classification.dismissal_reason_type) facts.dismissal_reason_type = classification.dismissal_reason_type;
     if (!hasValue(facts.advisory_topic) && classification.advisory_topic) facts.advisory_topic = classification.advisory_topic;
-    const next = resolveNextUnanswered(routeClassification(classification), facts);
+    let next = resolveNextUnanswered(routeClassification(classification), facts);
     const turn = await runConversationalTurn({ facts, stepName, step, answer: input, nextStep: next });
+    facts = mergeDirectExtractions(facts, turn);
     facts = mergeIntakeInferences(facts, turn);
+    next = resolveNextUnanswered(next, facts);
 
     if (facts._pending_confirmation?.items?.length && promptCount(facts) < WHATSAPP_PROMPT_LIMIT) {
       facts = withPromptRecorded(facts, `confirm:${facts._pending_confirmation.items.map(x => x.field).join(',')}`);
@@ -710,7 +740,9 @@ async function processIncomingMessage(message) {
   if (DEFLECTIONS[next]) return markHandoff(conversation, message, next, facts);
 
   const turn = await runConversationalTurn({ facts, stepName, step, answer: input, nextStep: next });
+  facts = mergeDirectExtractions(facts, turn);
   facts = mergeIntakeInferences(facts, turn);
+  next = resolveNextUnanswered(next, facts);
 
   if (facts._pending_confirmation?.items?.length && promptCount(facts) < WHATSAPP_PROMPT_LIMIT) {
     facts = withPromptRecorded(facts, `confirm:${facts._pending_confirmation.items.map(x => x.field).join(',')}`);
