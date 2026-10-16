@@ -59,6 +59,46 @@ function normaliseDirectExtractionValue(field, value) {
   return value;
 }
 
+function deterministicDirectExtractions(answer = '') {
+  const text = String(answer || '').trim();
+  const lower = text.toLowerCase();
+  const out = [];
+  const add = (field, value, evidence) => {
+    if (out.some(item => item.field === field)) return;
+    out.push({ field, value, evidence: String(evidence || text).slice(0, 240) });
+  };
+
+  if (/\b(fired|dismissed|sacked|terminated)\b/i.test(text)) {
+    add('employment_status', 'Dismissed', text);
+  } else if (/\b(resigned|quit)\b/i.test(text)) {
+    add('employment_status', 'Resigned', text);
+  }
+
+  const theftMention = /\b(theft|steal|stealing|stole|stolen|thief)\b/i.test(text);
+  if (theftMention) {
+    add('dismissal_reason_type', 'Misconduct', text);
+    add('misconduct_category', 'theft', text);
+  }
+
+  const explicitDenial = /\b(not me|wasn't me|was not me|did not steal|didn't steal|never stole|never stolen|deny|denied|dispute|disputed|false accusation|wrongly accused)\b/i.test(lower);
+  if (theftMention && explicitDenial) add('conduct_admission', 'Dispute', text);
+
+  if (/\b(no disciplinary hearing|no hearing|without a hearing|never had a hearing|did not have a hearing|didn't have a hearing)\b/i.test(lower)) {
+    add('hearing_held', false, text);
+  }
+
+  if (/\b(no prior warnings|no warnings|never had a warning|never received a warning|none)\b/i.test(lower) && /warning/i.test(lower)) {
+    add('prior_warnings', 'None', text);
+  }
+
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length >= 50) {
+    add('incident_description', text, text);
+  }
+
+  return out;
+}
+
 function parseJsonOnly(text = '') {
   const cleaned = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
   try {
@@ -217,7 +257,13 @@ async function processClientTurn({
   const parsed = parseJsonOnly(responseText);
 
   const existing = cleanObject(existingFacts);
-  const direct_extractions = (Array.isArray(parsed.direct_extractions) ? parsed.direct_extractions : [])
+  const deterministic = deterministicDirectExtractions(answer);
+  const modelExtractions = Array.isArray(parsed.direct_extractions) ? parsed.direct_extractions : [];
+  const combinedExtractions = [
+    ...deterministic,
+    ...modelExtractions.filter(item => !deterministic.some(d => d.field === item?.field))
+  ];
+  const direct_extractions = combinedExtractions
     .filter(item => item && DIRECT_EXTRACTION_FIELDS.has(String(item.field || '')))
     .filter(item => item.field !== currentField)
     .filter(item => {
