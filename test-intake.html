@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Justine Intake Test Harness</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#172033;background:#eef2f7}
+    *{box-sizing:border-box} body{margin:0;padding:20px}
+    .wrap{max-width:1400px;margin:0 auto}
+    .top{background:#fff;border:1px solid #dbe3ee;border-radius:12px;padding:18px;margin-bottom:16px}
+    h1{margin:0 0 8px;font-size:22px} p{margin:6px 0;color:#475569;line-height:1.45}
+    .warning{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:10px 12px;border-radius:8px;margin-top:12px}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+    button,select{font:inherit;padding:9px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#fff}
+    button{cursor:pointer;font-weight:600} button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px}
+    .panel{background:#fff;border:1px solid #dbe3ee;border-radius:12px;overflow:hidden}
+    .panel h2{font-size:15px;margin:0;padding:12px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc}
+    iframe{width:100%;height:760px;border:0;background:#fff}
+    .side{padding:14px}
+    .status{font-weight:700;margin-bottom:10px}.muted{color:#64748b;font-size:13px}
+    .check{padding:9px 10px;border-radius:8px;margin:7px 0;font-size:14px;border:1px solid #e2e8f0}
+    .pass{background:#f0fdf4;border-color:#86efac;color:#166534}
+    .fail{background:#fef2f2;border-color:#fca5a5;color:#991b1b}
+    .pending{background:#f8fafc;color:#475569}
+    pre{white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.45;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;max-height:300px;overflow:auto}
+    label{font-size:14px;color:#334155}
+    @media(max-width:1000px){.grid{grid-template-columns:1fr}iframe{height:650px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>Justine Intake Test Harness</h1>
+    <p>This page drives the real staging intake in the iframe below. It uses the same UI and backend as a normal client conversation, so each run creates a real staging case.</p>
+    <div class="warning"><strong>STAGING ONLY.</strong> This file is intentionally not linked from the public site and must be deleted before merging to <code>main</code>.</div>
+    <div class="controls">
+      <select id="scenario">
+        <option value="theft">Dismissal — theft allegation, no hearing</option>
+      </select>
+      <label><input type="checkbox" id="continueLetter"> Continue into “Yes, please draft the letter”</label>
+      <button class="primary" id="run">Run test</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Live Justine conversation</h2>
+      <iframe id="app" src="/?testHarness=1"></iframe>
+    </div>
+
+    <div class="panel">
+      <h2>Test review</h2>
+      <div class="side">
+        <div id="status" class="status">Ready</div>
+        <div class="muted">The runner tolerates questions being skipped. If a question that should have been skipped appears, it answers it so the test can continue, but records a failure.</div>
+        <div id="checks"></div>
+        <h3>Observed prompts</h3>
+        <pre id="log">No test run yet.</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const iframe = document.getElementById('app');
+const runBtn = document.getElementById('run');
+const resetBtn = document.getElementById('reset');
+const statusEl = document.getElementById('status');
+const checksEl = document.getElementById('checks');
+const logEl = document.getElementById('log');
+const continueLetter = document.getElementById('continueLetter');
+
+const STORY = "I was fired last week, the boss found some stock was missing and he accused me of stealing it. I told him it was not me and I asked to see evidence why he said it was me but he did not show me any proof. I have never stolen from him and I have always been honest at work. He said it doesn't matter, he is the boss and he fired me. Then when I went to work on Monday he would not let me in and told me he will call the police if I come back.";
+
+const rules = [
+  {name:'employee status', re:/employed by the company|freelancer or contractor/i, type:'button', answer:'Yes'},
+  {name:'South Africa jurisdiction', re:/operate or do business in South Africa/i, type:'button', answer:'Yes'},
+  {name:'public service', re:/government department or state entity/i, type:'button', answer:'No'},
+  {name:'initial story', re:/tell me what has happened at work|what you would like help with/i, type:'text', answer:STORY},
+
+  {name:'dismissal date', re:/exact date of your dismissal|when were you dismissed/i, type:'text', answer:'2026-10-09'},
+
+  // These should now be skipped because STORY explicitly answers them.
+  {name:'duplicate dismissal reason', re:/stated reason.*dismissal|reason given for your dismissal/i, type:'button', answer:'Theft', unexpected:true},
+  {name:'duplicate theft category', re:/what.*reason.*dismissal|nature of the allegation/i, type:'button', answer:'Theft', unexpected:true},
+  {name:'duplicate admit dispute', re:/agree with what your employer says|admit.*dispute|do you dispute/i, type:'button', answer:'Dispute', unexpected:true},
+
+  {name:'disciplinary hearing', re:/disciplinary hearing before dismissing|hold a disciplinary hearing/i, type:'button', answer:'No'},
+  {name:'prior warnings', re:/prior written warnings|prior warnings.*similar conduct/i, type:'button', answer:'None'},
+  {name:'employment length', re:/how long had you been employed|how long have you been employed|how long.*worked for this employer/i, type:'button', answer:'6m-2y'},
+  {name:'salary', re:/gross monthly salary/i, type:'text', answer:'16000'},
+
+  // STORY is >50 words, so this should be skipped.
+  {name:'duplicate story', re:/describe what happened leading up to your dismissal|describe exactly what happened/i, type:'text', answer:STORY, unexpected:true},
+
+  {name:'employer name', re:/employer.*full registered name/i, type:'text', answer:'ABC Trading'},
+  {name:'addressee', re:/who should any letter be addressed to/i, type:'text', answer:'James Newder'},
+  {name:'addressee position', re:/job title or position/i, type:'text', answer:'Manager'},
+  {name:'employer contact', re:/contact email or number.*employer|HR department or the addressee/i, type:'text', answer:'hr@abc.co.za'},
+  {name:'client name', re:/what is your full name/i, type:'text', answer:'Julian Junior'},
+  {name:'client email', re:/what personal email address/i, type:'text', answer:'justine.test.runner@gmail.com'},
+  {name:'client phone', re:/WhatsApp cell phone number/i, type:'text', answer:'+27 71 000 0001'}
+];
+
+let state = null;
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function appDoc(){
+  try { return iframe.contentDocument || iframe.contentWindow.document; }
+  catch(e){ throw new Error('Cannot access the intake iframe. The test harness must run on the same Netlify origin as Justine.'); }
+}
+
+function botMessages(doc){
+  return [...doc.querySelectorAll('.bot-row .message')].map(x => x.textContent.trim()).filter(Boolean);
+}
+function userMessages(doc){
+  return [...doc.querySelectorAll('.user-row .message')].map(x => x.textContent.trim()).filter(Boolean);
+}
+function visible(el){
+  if(!el) return false;
+  const style = getComputedStyle(el);
+  return style.display !== 'none' && style.visibility !== 'hidden';
+}
+function currentPrompt(doc){
+  const bots = botMessages(doc);
+  return bots.length ? bots[bots.length-1] : '';
+}
+function findRule(prompt){ return rules.find(r => r.re.test(prompt)); }
+
+function clickButtonByText(doc, wanted){
+  const buttons = [...doc.querySelectorAll('#button-input-container button')].filter(visible);
+  const exact = buttons.find(b => b.textContent.trim().toLowerCase() === wanted.toLowerCase());
+  const loose = buttons.find(b => b.textContent.trim().toLowerCase().includes(wanted.toLowerCase()));
+  const btn = exact || loose;
+  if(!btn) return false;
+  btn.click();
+  return true;
+}
+
+async function answerText(doc, value){
+  const input = doc.getElementById('user-input');
+  const form = doc.getElementById('text-input-container');
+  if(!input || !form || !visible(form)) return false;
+  input.value = value;
+  form.dispatchEvent(new Event('submit', {bubbles:true,cancelable:true}));
+  return true;
+}
+
+function setCheck(key, passed, detail=''){
+  state.checks[key] = {passed,detail};
+  renderReview();
+}
+
+function renderReview(){
+  if(!state) return;
+  const entries = Object.entries(state.checks);
+  checksEl.innerHTML = entries.map(([k,v]) =>
+    '<div class="check '+(v.passed===true?'pass':v.passed===false?'fail':'pending')+'"><strong>'+
+    (v.passed===true?'✓ ':v.passed===false?'✗ ':'… ')+k+'</strong>'+
+    (v.detail?'<div class="muted">'+escapeHtml(v.detail)+'</div>':'')+'</div>'
+  ).join('');
+  logEl.textContent = state.promptLog.join('\n\n---\n\n') || 'Waiting for prompts…';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+async function waitForConsent(doc, timeout=15000){
+  const started=Date.now();
+  while(Date.now()-started<timeout){
+    const a=doc.getElementById('consent-terms');
+    const b=doc.getElementById('consent-sensitive');
+    const c=doc.getElementById('consent-continue');
+    if(a&&b&&c) return {a,b,c};
+    await sleep(200);
+  }
+  throw new Error('Consent controls did not appear.');
+}
+
+async function runTest(){
+  runBtn.disabled=true;
+  resetBtn.disabled=true;
+  state = {
+    handledBotCount:0,
+    promptLog:[],
+    seenRules:new Set(),
+    checks:{
+      'Consent screen loaded':{passed:null},
+      'Dismissal reason was skipped':{passed:null},
+      'Admit/dispute was skipped':{passed:null},
+      'Repeated story was skipped':{passed:null},
+      'Reached assessment outcome':{passed:null},
+      'CNTB client reference returned':{passed:null},
+      'WP letter route offered':{passed:null}
+    }
+  };
+  renderReview();
+  statusEl.textContent='Loading fresh intake…';
+
+  iframe.src='/?testHarness=1&run='+Date.now();
+  await new Promise(resolve => iframe.onload = () => resolve());
+  const doc=appDoc();
+
+  const consent=await waitForConsent(doc);
+  setCheck('Consent screen loaded',true);
+  consent.a.checked=true; consent.b.checked=true; consent.c.click();
+  statusEl.textContent='Running conversation…';
+
+  const deadline=Date.now()+180000;
+  let lastPrompt='';
+
+  while(Date.now()<deadline){
+    await sleep(350);
+    const bots=botMessages(doc);
+
+    // Log each new bot message once.
+    while(state.handledBotCount < bots.length){
+      const msg=bots[state.handledBotCount++];
+      state.promptLog.push(msg);
+      renderReview();
+    }
+
+    const allText=bots.join('\n');
+    const reference=(allText.match(/CNTB\d{6}/)||[])[0];
+    if(reference) setCheck('CNTB client reference returned',true,reference);
+
+    const reachedOutcome=/Without Prejudice letter may be appropriate|not something we are able to take further|help guide you on/i.test(allText);
+    if(reachedOutcome) setCheck('Reached assessment outcome',true);
+
+    const letterBtn=[...doc.querySelectorAll('#button-input-container button')].find(b=>/Yes, please draft the letter/i.test(b.textContent));
+    if(letterBtn){
+      setCheck('WP letter route offered',true);
+      if(reference && reachedOutcome && !continueLetter.checked) break;
+      if(continueLetter.checked && !state.clickedLetter){
+        state.clickedLetter=true;
+        letterBtn.click();
+        await sleep(600);
+        // Stop once pre-payment consent appears; we are testing that the route continues correctly.
+        const prepay=doc.getElementById('prepay-consent');
+        if(prepay){
+          state.promptLog.push('[Harness] Pre-payment consent displayed successfully.');
+          break;
+        }
+      }
+    }
+
+    const prompt=currentPrompt(doc);
+    if(!prompt || prompt===lastPrompt) continue;
+
+    // Do not try to answer outcome/processing messages.
+    if(/Thinking|Give me a moment|case reference|Based on what you have told us|Thank you for sharing|submission has been recorded/i.test(prompt)){
+      lastPrompt=prompt;
+      continue;
+    }
+
+    const rule=findRule(prompt);
+    if(!rule){
+      // Allow asynchronous acknowledgements/rephrasings; fail only when an unanswered input is actually visible.
+      const hasInput=visible(doc.getElementById('text-input-container')) ||
+        [...doc.querySelectorAll('#button-input-container button')].some(visible);
+      if(hasInput){
+        state.promptLog.push('[UNMAPPED QUESTION] '+prompt);
+        statusEl.textContent='Stopped: unmapped question encountered.';
+        break;
+      }
+      lastPrompt=prompt;
+      continue;
+    }
+
+    state.seenRules.add(rule.name);
+    if(rule.unexpected){
+      if(rule.name==='duplicate dismissal reason' || rule.name==='duplicate theft category') setCheck('Dismissal reason was skipped',false,'Unexpected prompt: '+prompt);
+      if(rule.name==='duplicate admit dispute') setCheck('Admit/dispute was skipped',false,'Unexpected prompt: '+prompt);
+      if(rule.name==='duplicate story') setCheck('Repeated story was skipped',false,'Unexpected prompt: '+prompt);
+    }
+
+    let answered=false;
+    if(rule.type==='button') answered=clickButtonByText(doc,rule.answer);
+    else answered=await answerText(doc,rule.answer);
+
+    if(answered){
+      state.promptLog.push('[Harness answered] '+rule.answer);
+      lastPrompt=prompt;
+      renderReview();
+      await sleep(400);
+    }
+  }
+
+  // Mark skip assertions as passing when the unwanted prompts never appeared.
+  if(state.checks['Dismissal reason was skipped'].passed===null) setCheck('Dismissal reason was skipped',true);
+  if(state.checks['Admit/dispute was skipped'].passed===null) setCheck('Admit/dispute was skipped',true);
+  if(state.checks['Repeated story was skipped'].passed===null) setCheck('Repeated story was skipped',true);
+  if(state.checks['CNTB client reference returned'].passed===null) setCheck('CNTB client reference returned',false,'No CNTB reference observed.');
+  if(state.checks['Reached assessment outcome'].passed===null) setCheck('Reached assessment outcome',false,'No final assessment observed.');
+  if(state.checks['WP letter route offered'].passed===null) setCheck('WP letter route offered',false,'Letter option was not offered.');
+
+  const failed=Object.values(state.checks).some(x=>x.passed===false);
+  statusEl.textContent=failed?'Test completed with failures.':'Test passed.';
+  runBtn.disabled=false; resetBtn.disabled=false;
+}
+
+runBtn.addEventListener('click',()=>runTest().catch(err=>{
+  statusEl.textContent='Test error: '+err.message;
+  if(state){state.promptLog.push('[ERROR] '+err.stack);renderReview();}
+  runBtn.disabled=false;resetBtn.disabled=false;
+}));
+resetBtn.addEventListener('click',()=>{
+  iframe.src='/?testHarness=1&reset='+Date.now();
+  state=null;checksEl.innerHTML='';logEl.textContent='No test run yet.';statusEl.textContent='Ready';
+});
+</script>
+</body>
+</html>
