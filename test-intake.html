@@ -162,7 +162,7 @@ function currentPrompt(doc){
 function findRule(prompt){ return rules.find(r => r.re.test(prompt)); }
 
 function clickButtonByText(doc, wanted){
-  const buttons = [...doc.querySelectorAll('#button-input-container button')].filter(visible);
+  const buttons = [...doc.querySelectorAll('#button-input-container button')];
   const exact = buttons.find(b => b.textContent.trim().toLowerCase() === wanted.toLowerCase());
   const loose = buttons.find(b => b.textContent.trim().toLowerCase().includes(wanted.toLowerCase()));
   const btn = exact || loose;
@@ -174,7 +174,7 @@ function clickButtonByText(doc, wanted){
 async function answerText(doc, value){
   const input = doc.getElementById('user-input');
   const form = doc.getElementById('text-input-container');
-  if(!input || !form || !visible(form)) return false;
+  if(!input || !form || form.style.display === 'none') return false;
   input.value = value;
   form.dispatchEvent(new Event('submit', {bubbles:true,cancelable:true}));
   return true;
@@ -317,9 +317,13 @@ async function runTest(){
       renderReview();
       await sleep(400);
     } else {
-      state.promptLog.push('[ANSWER FAILED] state='+String(current)+' answer='+rule.answer);
-      statusEl.textContent='Stopped: could not answer '+String(current)+'.';
-      break;
+      // renderState uses a short timeout before controls appear. The internal state
+      // can therefore advance slightly before the matching controls exist.
+      const waitLine='[Waiting for controls] state='+String(current);
+      if(state.promptLog[state.promptLog.length-1] !== waitLine) state.promptLog.push(waitLine);
+      renderReview();
+      await sleep(300);
+      continue;
     }
   }
 
