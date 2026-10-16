@@ -76,6 +76,35 @@ const continueLetter = document.getElementById('continueLetter');
 
 const STORY = "I was fired last week, the boss found some stock was missing and he accused me of stealing it. I told him it was not me and I asked to see evidence why he said it was me but he did not show me any proof. I have never stolen from him and I have always been honest at work. He said it doesn't matter, he is the boss and he fired me. Then when I went to work on Monday he would not let me in and told me he will call the police if I come back.";
 
+const stateAnswers = {
+  JUR_EMPLOYEE:{type:'button',answer:'Yes'},
+  JUR_SA_EMPLOYER:{type:'button',answer:'Yes'},
+  JUR_PUBLIC_SERVICE:{type:'button',answer:'No'},
+  START:{type:'text',answer:STORY},
+  FIRED_DATE:{type:'text',answer:'2026-10-09'},
+  FIRED_REASON_TYPE:{type:'button',answer:'Misconduct',unexpected:'Dismissal reason was skipped'},
+  A2_MISCONDUCT_CATEGORY:{type:'button',answer:'Theft',unexpected:'Dismissal reason was skipped'},
+  A3_CONDUCT_ADMISSION:{type:'button',answer:'Dispute',unexpected:'Admit/dispute was skipped'},
+  A4_HEARING_HELD:{type:'button',answer:'No'},
+  A8_PRIOR_WARNINGS:{type:'button',answer:'None'},
+  A9_EMPLOYMENT_LENGTH:{type:'button',answer:'6m-2y'},
+  A10_SALARY:{type:'text',answer:'16000'},
+  A11_MISCONDUCT_NARRATIVE:{type:'text',answer:STORY,unexpected:'Repeated story was skipped'},
+  COMPANY_NAME:{type:'text',answer:'ABC Trading'},
+  ADDRESSEE_NAME:{type:'text',answer:'James Newder'},
+  ADDRESSEE_POSITION:{type:'text',answer:'Manager'},
+  COMPANY_CONTACT:{type:'text',answer:'hr@abc.co.za'},
+  CLIENT_NAME:{type:'text',answer:'Julian Junior'},
+  CLIENT_EMAIL:{type:'text',answer:'justine.test.runner@gmail.com'},
+  CLIENT_PHONE:{type:'text',answer:'+27 71 000 0001'}
+};
+
+function intakeState(){
+  try { return iframe.contentWindow.eval('currentState'); }
+  catch(e){ return null; }
+}
+
+
 const rules = [
   {name:'employee status', re:/employed by the company|freelancer or contractor/i, type:'button', answer:'Yes'},
   {name:'South Africa jurisdiction', re:/operate or do business in South Africa/i, type:'button', answer:'Yes'},
@@ -256,25 +285,26 @@ async function runTest(){
       continue;
     }
 
-    const rule=findRule(prompt);
+    const current = intakeState();
+    const stateRule = current ? stateAnswers[current] : null;
+    const rule = stateRule || findRule(prompt);
+
     if(!rule){
-      // Allow asynchronous acknowledgements/rephrasings; fail only when an unanswered input is actually visible.
       const hasInput=visible(doc.getElementById('text-input-container')) ||
         [...doc.querySelectorAll('#button-input-container button')].some(visible);
       if(hasInput){
-        state.promptLog.push('[UNMAPPED QUESTION] '+prompt);
-        statusEl.textContent='Stopped: unmapped question encountered.';
+        state.promptLog.push('[UNMAPPED STATE] '+String(current)+'\n'+prompt);
+        statusEl.textContent='Stopped: unmapped intake state '+String(current)+'.';
         break;
       }
       lastPrompt=prompt;
       continue;
     }
 
-    state.seenRules.add(rule.name);
+    if(current) state.promptLog.push('[State] '+current);
+
     if(rule.unexpected){
-      if(rule.name==='duplicate dismissal reason' || rule.name==='duplicate theft category') setCheck('Dismissal reason was skipped',false,'Unexpected prompt: '+prompt);
-      if(rule.name==='duplicate admit dispute') setCheck('Admit/dispute was skipped',false,'Unexpected prompt: '+prompt);
-      if(rule.name==='duplicate story') setCheck('Repeated story was skipped',false,'Unexpected prompt: '+prompt);
+      setCheck(rule.unexpected,false,'Unexpected state '+String(current)+': '+prompt);
     }
 
     let answered=false;
@@ -286,6 +316,10 @@ async function runTest(){
       lastPrompt=prompt;
       renderReview();
       await sleep(400);
+    } else {
+      state.promptLog.push('[ANSWER FAILED] state='+String(current)+' answer='+rule.answer);
+      statusEl.textContent='Stopped: could not answer '+String(current)+'.';
+      break;
     }
   }
 
@@ -298,7 +332,9 @@ async function runTest(){
   if(state.checks['WP letter route offered'].passed===null) setCheck('WP letter route offered',false,'Letter option was not offered.');
 
   const failed=Object.values(state.checks).some(x=>x.passed===false);
-  statusEl.textContent=failed?'Test completed with failures.':'Test passed.';
+  if(!statusEl.textContent.startsWith('Stopped:')) {
+    statusEl.textContent=failed?'Test completed with failures.':'Test passed.';
+  }
   runBtn.disabled=false; resetBtn.disabled=false;
 }
 
