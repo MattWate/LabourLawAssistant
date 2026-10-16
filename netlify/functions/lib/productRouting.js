@@ -15,7 +15,9 @@ function determineProductRoute(facts = {}) {
     };
   }
 
-  if (track === 'ANC' || advisoryTopic || ['PDA', 'ULP'].includes(track)) {
+  const isAdvisoryRoute = track === 'ANC' || ['PDA', 'ULP'].includes(track) || employmentStatus === 'ADVISORY';
+
+  if (isAdvisoryRoute) {
     return {
       route: 'ANCILLARY_OR_ADVISORY',
       product_code: null,
