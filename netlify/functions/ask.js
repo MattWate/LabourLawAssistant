@@ -335,7 +335,7 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           success: true,
           caseId: data.id,
-          caseReference: caseReference(data.id, data.created_at),
+          caseReference: data.client_reference || caseReference(data.id, data.created_at),
           message: 'Thanks. I have saved what you have told me and sent it to VRS so a person can continue with you.'
         })
       };
@@ -352,7 +352,7 @@ exports.handler = async (event) => {
         letter_status: 'not_applicable'
       }).select().single();
       if (error) throw error;
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: true, caseId: data.id, caseReference: caseReference(data.id, data.created_at), triage, message: triage.recommended_next_step }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: true, caseId: data.id, caseReference: data.client_reference || caseReference(data.id, data.created_at), triage, message: triage.recommended_next_step }) };
     }
 
     if (action === 'evaluate') {
@@ -412,7 +412,7 @@ exports.handler = async (event) => {
         }
       }
 
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: clientOutcome, clientOutcome, internalAssessment: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, caseReference: caseReference(data.id, data.created_at), scorecard, governance: caseFacts.llm_governance, whatsapp }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: clientOutcome, clientOutcome, internalAssessment: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, caseReference: data.client_reference || caseReference(data.id, data.created_at), scorecard, governance: caseFacts.llm_governance, whatsapp }) };
     }
 
     if (action === 'close') {
