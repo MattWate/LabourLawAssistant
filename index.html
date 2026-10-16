@@ -149,7 +149,7 @@
             type: "end"
         },
         JUR_EMPLOYEE: {
-            msg: "Hi, my name is Justine and I am a VRS Labour Law Assistant. I am here to help you work through what has happened. Before we start, the information you share will be used by VRS Labour Law Consultants to understand and assess your matter and will be handled as part of your VRS enquiry. Justine provides an initial automated assessment, and a VRS consultant reviews the matter and decides the next step. The automated flow is currently in English. To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?",
+            msg: "To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?",
             type: "buttons",
             options: [
                 { label: "Yes", next: "JUR_SA_EMPLOYER", val: "Employee" },
@@ -357,7 +357,7 @@
     }
 
     const AI_SKIP_CONFIDENCE = 0.8;
-    const WEB_PROMPT_LIMIT = 15;
+    const WEB_PROMPT_LIMIT = 25;
 
     function webPromptCount() { return Number(collectedFacts._intake_prompt_count || 0); }
     function recordWebPrompt(key) {
@@ -385,6 +385,33 @@
             }));
         if (items.length) collectedFacts._pending_confirmation = { items };
     }
+    function mergeDirectExtractions(turn) {
+        if (!turn?.enabled || !Array.isArray(turn.direct_extractions)) return;
+        const metadata = { ...(collectedFacts._fact_metadata || {}) };
+
+        turn.direct_extractions.forEach(item => {
+            if (!item?.field || !hasKnownValue(item.value)) return;
+            const existingMeta = metadata[item.field];
+            if (hasKnownValue(collectedFacts[item.field]) && existingMeta?.confirmed === true) return;
+
+            collectedFacts[item.field] = item.value;
+            metadata[item.field] = {
+                source: "client_explicit_extraction",
+                confidence: 1,
+                confirmed: true,
+                evidence: item.evidence || null,
+                captured_at: new Date().toISOString()
+            };
+        });
+
+        collectedFacts._fact_metadata = metadata;
+
+        const pending = collectedFacts._pending_confirmation?.items || [];
+        const remaining = pending.filter(item => metadata[item.field]?.confirmed !== true);
+        if (remaining.length) collectedFacts._pending_confirmation = { items: remaining };
+        else delete collectedFacts._pending_confirmation;
+    }
+
     function mergeConversationalInferences(turn) {
         if (!turn?.enabled || !Array.isArray(turn.inferences)) return;
         const metadata = { ...(collectedFacts._fact_metadata || {}) };
@@ -435,6 +462,7 @@
             });
             const data = await res.json();
             if (!res.ok || data.error) throw new Error(data.error || "intake turn failed");
+            mergeDirectExtractions(data);
             mergeConversationalInferences(data);
             if (data.next_question && nextStateKey) collectedFacts._next_question_override = { state: nextStateKey, text: data.next_question };
             return data;
