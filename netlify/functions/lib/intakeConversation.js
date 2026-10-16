@@ -4,7 +4,7 @@ const { loadSkillAsset } = require('./skillRegistry');
 const MAX_INFERENCES = 4;
 const MAX_DIRECT_EXTRACTIONS = 8;
 const DIRECT_EXTRACTION_FIELDS = new Set([
-  'employment_status','dismissal_reason_type','misconduct_category','conduct_admission','hearing_held','prior_warnings','length_of_service','gross_monthly_salary','incident_description','employer_name','employer_registered_name','addressee_name','addressee_position','employer_contact_details','client_name','client_email','south_african_employer','public_service_or_excluded_agency','contractor_control_test','advisory_topic','protected_ground'
+  'employment_status','dismissal_reason_type','misconduct_category','conduct_admission','hearing_held','prior_warnings','length_of_service','gross_monthly_salary','incident_description','employer_name','employer_registered_name','addressee_name','addressee_position','employer_contact_details','client_name','south_african_employer','public_service_or_excluded_agency','contractor_control_test','advisory_topic','protected_ground'
 ]);
 
 function enabled() {
@@ -158,7 +158,7 @@ Return ONLY valid JSON in this shape:
 
 Rules for JSON:
 - Return no more than 8 direct_extractions and 4 inferences.
-- direct_extractions may only use these fields: employment_status, dismissal_reason_type, misconduct_category, conduct_admission, hearing_held, prior_warnings, length_of_service, gross_monthly_salary, incident_description, employer_name, employer_registered_name, addressee_name, addressee_position, employer_contact_details, client_name, client_email, south_african_employer, public_service_or_excluded_agency, contractor_control_test, advisory_topic, protected_ground.
+- direct_extractions may only use these fields: employment_status, dismissal_reason_type, misconduct_category, conduct_admission, hearing_held, prior_warnings, length_of_service, gross_monthly_salary, incident_description, employer_name, employer_registered_name, addressee_name, addressee_position, employer_contact_details, client_name, south_african_employer, public_service_or_excluded_agency, contractor_control_test, advisory_topic, protected_ground.
 - Only use direct_extractions where the client clearly and explicitly stated the fact. Do not use them for guesses, legal conclusions or implications.
 - Normalise direct values to the controlled-flow values where obvious. Examples: stealing/theft -> misconduct_category="theft"; fired/sacked -> employment_status="Dismissed"; "I never stole it" -> conduct_admission="Dispute"; "there was no hearing" -> hearing_held=false.
 - If the client's current narrative is already a sufficiently detailed account of the incident (roughly 50+ words), direct_extractions may set incident_description to that narrative so they are not asked to tell the same story twice.
