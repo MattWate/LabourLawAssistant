@@ -540,7 +540,7 @@ async function completeEvaluation(conversation, message, facts) {
   await updateConversation(conversation.id, { status: 'completed', current_step: 'COMPLETE', collected_facts: finalFacts, case_id: evaluation.caseId,
     processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
   const assessment = evaluation.pitch || evaluation.scorecard?.recommended_next_step || 'Your enquiry has been recorded for review.';
-  return `Thank you. I have created your confidential VRS intake and sent it for legal review.\n\nInitial assessment:\n${assessment}\n\nReference: ${evaluation.caseId}`;
+  return `Thank you. I have created your confidential VRS intake and sent it for legal review.\n\nInitial assessment:\n${assessment}\n\nReference: ${evaluation.caseReference || evaluation.caseId}`;
 }
 async function processIncomingMessage(message) {
   if (!supabase) throw new Error('Supabase is not configured for WhatsApp conversation state');
