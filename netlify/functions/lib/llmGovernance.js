@@ -161,7 +161,8 @@ function toCompatibilityShape(governance = {}) {
 function normaliseGovernance(raw = {}, source = 'claude') {
   const primaryTrack = normaliseTrack(raw.primary_track);
   const secondaryTrack = normaliseTrack(raw.secondary_track);
-  const advisoryTopic = cleanString(raw.advisory_topic) || null;
+  const rawAdvisoryTopic = cleanString(raw.advisory_topic) || null;
+  const advisoryTopic = ['ANC', 'PDA', 'ULP'].includes(primaryTrack) ? rawAdvisoryTopic : null;
   const overrideFlags = normaliseOverrideFlags(raw.override_flags);
   const hydratedFacts = cleanHydratedFacts(raw.hydrated_facts || raw.extracted_fields || raw.case_facts || {});
 
