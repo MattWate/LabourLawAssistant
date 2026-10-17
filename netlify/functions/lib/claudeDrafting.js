@@ -99,7 +99,7 @@ Rules for this API output:
 - Do not include salary figures or salary amounts anywhere in the letter.
 - Do not guess names, job titles, dates, addresses or facts. Use a clear placeholder such as [ADDRESSEE NAME] where required information is unknown.
 - Use conditional wording for anything that is not confirmed.
-- Give the recipient seven business days to respond.
+- Give the recipient seven calendar days to respond.
 - Do not use section headings in the body. The background must read as coherent essay-style paragraphs.
 - Do not include specific rand figures in the body of the letter unless explicitly authorised as a settlement figure by VRS.
 - Apply the audience profile from VRS_HOUSE_STYLE consistently throughout Part A. Do not add contradictory tone instructions of your own.
@@ -204,8 +204,13 @@ Score these six criteria separately from 0 to 10 and return one criteria item fo
 2. Legal and strategic alignment — the draft reflects the deterministic WP posture and protected VRS skill context without overstating the merits.
 3. VRS tone and house style — counterparty-facing tone is professional, confident, proportionate and consistent with the protected style.
 4. Structure and readability — coherent essay-style background, distinct numbered legal claims, clear flow, no visible section headings or duplicated template content.
-5. Settlement clarity and actionability — settlement proposal is clear, commercially usable, appropriately framed and gives seven business days to respond.
+5. Settlement clarity and actionability — settlement proposal is clear, commercially usable, appropriately framed and gives no more than seven calendar days to respond.
 6. Safety and drafting compliance — no case-law citations, salary figures, unsupported certainty, duplicate salutation/closing/signature, or other prohibited content.
+
+Important scope rule: you are reviewing ONLY the structured Part A body returned by the drafting model, not the final rendered Word document.
+The Word template supplies the opening reference block, WITHOUT PREJUDICE line, RE line, salutation, closing, firm/signatory details and signature. Do NOT penalise the Part A draft for their absence and do NOT request that the redraft add them.
+The legal_claims.title values are structural metadata used by the renderer and are not visible section headings. Do NOT penalise those title fields unless the claim text itself contains prohibited heading-like text.
+Assess only content the drafting model is responsible for: opening narrative paragraphs, legal claim text, settlement intro, settlement terms and conclusion paragraphs.
 
 For every criterion, identify the concrete problem, brief evidence from the draft, the required fix and severity. Use empty strings and severity "none" where there is no problem.
 The overall drafting_quality_score must reflect the draft as a whole and be consistent with the six criterion scores. Do not inflate it merely to pass.
