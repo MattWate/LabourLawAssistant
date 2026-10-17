@@ -205,7 +205,7 @@ function inspectDraft(c){
   const salaryDigits=salary.replace(/\.0+$/,'');
   const salaryLeak=salaryDigits.length>=4&&draft.replace(/[,\s]/g,'').includes(salaryDigits);
   check('No client salary figure in letter',!salaryLeak,salaryLeak?'The captured salary appears in the draft.':'');
-  check('Seven calendar day response convention',/seven\s+calendar\s+days/i.test(draft),'');
+  check('Seven calendar day response convention',/(?:seven|7)\s+calendar\s+days/i.test(draft),'');
   check('No case law citations',!/(\bv\.|\bv\s+[A-Z]|\[[12][0-9]{3}\]\s*(ZALC|ZACC|ZASCA|BLLR|ILJ))/i.test(draft),'');
   check('Template requirement recorded',Boolean(f.wp_template_required),String(f.wp_template_required||''));
   check('Redraft audit recorded',typeof qa.redraft_performed==='boolean','redraft_performed='+String(qa.redraft_performed));
