@@ -55,6 +55,8 @@
         <h2>Test results</h2>
         <div id="status" class="status">Ready</div>
         <div id="checks"></div>
+        <h2 style="margin-top:18px">QA breakdown</h2>
+        <pre id="qa">No QA result yet.</pre>
         <h2 style="margin-top:18px">Raw test log</h2>
         <pre id="log">No test run yet.</pre>
       </div>
@@ -78,6 +80,52 @@ function check(name,passed,detail=''){
   el.className='check '+(passed===true?'pass':passed===false?'fail':'pending');
   el.innerHTML='<strong>'+(passed===true?'✓ ':passed===false?'✗ ':'… ')+name+'</strong>'+(detail?'<div class="muted">'+detail.replace(/[&<>]/g,'')+'</div>':'');
 }
+function renderQA(qa={}){
+  if(!qa || !Object.keys(qa).length){
+    $('qa').textContent='No QA result yet.';
+    return;
+  }
+  const initial=qa.initial_assessment||{};
+  const finalScore=Number(qa.final_drafting_quality_score ?? qa.drafting_quality_score ?? 0);
+  const initialScore=Number(qa.initial_drafting_quality_score ?? initial.drafting_quality_score ?? finalScore);
+  const delta=Number(qa.score_change ?? (finalScore-initialScore));
+  const lines=[
+    'INITIAL QA: '+initialScore.toFixed(2)+' / 10',
+    'FINAL QA:   '+finalScore.toFixed(2)+' / 10',
+    'CHANGE:     '+(delta>=0?'+':'')+delta.toFixed(2),
+    'FLOOR:      '+Number(qa.quality_floor||7.5).toFixed(2),
+    'REDRAFT:    '+String(qa.redraft_performed===true),
+    ''
+  ];
+  function addAssessment(label,a){
+    const criteria=Array.isArray(a?.criteria)?a.criteria:[];
+    if(criteria.length){
+      lines.push(label+' CRITERIA');
+      criteria.forEach(item=>{
+        lines.push('- '+String(item.criterion||'Criterion')+': '+Number(item.score||0).toFixed(2)+'/10 ['+String(item.severity||'')+']');
+        if(item.problem) lines.push('  Problem: '+item.problem);
+        if(item.evidence_from_draft) lines.push('  Evidence: '+item.evidence_from_draft);
+        if(item.required_fix) lines.push('  Required fix: '+item.required_fix);
+      });
+      lines.push('');
+    }
+    if(Array.isArray(a?.what_needs_work)&&a.what_needs_work.length){
+      lines.push(label+' NEEDS WORK');
+      a.what_needs_work.forEach(x=>lines.push('- '+x));
+      lines.push('');
+    }
+    if(Array.isArray(a?.recommended_amendments)&&a.recommended_amendments.length){
+      lines.push(label+' RECOMMENDED AMENDMENTS');
+      a.recommended_amendments.forEach(x=>lines.push('- '+x));
+      lines.push('');
+    }
+    if(a?.supervisory_summary) lines.push(label+' SUMMARY\n'+a.supervisory_summary+'\n');
+  }
+  if(Object.keys(initial).length) addAssessment('INITIAL',initial);
+  addAssessment('FINAL',qa);
+  $('qa').textContent=lines.join('\n');
+}
+
 async function getToken(){
   if(!token) throw new Error('Please sign in again.');
   return token;
@@ -137,6 +185,7 @@ function inspectDraft(c){
   const qa=f.wp_supervisory_assessment||{};
   const structure=f.wp_letter_structure||{};
   const draft=String(c.draft_letter||'');
+  renderQA(qa);
   $('draft').value=draft||'No draft generated.';
 
   check('Draft text generated',draft.length>200,'Length: '+draft.length+' characters');
@@ -163,7 +212,7 @@ function inspectDraft(c){
 }
 
 async function run(){
-  $('runBtn').disabled=true;$('checks').innerHTML='';$('log').textContent='';$('draft').value='Running…';
+  $('runBtn').disabled=true;$('checks').innerHTML='';$('log').textContent='';$('qa').textContent='Waiting for supervisory QA…';$('draft').value='Running…';
   $('status').textContent='Preparing staging drafting case…';
   try{
     const sourceId=$('caseSelect').value;
@@ -200,7 +249,11 @@ async function run(){
       if(current.letter_status==='generation_failed'){
         const qa=f.wp_supervisory_assessment||{};
         if(qa&&Object.keys(qa).length){
-          check('Supervisory QA completed',true,'Score '+String(qa.drafting_quality_score||0)+' / 10');
+          renderQA(qa);
+          const initialScore=Number(qa.initial_drafting_quality_score ?? qa.initial_assessment?.drafting_quality_score ?? qa.drafting_quality_score ?? 0);
+          const finalScore=Number(qa.final_drafting_quality_score ?? qa.drafting_quality_score ?? 0);
+          const delta=Number(qa.score_change ?? (finalScore-initialScore));
+          check('Supervisory QA completed',true,'Initial '+initialScore.toFixed(2)+' → final '+finalScore.toFixed(2)+' ('+(delta>=0?'+':'')+delta.toFixed(2)+')');
           const needs=[...(qa.what_needs_work||[]),...(qa.recommended_amendments||[])].filter(Boolean);
           check('Drafting QA meets 7.5 floor',Number(qa.drafting_quality_score||0)>=Number(qa.quality_floor||7.5),needs.slice(0,6).join(' | '));
           if(f.wp_failed_draft_preview) $('draft').value=f.wp_failed_draft_preview;
