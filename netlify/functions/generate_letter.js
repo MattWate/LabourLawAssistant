@@ -19,7 +19,11 @@ async function authenticate(event) {
 }
 
 function siteBaseUrl(event) {
-  const configured = process.env.URL || process.env.DEPLOY_PRIME_URL;
+  // DEPLOY_PRIME_URL points at the current Netlify deploy context (including
+  // branch deploys). URL can point at the production site even when this
+  // function is running in staging, which would accidentally queue the
+  // background draft against production code.
+  const configured = process.env.DEPLOY_PRIME_URL || process.env.URL;
   if (configured) return configured.replace(/\/$/, '');
   const host = event.headers?.host;
   const proto = event.headers?.['x-forwarded-proto'] || 'https';
