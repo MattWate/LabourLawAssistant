@@ -197,7 +197,16 @@ async function run(){
       if(!current) throw new Error('Test case disappeared while polling.');
       const f=current.case_facts||{};
       addLog(new Date().toLocaleTimeString()+' — '+String(current.letter_status)+' / '+String(f.wp_letter_status||''));
-      if(current.letter_status==='generation_failed') throw new Error('Draft generation failed: '+String(f.wp_generation_error||'unknown error'));
+      if(current.letter_status==='generation_failed'){
+        const qa=f.wp_supervisory_assessment||{};
+        if(qa&&Object.keys(qa).length){
+          check('Supervisory QA completed',true,'Score '+String(qa.drafting_quality_score||0)+' / 10');
+          const needs=[...(qa.what_needs_work||[]),...(qa.recommended_amendments||[])].filter(Boolean);
+          check('Drafting QA meets 7.5 floor',Number(qa.drafting_quality_score||0)>=Number(qa.quality_floor||7.5),needs.slice(0,6).join(' | '));
+          if(f.wp_failed_draft_preview) $('draft').value=f.wp_failed_draft_preview;
+        }
+        throw new Error('Draft generation failed: '+String(f.wp_generation_error||'unknown error'));
+      }
       if(current.letter_status==='pending_review'&&current.draft_letter) break;
     }
     if(!current||current.letter_status!=='pending_review') throw new Error('Drafting did not complete within four minutes.');
