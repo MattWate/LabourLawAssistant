@@ -108,6 +108,9 @@ Rules for this API output:
 - Keep ordinary narrative text in "opening_paragraphs", "settlement_intro" and "conclusion_paragraphs".
 - Do NOT include the letter salutation, subject heading, "It is trusted that you will find same to be in order.", "Yours faithfully", the firm name, attorney/signatory name, electronic-signature note, or any other closing/signature block in Part A. Those are supplied exactly once by the Word template.
 - Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term.
+- If wp_type is PROCEDURAL_ONLY, make procedural unfairness the primary legal and settlement lever. Record the client's denial of misconduct as a fact, but do not imply substantive vindication or present the substantive case as equally strong unless the case brief supports that.
+- Any police, criminal-complaint or SAPS-related wording must track the confirmed case facts narrowly. Do not imply that a complaint was made or contemplated unless the case brief says so; use conditional wording only where genuinely necessary.
+- Settlement terms should cover the standing VRS settlement categories where supported by the facts, including compensation, notice pay, leave pay, UIF/UI-19, certificate of service, reference, confidentiality/non-disparagement, pension or provident-fund confirmation where applicable, and a clean-record/expungement term where an unresolved misconduct allegation may remain on the employer's records.
 - The first drafting call must not self-certify quality. A separate supervisory Claude call will score the draft.
 - The Case Merits Score must remain candid and must not be inflated to meet the drafting quality floor.`;
 }
