@@ -199,22 +199,31 @@ ${JSON.stringify(caseBrief, null, 2)}
 === PROPOSED DRAFT ===
 ${JSON.stringify(draft, null, 2)}
 
-Check all of the following:
-- no section headings in the letter body;
-- background reads as coherent essay-style paragraphs;
-- no case-law citations;
-- no salary figures;
-- no guessed names, job titles, dates or addresses;
-- conditional wording for anything not confirmed;
-- placeholders where required information is unknown;
-- seven business days to respond;
-- no duplicate salutation, closing or signature;
-- draft stays aligned to the deterministic WP posture.
+Score these six criteria separately from 0 to 10 and return one criteria item for each:
+1. Factual fidelity — every material assertion is supported by the fixed case brief; no invented facts, names, dates, titles, addresses or salary figures.
+2. Legal and strategic alignment — the draft reflects the deterministic WP posture and protected VRS skill context without overstating the merits.
+3. VRS tone and house style — counterparty-facing tone is professional, confident, proportionate and consistent with the protected style.
+4. Structure and readability — coherent essay-style background, distinct numbered legal claims, clear flow, no visible section headings or duplicated template content.
+5. Settlement clarity and actionability — settlement proposal is clear, commercially usable, appropriately framed and gives seven business days to respond.
+6. Safety and drafting compliance — no case-law citations, salary figures, unsupported certainty, duplicate salutation/closing/signature, or other prohibited content.
+
+For every criterion, identify the concrete problem, brief evidence from the draft, the required fix and severity. Use empty strings and severity "none" where there is no problem.
+The overall drafting_quality_score must reflect the draft as a whole and be consistent with the six criterion scores. Do not inflate it merely to pass.
 
 Return ONLY valid JSON:
 {
   "drafting_quality_score": 0.0,
   "quality_floor_met": false,
+  "criteria": [
+    {
+      "criterion": "Factual fidelity",
+      "score": 0.0,
+      "problem": "what is wrong, or empty string",
+      "evidence_from_draft": "short evidence from the draft, or empty string",
+      "required_fix": "specific correction, or empty string",
+      "severity": "high|medium|low|none"
+    }
+  ],
   "what_is_strong": [],
   "what_needs_work": [],
   "risks_to_monitor": [],
@@ -240,6 +249,22 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
         properties: {
           drafting_quality_score: { type: 'number' },
           quality_floor_met: { type: 'boolean' },
+          criteria: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                criterion: { type: 'string' },
+                score: { type: 'number' },
+                problem: { type: 'string' },
+                evidence_from_draft: { type: 'string' },
+                required_fix: { type: 'string' },
+                severity: { type: 'string' }
+              },
+              required: ['criterion','score','problem','evidence_from_draft','required_fix','severity']
+            }
+          },
           what_is_strong: { type: 'array', items: { type: 'string' } },
           what_needs_work: { type: 'array', items: { type: 'string' } },
           risks_to_monitor: { type: 'array', items: { type: 'string' } },
@@ -247,7 +272,7 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
           recommended_amendments: { type: 'array', items: { type: 'string' } },
           supervisory_summary: { type: 'string' }
         },
-        required: ['drafting_quality_score','quality_floor_met','what_is_strong','what_needs_work','risks_to_monitor','forensic_questions','recommended_amendments','supervisory_summary']
+        required: ['drafting_quality_score','quality_floor_met','criteria','what_is_strong','what_needs_work','risks_to_monitor','forensic_questions','recommended_amendments','supervisory_summary']
       }
     }],
     tool_choice: { type: 'tool', name: 'submit_supervisory_assessment' },
@@ -295,11 +320,19 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
 }
 
 function revisionInstructions(assessment = {}) {
+  const criterionFixes = (Array.isArray(assessment.criteria) ? assessment.criteria : [])
+    .filter(item => item && item.required_fix && String(item.severity || '').toLowerCase() !== 'none')
+    .map(item => `${item.criterion || 'Criterion'} (${item.score ?? 'n/a'}/10, ${item.severity || 'unspecified'}): ${item.required_fix}`);
+
   const issues = [
+    ...criterionFixes,
     ...(Array.isArray(assessment.what_needs_work) ? assessment.what_needs_work : []),
     ...(Array.isArray(assessment.recommended_amendments) ? assessment.recommended_amendments : [])
   ].filter(Boolean);
-  return issues.length ? issues.map((item, index) => `${index + 1}. ${item}`).join('\n') : 'Revise the draft to comply fully with the protected VRS prompt and final letter conventions.';
+
+  return issues.length
+    ? issues.map((item, index) => `${index + 1}. ${item}`).join('\n')
+    : 'Revise the draft to comply fully with the protected VRS prompt and final letter conventions.';
 }
 async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured');
@@ -353,11 +386,16 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   });
   callLogs.push(supervisor.log);
   let assessment = supervisor.assessment;
+  const initialAssessment = JSON.parse(JSON.stringify(assessment || {}));
   let redraftPerformed = false;
 
   if (Number(assessment.drafting_quality_score || 0) < DRAFT_QUALITY_FLOOR) {
     redraftPerformed = true;
-    const redraftPrompt = prompt + '\n\n=== REQUIRED REVISIONS FROM SEPARATE SUPERVISORY CHECK ===\n' + revisionInstructions(assessment);
+    const originalDraft = JSON.stringify(parsed.part_a_letter || parsed, null, 2);
+    const redraftPrompt = prompt +
+      '\n\n=== ORIGINAL DRAFT TO REVISE ===\n' + originalDraft +
+      '\n\n=== REQUIRED REVISIONS FROM SEPARATE SUPERVISORY CHECK ===\n' + revisionInstructions(assessment) +
+      '\n\nRevise the ORIGINAL DRAFT above. Preserve accurate, useful content that already works; make targeted corrections for every supervisory issue. Do not ignore a required fix and do not introduce new facts.';
     const redraftBody = {
       ...requestBody,
       messages: [{ role: 'user', content: redraftPrompt }]
@@ -398,6 +436,10 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   assessment.quality_floor_met = Number(assessment.drafting_quality_score || 0) >= DRAFT_QUALITY_FLOOR;
   assessment.quality_floor = DRAFT_QUALITY_FLOOR;
   assessment.redraft_performed = redraftPerformed;
+  assessment.initial_assessment = initialAssessment;
+  assessment.initial_drafting_quality_score = Number(initialAssessment.drafting_quality_score || 0);
+  assessment.final_drafting_quality_score = Number(assessment.drafting_quality_score || 0);
+  assessment.score_change = Number((assessment.final_drafting_quality_score - assessment.initial_drafting_quality_score).toFixed(2));
   parsed.part_b_supervisory_assessment = assessment;
 
   return {
