@@ -193,6 +193,7 @@ exports.handler = async (event) => {
     const { handler: createPayment } = require('./create_payfast_payment');
     const paymentResponse = await createPayment({
       httpMethod: 'POST',
+      headers: { authorization: event.headers?.authorization || event.headers?.Authorization || '' },
       body: JSON.stringify({ caseId, amount: body.amount })
     });
     const payment = JSON.parse(paymentResponse.body || '{}');
