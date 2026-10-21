@@ -19,6 +19,14 @@ function json(statusCode, body) {
   };
 }
 
+async function authenticate(event) {
+  const auth = event.headers?.authorization || event.headers?.Authorization || '';
+  if (!auth.startsWith('Bearer ')) throw new Error('Unauthorized');
+  const { data, error } = await supabase.auth.getUser(auth.slice(7));
+  if (error || !data?.user) throw new Error('Unauthorized');
+  return data.user;
+}
+
 function firstAndLast(name = '') {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   return {
@@ -66,6 +74,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
 
   try {
+    await authenticate(event);
     const body = JSON.parse(event.body || '{}');
     const caseId = body.caseId || body.case_id;
     if (!caseId) return json(400, { error: 'caseId is required' });
@@ -129,6 +138,6 @@ exports.handler = async (event) => {
     });
   } catch (error) {
     console.error('create_payfast_payment error:', error);
-    return json(500, { error: error.message });
+    return json(error.message === 'Unauthorized' ? 401 : 500, { error: error.message });
   }
 };
