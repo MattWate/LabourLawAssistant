@@ -39,16 +39,7 @@ exports.handler = async (event) => {
       success: true,
       found: Boolean(data),
       payment: data ? {
-        id: data.id,
-        case_id: data.case_id,
-        m_payment_id: data.m_payment_id,
-        pf_payment_id: data.pf_payment_id,
-        amount: data.amount,
-        item_name: data.item_name,
         status: data.status,
-        signature_valid: data.signature_valid,
-        merchant_valid: data.merchant_valid,
-        payfast_validation_status: data.payfast_validation_status,
         received_at: data.received_at,
         updated_at: data.updated_at
       } : null
