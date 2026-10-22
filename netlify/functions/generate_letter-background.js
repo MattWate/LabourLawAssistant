@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { loadWpSkillSet, buildProtectedPromptContext } = require('./lib/skillRegistry');
 const { buildCaseBrief, callClaudeForWpDraft } = require('./lib/claudeDrafting');
+const { factsForDeterministicDecision } = require('./lib/factProvenance');
 const { normaliseLetterStructure, letterStructureToPlainText } = require('./lib/letterStructure');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -143,7 +144,8 @@ exports.handler = async (event) => {
     });
 
     const skillContext = buildProtectedPromptContext(skillSet);
-    const caseBrief = buildCaseBrief({ facts, senderVariant, clientSide });
+    const confirmedDraftFacts = factsForDeterministicDecision(facts);
+    const caseBrief = buildCaseBrief({ facts: confirmedDraftFacts, senderVariant, clientSide });
 
     await recordProgress(caseId, 'CLAUDE_STARTED', {
       wp_generation_claude_started_at: new Date().toISOString()
@@ -162,6 +164,38 @@ exports.handler = async (event) => {
 
     const latestFacts = await getLatestFacts(caseId);
     const existingLogs = Array.isArray(latestFacts.llm_call_logs) ? latestFacts.llm_call_logs : [];
+
+    if (Number(partB.drafting_quality_score || 0) < Number(partB.quality_floor || 7.5)) {
+      const failedAt = new Date().toISOString();
+      const failedFacts = {
+        ...latestFacts,
+        wp_letter_status: 'QUALITY_REVIEW_FAILED',
+        wp_generation_completed_at: failedAt,
+        wp_generation_error: `Drafting quality remained below the VRS floor after supervised redraft (${partB.drafting_quality_score || 0}/10)`,
+        wp_client_side: clientSide,
+        wp_sender_variant: senderVariant,
+        wp_skill_version: skillSet.version,
+        wp_skill_hash: skillSet.skill_hash,
+        wp_skill_manifest: skillSet.manifest,
+        wp_letter_structure: partAStructure,
+        wp_supervisory_assessment: partB,
+        wp_failed_draft_preview: partA,
+        llm_call_logs: [...existingLogs, log]
+      };
+      await supabase.from('cases').update({
+        status: 'paid_ready_for_drafting',
+        letter_status: 'generation_failed',
+        case_facts: failedFacts,
+        updated_at: failedAt
+      }).eq('id', caseId);
+
+      const reasons = [
+        ...(Array.isArray(partB.what_needs_work) ? partB.what_needs_work : []),
+        ...(Array.isArray(partB.recommended_amendments) ? partB.recommended_amendments : [])
+      ].filter(Boolean).slice(0, 4);
+      const detail = reasons.length ? `: ${reasons.join(' | ')}` : '';
+      throw new Error(`Drafting quality remained below the VRS floor after supervised redraft (${partB.drafting_quality_score || 0}/10)${detail}`);
+    }
     const completedAt = new Date().toISOString();
     const updatedFacts = {
       ...latestFacts,

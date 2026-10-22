@@ -5,6 +5,13 @@ const { scoreCase } = require('./lib/scoringEngine');
 const { applyOverridePostProcessing } = require('./lib/overridePostProcessor');
 const { classifyAndHydrateMatter, mergeGovernanceFacts } = require('./lib/llmGovernance');
 const { caseReference } = require('./lib/caseReference');
+const { factsForDeterministicDecision, buildFactTrace } = require('./lib/factProvenance');
+const { processClientTurn } = require('./lib/intakeConversation');
+const { explainDeterministicDetermination } = require('./lib/determinationExplanation');
+const { CONSENT_CONFIG, consentSnapshot } = require('./lib/consentConfig');
+const { compareClientEmployerEmail, cleanEmail } = require('./lib/emailPrivacy');
+const { retentionMetadata } = require('./lib/privacyGovernance');
+const { determineProductRoute } = require('./lib/productRouting');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -148,8 +155,13 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
   return {
     client_name: facts.client_name || null,
     contact_info: facts.contact_info || null,
+    client_email: facts.client_email || null,
+    consent: facts.consent || null,
     employer_name: facts.employer_name || null,
+    employer_registered_name: facts.employer_registered_name || facts.employer_name || null,
     employer_contact_details: facts.employer_contact_details || null,
+    addressee_name: facts.addressee_name || null,
+    addressee_position: facts.addressee_position || null,
     incident_date: facts.incident_date || null,
     incident_description: story || null,
     employment_status: facts.employment_status || null,
@@ -187,7 +199,8 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     attorney_review_flag: true,
     legal_context_snapshot: contextText,
     llm_governance: facts.llm_governance || null,
-    llm_call_logs: facts.llm_call_logs || []
+    llm_call_logs: facts.llm_call_logs || [],
+    privacy_governance: facts.privacy_governance || retentionMetadata({ channel: facts.source || 'web' })
   };
 }
 
@@ -218,7 +231,8 @@ function buildTriageFacts(facts = {}, outcome = 'UNKNOWN') {
     merit_band: 'NO MERIT',
     recommended_next_step: `Jurisdiction triage captured. Recommended forum: ${forum}.`,
     attorney_review_flag: true,
-    wp_letter_status: 'NOT_APPLICABLE'
+    wp_letter_status: 'NOT_APPLICABLE',
+    privacy_governance: facts.privacy_governance || retentionMetadata({ channel: facts.source || 'web' })
   };
 }
 
@@ -256,9 +270,75 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || '{}');
     const action = body.action;
 
+    if (action === 'consent_config') {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(CONSENT_CONFIG)
+      };
+    }
+
+    if (action === 'validate_client_email') {
+      const result = compareClientEmployerEmail({
+        clientEmail: body.clientEmail,
+        employerEmail: body.employerEmail
+      });
+      return {
+        statusCode: result.ok ? 200 : 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result)
+      };
+    }
+
     if (action === 'classify') {
       const result = await classifyText(body.text || '');
       return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) };
+    }
+
+    if (action === 'intake_turn') {
+      const result = await processClientTurn({
+        supabase,
+        channel: body.channel || 'web',
+        currentQuestion: body.currentQuestion || '',
+        answer: body.answer || '',
+        currentField: body.currentField || null,
+        plannedNextQuestion: body.plannedNextQuestion || '',
+        existingFacts: body.facts || {},
+        promptCount: Number(body.promptCount || 0),
+        promptLimit: Number(body.promptLimit || 0)
+      });
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) };
+    }
+
+    if (action === 'intake_handoff') {
+      const facts = body.facts || {};
+      const reason = String(body.reason || 'intake_incomplete');
+      const missing = Array.isArray(body.missing) ? body.missing : [];
+      const { data, error } = await supabase.from('cases').insert({
+        client_name: facts.client_name || 'Intake follow-up required',
+        contact_info: facts.contact_info || facts.whatsapp_number || null,
+        issue_summary: 'Automated intake requires VRS follow-up before assessment can be completed.',
+        case_facts: {
+          ...facts,
+          intake_handoff_reason: reason,
+          intake_missing_fields: missing,
+          attorney_review_flag: true,
+          privacy_governance: facts.privacy_governance || retentionMetadata({ channel: facts.source || 'web' })
+        },
+        status: 'needs_more_info',
+        letter_status: 'not_drafted'
+      }).select().single();
+      if (error) throw error;
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          success: true,
+          caseId: data.id,
+          caseReference: data.client_reference || caseReference(data.id, data.created_at),
+          message: 'Thanks. I have saved what you have told me and sent it to VRS so a person can continue with you.'
+        })
+      };
     }
 
     if (action === 'triage') {
@@ -272,7 +352,7 @@ exports.handler = async (event) => {
         letter_status: 'not_applicable'
       }).select().single();
       if (error) throw error;
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: true, caseId: data.id, caseReference: caseReference(data.id, data.created_at), triage, message: triage.recommended_next_step }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ success: true, caseId: data.id, caseReference: data.client_reference || caseReference(data.id, data.created_at), triage, message: triage.recommended_next_step }) };
     }
 
     if (action === 'evaluate') {
@@ -282,10 +362,26 @@ exports.handler = async (event) => {
       const facts = mergeGovernanceFacts(originalFacts, governance);
       const fullStory = dedupeStory(`${facts.initial_query ? `${facts.initial_query} ` : ''}${facts.incident_description || ''}`.trim());
       const contextText = await searchLegalContext(buildLegalKeywords(facts, fullStory));
-      const scoringInput = { ...facts, incident_description: fullStory };
+      const scoringFacts = factsForDeterministicDecision(facts);
+      const scoringStory = dedupeStory(`${scoringFacts.initial_query ? `${scoringFacts.initial_query} ` : ''}${scoringFacts.incident_description || ''}`.trim());
+      const scoringInput = { ...scoringFacts, incident_description: scoringStory };
       const baseScorecard = scoreCase(scoringInput);
-      const scorecard = applyOverridePostProcessing(scoringInput, fullStory, baseScorecard);
-      const caseFacts = buildCoreFacts(facts, fullStory, scorecard, contextText);
+      const scorecard = applyOverridePostProcessing(scoringInput, scoringStory, baseScorecard);
+      const determination = await explainDeterministicDetermination({
+        facts,
+        scorecard,
+        sourceLinks: facts.verified_legal_sources || facts.legal_source_links || []
+      });
+      const preliminaryFacts = {
+        ...buildCoreFacts(facts, fullStory, scorecard, contextText),
+        fact_trace: buildFactTrace(facts),
+        admin_determination: determination,
+        recommended_forum: determination.forum || facts.recommended_forum || null
+      };
+      const caseFacts = {
+        ...preliminaryFacts,
+        product_route: determineProductRoute(preliminaryFacts)
+      };
       const clientOutcome = clientOutcomeFor(caseFacts, scorecard);
 
       const { data, error } = await supabase.from('cases').insert({
@@ -316,16 +412,23 @@ exports.handler = async (event) => {
         }
       }
 
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: clientOutcome, clientOutcome, internalAssessment: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, caseReference: caseReference(data.id, data.created_at), scorecard, governance: caseFacts.llm_governance, whatsapp }) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pitch: clientOutcome, clientOutcome, internalAssessment: scorecard.advisory_note, hasMerit: scorecard.wp_eligible, caseId: data.id, caseReference: data.client_reference || caseReference(data.id, data.created_at), scorecard, governance: caseFacts.llm_governance, whatsapp }) };
     }
 
     if (action === 'close') {
-      const { caseId, wants_letter } = body;
+      const { caseId, wants_letter, payment_start_consent } = body;
       const { data: existing, error: readErr } = await supabase.from('cases').select('case_facts').eq('id', caseId).single();
       if (readErr) throw readErr;
       const caseFacts = existing?.case_facts || {};
-      const wpEligible = caseFacts.wp_eligible === true;
-      const updatePayload = { updated_at: new Date().toISOString(), case_facts: { ...caseFacts, wants_letter } };
+      const wpEligible = caseFacts.wp_eligible === true && caseFacts.product_route?.wp_letter_allowed !== false;
+      const updatePayload = {
+        updated_at: new Date().toISOString(),
+        case_facts: {
+          ...caseFacts,
+          wants_letter,
+          ...(wants_letter && payment_start_consent?.accepted === true ? { payment_start_consent } : {})
+        }
+      };
       if (wants_letter && wpEligible) {
         updatePayload.status = 'requires_attorney';
         updatePayload.letter_status = 'needs_drafting';

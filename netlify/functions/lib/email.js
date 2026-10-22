@@ -27,7 +27,7 @@ function normaliseAttachments(attachments = []) {
   }));
 }
 
-async function sendEmail({ to, cc = [], subject, html, text, attachments = [] }) {
+async function sendEmail({ to, cc = [], bcc = [], subject, html, text, attachments = [] }) {
   const apiKey = required('RESEND_API_KEY');
   const from = required('EMAIL_FROM');
   if (!to) throw new Error('Email recipient is required');
@@ -44,6 +44,7 @@ async function sendEmail({ to, cc = [], subject, html, text, attachments = [] })
       from,
       to: Array.isArray(to) ? to : [to],
       ...(Array.isArray(cc) && cc.length ? { cc } : {}),
+      ...(Array.isArray(bcc) && bcc.length ? { bcc } : {}),
       subject,
       ...(html ? { html } : {}),
       ...(text ? { text } : {}),
@@ -72,7 +73,7 @@ async function sendApprovedLetter({ employerEmail, clientEmail, clientName, empl
 
   return sendEmail({
     to: employerEmail,
-    cc: clientEmail ? [clientEmail] : [],
+    bcc: clientEmail ? [clientEmail] : [],
     subject,
     html: `<div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;color:#172033;line-height:1.6">${intro}${outro}</div>`,
     text: `Please find attached formal correspondence issued by Van Rensburg Schoon Inc. in relation to case ${caseId}.\n\nRegards,\nVan Rensburg Schoon Inc.`,

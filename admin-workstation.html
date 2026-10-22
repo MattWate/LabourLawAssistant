@@ -527,7 +527,7 @@
         if (currentQueueFilter === 'wp' && !bool(ed.wp_eligible)) return false;
         if (currentQueueFilter === 'high' && !['HIGH','MEDIUM-HIGH'].includes(String(ed.merit_band || '').toUpperCase())) return false;
         if (!search) return true;
-        return [f.case_reference,c.case_reference,c.id,f.client_name,c.client_name,f.contact_info,c.contact_info,f.employer_name,f.employer_contact_details,f.incident_description,c.issue_summary,ed.track,ed.merit_band].join(' ').toLowerCase().includes(search);
+        return [c.client_reference,f.case_reference,c.case_reference,c.id,f.client_name,c.client_name,f.contact_info,c.contact_info,f.employer_name,f.employer_contact_details,f.incident_description,c.issue_summary,ed.track,ed.merit_band].join(' ').toLowerCase().includes(search);
       });
     }
 
@@ -586,7 +586,7 @@
     function selectCase(id) { selectedCaseId = id; currentView = 'workstation'; render(); }
 
     function statusBadge(s) {
-      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved – Ready to Send','green'], sent:['Letter Sent','green'], letter_sent:['Letter Sent','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
+      const map = { archived:['Archived','red'], needs_info:['Needs Info','amber'], awaiting_payment_consent:['Awaiting Client Consent','amber'], payment_pending:['Awaiting Payment','amber'], paid_ready_for_drafting:['Paid – Ready to Draft','green'], drafting_in_progress:['Drafting','blue'], attorney_review:['Review','purple'], pending_review:['Draft Review','amber'], approved:['Approved – Ready to Send','green'], send_failed:['Send Failed','red'], letter_send_failed:['Send Failed','red'], sent:['Letter Sent','green'], letter_sent:['Letter Sent','green'], needs_drafting:['Drafting','blue'], new:['New','blue'] };
       const item = map[s] || [s, 'blue'];
       return '<span class="badge ' + item[1] + '">' + esc(item[0]) + '</span>';
     }
@@ -604,14 +604,16 @@
       const ed = effective(c);
       return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id"><strong>Reference: ' + esc(f.case_reference || c.case_reference || '—') + '</strong> · Internal ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions">' + paymentAction(c) + '<button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\'' + c.id + '\')">Save Facts</button></div></div><div class="fact-grid">' +
         fact('Employer', f.employer_name) + fact('Contact', f.contact_info || c.contact_info) + fact('Incident Date', f.incident_date) + fact('Employment Status', f.employment_status) + fact('Incident Description', f.incident_description || c.issue_summary, true) +
-        '</div></div><div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\'' + c.id + '\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\'' + c.id + '\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
+        '</div></div>' + determinationCard(f) + '<div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\'' + c.id + '\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\'' + c.id + '\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
     }
 
     function paymentAction(c) {
       const ed = effective(c);
       if (c.payment_status === 'paid') return '<span class="badge green">Payment received ' + esc(date(c.paid_at)) + '</span>';
+      if (c.status === 'awaiting_payment_consent') return '<button class="btn ghost" disabled>Awaiting Client Consent</button>';
       if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button>';
-      if (!bool(ed.wp_eligible)) return '';
+      const route = f.product_route || {};
+      if (!bool(ed.wp_eligible) || route.payment_allowed === false || (route.product_code && route.product_code !== 'WP_LETTER')) return '';
       return '<button id="btn-payment-' + c.id + '" class="btn success" onclick="approveCaseForPayment(\'' + c.id + '\')">Approve & Request Payment</button>';
     }
 
@@ -621,13 +623,13 @@
 
     function editableFacts(c) {
       const f = facts(c);
-      const keys = ['client_name','contact_info','employer_name','employer_contact_details','incident_date','employment_status','dismissal_reason_type','contract_type','sector','hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter','incident_description'];
+      const keys = ['client_name','contact_info','employer_name','addressee_name','addressee_position','employer_contact_details','incident_date','employment_status','dismissal_reason_type','contract_type','sector','hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter','incident_description'];
       return '<div class="edit-grid">' + keys.map(k => editField(k, f[k])).join('') + '</div>';
     }
 
     function editField(k, v) {
       const labels = {
-        client_name:'Client Name',contact_info:'Client Contact',employer_name:'Employer Name',employer_contact_details:'Employer Contact',incident_date:'Incident Date',employment_status:'Employment Status',dismissal_reason_type:'Dismissal Reason',contract_type:'Contract Type',sector:'Sector',
+        client_name:'Client Name',contact_info:'Client Contact',employer_name:'Employer Registered Name',addressee_name:'Addressee Name',addressee_position:'Addressee Position',employer_contact_details:'Employer Contact',incident_date:'Incident Date',employment_status:'Employment Status',dismissal_reason_type:'Dismissal Reason',contract_type:'Contract Type',sector:'Sector',
         hearing_held:'Hearing Held?',proc_notice:'48h Notice Given?',proc_rep:'Representation Allowed?',proc_chair:'Independent Chair?',proc_consultation:'Consultation Held?',paid_suspension:'Paid Suspension?',constructive_dismissal:'Constructive Dismissal?',wants_letter:'Wants Letter?',incident_description:'Incident Description'
       };
       const bools = ['hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter'];
@@ -640,6 +642,26 @@
       return '<div class="block"><label>' + labels[k] + '</label><input class="field fact-input" data-key="' + k + '" value="' + attr(txt(v, '')) + '"/></div>';
     }
 
+    function determinationCard(f) {
+      const d = f.admin_determination || {};
+      if (!f.admin_determination) return '';
+      const time = d.time_bar || {};
+      const trace = Array.isArray(d.fact_trace) ? d.fact_trace : (Array.isArray(f.fact_trace) ? f.fact_trace : []);
+      const verified = Array.isArray(d.verified_references) ? d.verified_references : [];
+      const unverified = Array.isArray(d.unverified_references) ? d.unverified_references : [];
+      const issues = Array.isArray(d.claims_or_issues) ? d.claims_or_issues : [];
+      const uncertainties = Array.isArray(d.uncertainties) ? d.uncertainties : [];
+      const rows = trace.map(item => '<div class="timeline-item"><strong>' + esc(item.key) + ' · ' + (item.confirmed === false ? 'Claude inference / excluded' : 'Confirmed / usable') + '</strong>' + esc(txt(item.value)) + '</div>').join('');
+      return '<div class="card"><h3>Claude Determination</h3>' +
+        '<div class="badges" style="margin-bottom:12px"><span class="badge ' + meritClass(d.band || f.merit_band) + '">' + esc(d.band || f.merit_band || 'REVIEW') + '</span><span class="badge purple">' + esc(d.posture || f.wp_type || (f.wp_eligible ? 'WP ELIGIBLE' : 'NO WP')) + '</span><span class="badge blue">' + esc(time.label || 'Time bar unknown') + '</span>' + (d.review_flag === false ? '' : '<span class="badge amber">Review</span>') + '</div>' +
+        '<div class="score-grid"><div class="score"><span>Substantive</span><strong>' + esc(txt(d.substantive_score ?? f.substantive_score)) + '</strong></div><div class="score"><span>Procedural</span><strong>' + esc(txt(d.procedural_score ?? f.procedural_score)) + '</strong></div></div>' +
+        '<div class="timeline"><div class="timeline-item"><strong>Forum</strong>' + esc(txt(d.forum || f.recommended_forum)) + '</div><div class="timeline-item"><strong>Claude explanation</strong>' + esc(txt(d.explanation, 'No Claude explanation recorded.')) + '</div><div class="timeline-item"><strong>Claims / issues</strong>' + esc(issues.length ? issues.join('; ') : '—') + '</div><div class="timeline-item"><strong>Uncertainties</strong>' + esc(uncertainties.length ? uncertainties.join('; ') : '—') + '</div></div>' +
+        '<h4 style="margin:16px 0 8px">Fact provenance</h4><div class="timeline">' + (rows || '<div class="timeline-item">No provenance recorded.</div>') + '</div>' +
+        '<h4 style="margin:16px 0 8px">References</h4><div class="timeline">' +
+          (verified.length ? verified.map(x => '<div class="timeline-item"><strong>Verified</strong><a href="' + attr(x.url) + '" target="_blank" rel="noopener">' + esc(x.label) + '</a></div>').join('') : '<div class="timeline-item"><strong>Verified</strong>No source-linked references recorded.</div>') +
+          (unverified.length ? unverified.map(x => '<div class="timeline-item"><strong>Unverified – excluded from Claude reasoning</strong>' + esc(x.label) + '</div>').join('') : '') +
+        '</div></div>';
+    }
     function decisionSummary(d) {
       return '<div class="badges" style="margin-bottom:12px"><span class="badge blue">' + esc(d.track || 'UNCLASSIFIED') + '</span><span class="badge ' + meritClass(d.merit_band) + '">' + esc(d.merit_band || d.overall_viability || 'REVIEW') + '</span>' + (bool(d.wp_eligible) ? '<span class="badge green">WP ELIGIBLE</span>' : '<span class="badge">WP N/A</span>') + '</div><div class="score-grid"><div class="score"><span>Substantive</span><strong>' + esc(txt(d.substantive_score)) + '</strong></div><div class="score"><span>Procedural</span><strong>' + esc(txt(d.procedural_score)) + '</strong></div></div><div class="timeline-item" style="margin-top:12px"><strong>Next step</strong>' + esc(txt(d.recommended_next_step || d.overall_viability, 'Review matter')) + '</div>';
     }
@@ -660,7 +682,10 @@
             ? '<button id="btn-save-' + c.id + '" class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'save\')">Save Revised Draft</button><button id="btn-send-' + c.id + '" class="btn success" onclick="manageLetter(\'' + c.id + '\',\'send\')">Release & Send Letter</button>'
             : '<button id="btn-save-' + c.id + '" class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'save\')">Save Draft</button><button id="btn-approve-' + c.id + '" class="btn success" onclick="manageLetter(\'' + c.id + '\',\'approve\')">Approve Letter</button>';
         const editorInput = approved && !sent ? ' oninput="markApprovedLetterEdited(\'' + c.id + '\')"' : '';
-        return '<div class="card"><h3>Drafted Letter</h3><textarea id="letter-editor" class="letter" ' + (sent ? 'readonly' : '') + editorInput + '>' + esc(c.draft_letter) + '</textarea>' + audit + '<div id="letter-action-note-' + c.id + '" style="margin-top:10px;color:var(--muted);font-size:.86rem"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px;flex-wrap:wrap">' + buttons + '</div></div>';
+        const qa = f.wp_supervisory_assessment || {};
+        const qaScore = qa.drafting_quality_score !== undefined ? Number(qa.drafting_quality_score).toFixed(1) + '/10' : '—';
+        const qaBadge = Number(qa.drafting_quality_score || 0) >= Number(qa.quality_floor || 7.5) ? 'green' : 'red';
+        return '<div class="card"><h3>Drafted Letter</h3><div class="badges" style="margin-bottom:12px"><span class="badge ' + qaBadge + '">Drafting QA: ' + esc(qaScore) + '</span>' + (qa.redraft_performed ? '<span class="badge amber">Auto-redrafted</span>' : '') + '</div><textarea id="letter-editor" class="letter" ' + (sent ? 'readonly' : '') + editorInput + '>' + esc(c.draft_letter) + '</textarea>' + audit + '<div id="letter-action-note-' + c.id + '" style="margin-top:10px;color:var(--muted);font-size:.86rem"></div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px;flex-wrap:wrap">' + buttons + '</div></div>';
       }
       if (f.wants_letter) { const paid = c.payment_status === 'paid' && (c.wp_generation_unlocked === true || f.wp_generation_unlocked === true); return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted);line-height:1.5">' + (paid ? 'Payment is confirmed. Save corrected facts, then start the controlled draft.' : 'Drafting is locked until PayFast confirms payment.') + '</p><button id="btn-generate-' + c.id + '" class="btn warn" ' + (paid ? '' : 'disabled') + ' onclick="generateDraft(\'' + c.id + '\')">' + (paid ? 'Generate Draft Letter' : 'Awaiting Confirmed Payment') + '</button></div>'; }
       return '<div class="card"><h3>Letter Action</h3><p style="color:var(--muted)">No letter requested at this stage.</p></div>';
@@ -671,9 +696,34 @@
       const ed = effective(c);
       const questions = f.client_questions || [];
       const legal = ed.legal_basis || f.legal_basis || [];
-      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge ' + (c.payment_status === 'paid' ? 'green' : c.payment_status === 'pending' ? 'amber' : 'blue') + '">Payment: ' + esc(c.payment_status || 'not requested') + '</span><span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div><div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
+      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge ' + (c.payment_status === 'paid' ? 'green' : c.payment_status === 'pending' ? 'amber' : 'blue') + '">Payment: ' + esc(c.payment_status || 'not requested') + '</span><span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div>' + paymentResolutionCard(c) + '<div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
     }
 
+    function paymentResolutionCard(c) {
+      if (c.payment_status !== 'paid') return '';
+      const f = facts(c);
+      const current = f.payment_resolution || {};
+      const currentText = current.resolution ? current.resolution.replace(/_/g, ' ') + ' · ' + date(current.recorded_at) : 'No refund or credit action recorded.';
+      return '<div class="card"><h3>Refund / Credit Route</h3><p style="color:var(--muted);line-height:1.5">Use this only when VRS declines to release a paid letter or resolves the paid service by refund or credit. This records the operational action; it does not move money automatically.</p><div class="timeline-item"><strong>Current status</strong>' + esc(currentText) + '</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn warn" onclick="recordPaymentResolution(\'' + c.id + '\',\'refund_required\')">Refund Required</button><button class="btn ghost" onclick="recordPaymentResolution(\'' + c.id + '\',\'refund_processed\')">Refund Processed</button><button class="btn ghost" onclick="recordPaymentResolution(\'' + c.id + '\',\'credit_offered\')">Credit Offered</button><button class="btn ghost" onclick="recordPaymentResolution(\'' + c.id + '\',\'credit_issued\')">Credit Issued</button></div></div>';
+    }
+
+    async function recordPaymentResolution(id, resolution) {
+      const note = window.prompt('Optional note for this refund/credit action:', '') || '';
+      if (!window.confirm('Record ' + resolution.replace(/_/g, ' ') + ' for this paid case?')) return;
+      try {
+        const res = await authFetch('/.netlify/functions/manage_payment_resolution', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ caseId: id, resolution, note })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not record refund/credit action.');
+        toast('Payment resolution recorded.');
+        await fetchCases();
+      } catch (e) {
+        toast(e.message || 'Could not record refund/credit action.');
+      }
+    }
     async function approveCaseForPayment(id) {
       const c = casesData.find(x => x.id === id);
       if (!c) return toast('Case not found.');
@@ -691,6 +741,11 @@
         let result = {};
         try { result = await res.json(); } catch (e) {}
         if (!res.ok) throw new Error(result.error || 'Could not approve case for payment.');
+        if (result.consent_required) {
+          toast(result.message || 'Pre-payment consent has been requested from the client. Ask them to reply YES, then request payment again.');
+          await fetchCases();
+          return;
+        }
         const channel = result.whatsapp_mode === 'template' ? 'WhatsApp template' : result.whatsapp_sent ? 'WhatsApp message' : 'payment link';
         toast('Case approved. The ' + channel + ' was created successfully.');
         await fetchCases();

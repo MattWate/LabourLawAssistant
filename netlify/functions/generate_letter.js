@@ -19,11 +19,16 @@ async function authenticate(event) {
 }
 
 function siteBaseUrl(event) {
-  const configured = process.env.URL || process.env.DEPLOY_PRIME_URL;
-  if (configured) return configured.replace(/\/$/, '');
-  const host = event.headers?.host;
+  // Use the exact host that received this request first. This guarantees that
+  // a branch-deploy request queues its background function on the same branch,
+  // rather than following a production URL from Netlify environment metadata.
+  const host = event.headers?.host || event.headers?.['x-forwarded-host'];
   const proto = event.headers?.['x-forwarded-proto'] || 'https';
   if (host) return `${proto}://${host}`;
+
+  const configured = process.env.DEPLOY_PRIME_URL || process.env.URL;
+  if (configured) return configured.replace(/\/$/, '');
+
   throw new Error('Could not determine site URL for background function');
 }
 

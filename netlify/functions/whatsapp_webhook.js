@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { sendWhatsAppText, sendWhatsAppButtons, sendWhatsAppList } = require('./lib/whatsapp');
 const { processIncomingMessage, STEPS } = require('./lib/whatsappProductionConversation');
@@ -27,6 +28,27 @@ function parseJson(body = '{}') {
   } catch (error) {
     return null;
   }
+}
+
+function verifyMetaSignature(event) {
+  const secret = String(process.env.WHATSAPP_APP_SECRET || '').trim();
+  const context = String(process.env.CONTEXT || '').toLowerCase();
+  const isProduction = context === 'production' || String(process.env.BRANCH || '').toLowerCase() === 'main';
+
+  if (!secret) {
+    if (isProduction) return { ok: false, reason: 'WHATSAPP_APP_SECRET is not configured' };
+    console.warn('WHATSAPP_APP_SECRET is not configured; webhook signature verification skipped outside production.');
+    return { ok: true, skipped: true };
+  }
+
+  const supplied = String(event.headers?.['x-hub-signature-256'] || event.headers?.['X-Hub-Signature-256'] || '').trim();
+  if (!supplied.startsWith('sha256=')) return { ok: false, reason: 'Missing Meta webhook signature' };
+
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(event.body || '', 'utf8').digest('hex');
+  const a = Buffer.from(supplied, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return { ok: false, reason: 'Invalid Meta webhook signature' };
+  return { ok: true };
 }
 
 function extractInteractiveAnswer(message = {}) {
@@ -244,6 +266,12 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod === 'POST') {
+    const signature = verifyMetaSignature(event);
+    if (!signature.ok) {
+      console.warn('Rejected WhatsApp webhook request:', signature.reason);
+      return response(403, { ok: false, error: 'Forbidden' });
+    }
+
     const payload = parseJson(event.body);
     if (!payload) return response(400, { ok: false, error: 'Invalid JSON payload' });
 

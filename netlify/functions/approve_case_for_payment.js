@@ -1,5 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
+const { determineProductRoute } = require('./lib/productRouting');
+const { CONSENT_CONFIG } = require('./lib/consentConfig');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -115,6 +117,56 @@ exports.handler = async (event) => {
     }
 
     const facts = caseData.case_facts || {};
+    const productRoute = determineProductRoute(facts);
+    if (!productRoute.payment_allowed || productRoute.product_code !== 'WP_LETTER') {
+      return json(409, { error: productRoute.reason || 'No payable product is available for this case', product_route: productRoute });
+    }
+
+    if (facts.payment_start_consent?.accepted !== true) {
+      const { data: consentConversation } = await supabase
+        .from('whatsapp_conversations')
+        .select('id,from_number,phone_number_id')
+        .eq('case_id', caseId)
+        .maybeSingle();
+
+      if (!consentConversation?.from_number) {
+        return json(409, {
+          error: 'Client pre-payment consent is required before a payment link can be created. No linked WhatsApp conversation is available to request it.',
+          consent_required: true
+        });
+      }
+
+      const phoneNumberId = consentConversation.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
+      await sendWhatsAppText({
+        to: consentConversation.from_number,
+        phoneNumberId,
+        body: `${CONSENT_CONFIG.pre_payment.text}\n\nReply YES to confirm.`
+      });
+
+      const now = new Date().toISOString();
+      await supabase.from('whatsapp_conversations').update({
+        status: 'awaiting_payment_consent',
+        updated_at: now
+      }).eq('id', consentConversation.id);
+
+      await supabase.from('cases').update({
+        status: 'awaiting_payment_consent',
+        case_facts: {
+          ...facts,
+          payment_consent_requested_at: now,
+          payment_consent_version: CONSENT_CONFIG.version
+        },
+        updated_at: now
+      }).eq('id', caseId);
+
+      return json(202, {
+        success: true,
+        consent_required: true,
+        consent_requested: true,
+        message: 'The approved pre-payment wording has been sent to the client on WhatsApp. Ask the client to reply YES, then request payment again.'
+      });
+    }
+
     const employerEmail = facts.employer_email || extractEmail(facts.employer_contact_details);
     const clientEmail = facts.client_email || extractEmail(facts.contact_info || caseData.contact_info);
 
@@ -141,6 +193,7 @@ exports.handler = async (event) => {
     const { handler: createPayment } = require('./create_payfast_payment');
     const paymentResponse = await createPayment({
       httpMethod: 'POST',
+      headers: { authorization: event.headers?.authorization || event.headers?.Authorization || '' },
       body: JSON.stringify({ caseId, amount: body.amount })
     });
     const payment = JSON.parse(paymentResponse.body || '{}');

@@ -120,10 +120,36 @@
 
     let collectedFacts = { source: "web" };
     let activeCaseId = null;
+    let consentConfig = {
+        version: "1.0",
+        issued_date: "2026-10-12",
+        is_placeholder: false,
+        notice_url: "/terms.html",
+        website: {
+            heading: "Before we start",
+            intro: [
+                "I’m Justine, the AI assistant of VRS Labour Law Consultants. I’m not a person and I don’t give legal advice. I’ll help you set out what happened at work and give you a first, general view, and a VRS consultant checks every matter before any letter is sent.",
+                "AI can get things wrong, so please don’t rely on my answers alone. Talking to me also doesn’t stop legal deadlines: a dismissal dispute must usually be referred to the CCMA within 30 days."
+            ],
+            terms_label: "I am 18 or older and I accept Justine’s Terms of Use and Privacy Notice, including clause 13, which limits VRS’s responsibility.",
+            sensitive_label: "I agree that VRS may use sensitive information I choose to share, such as my health, union membership or an allegation made against me, and that its service providers may process my information outside South Africa.",
+            link_label: "Read the full Terms of Use and Privacy Notice"
+        },
+        pre_payment: {
+            text: "Please start work on my matter as soon as I pay. I understand that once work has started the seven-day cooling-off right for online purchases no longer applies, and that VRS will refund my fee in full if it declines to act or does not release a letter."
+        }
+    };
 
     const scriptFlow = {
+        CONSENT: {
+            type: "consent"
+        },
+        CONSENT_DECLINED: {
+            msg: "Thanks. I cannot continue the automated intake without your consent. Please contact VRS directly if you would like to discuss another way to provide your information.",
+            type: "end"
+        },
         JUR_EMPLOYEE: {
-            msg: "Hi, my name is Justine and I am a VRS Labour Law Assistant. I am here to help you work through what has happened. Before we start, the information you share will be used by VRS Labour Law Consultants to understand and assess your matter and will be handled as part of your VRS enquiry. Justine provides an initial automated assessment, and a VRS consultant reviews the matter and decides the next step. The automated flow is currently in English. To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?",
+            msg: "To start, are you employed by the company, rather than working for yourself as a freelancer or contractor?",
             type: "buttons",
             options: [
                 { label: "Yes", next: "JUR_SA_EMPLOYER", val: "Employee" },
@@ -308,14 +334,17 @@
             msg: "Thank you for taking the time to share this with us. Unfortunately, this falls outside the scope of what we're able to assist with through this automated service. Please note this is not a reflection of the merits of your case, it simply needs a different form of review. We'd recommend seeking advice from the relevant bargaining council or a practitioner who specialises in this area.",
             type: "end", triageOutcome: "SOE_UNCLEAR"
         },
-        COMPANY_NAME: { msg: "What is the name of the company you work for, or worked for?", type: "text", next: "COMPANY_CONTACT", saveAs: "employer_name" },
-        COMPANY_CONTACT: { msg: "Could you share a contact email or number for your employer's HR department or your manager? This just helps us know where to send correspondence.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
-        CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_PHONE", saveAs: "client_name" },
+        COMPANY_NAME: { msg: "What is the employer's full registered name?", type: "text", next: "ADDRESSEE_NAME", saveAs: "employer_name" },
+        ADDRESSEE_NAME: { msg: "Who should any letter be addressed to? Please give their full name, or type UNKNOWN if you do not know it.", type: "text", next: "ADDRESSEE_POSITION", saveAs: "addressee_name" },
+        ADDRESSEE_POSITION: { msg: "What is that person's job title or position? Type UNKNOWN if you do not know it.", type: "text", next: "COMPANY_CONTACT", saveAs: "addressee_position" },
+        COMPANY_CONTACT: { msg: "Could you share a contact email or number for the employer's HR department or the addressee? Type UNKNOWN if you do not have it.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
+        CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_EMAIL", saveAs: "client_name" },
+        CLIENT_EMAIL: { msg: "What personal email address should VRS use for confidential correspondence? Please do not use an employer-controlled work email address.", type: "text", next: "CLIENT_PHONE", saveAs: "client_email" },
         CLIENT_PHONE: { msg: "And finally, what WhatsApp cell phone number should VRS use to contact you? Please include the country code, for example +27 82 123 4567.", type: "text", next: "HANDOFF", saveAs: "whatsapp_number" },
         HANDOFF: { action: "evaluate" }
     };
 
-    let currentState = "JUR_EMPLOYEE";
+    let currentState = "CONSENT";
 
     function scrollToBottom() { setTimeout(() => { historyEl.scrollTop = historyEl.scrollHeight; }, 50); }
     function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
@@ -328,6 +357,201 @@
     }
 
     const AI_SKIP_CONFIDENCE = 0.8;
+    const WEB_PROMPT_LIMIT = 25;
+
+    function webPromptCount() { return Number(collectedFacts._intake_prompt_count || 0); }
+    function recordWebPrompt(key) {
+        const history = Array.isArray(collectedFacts._intake_prompt_history) ? collectedFacts._intake_prompt_history : [];
+        if (!key || history.includes(key)) return true;
+        if (history.length >= WEB_PROMPT_LIMIT) return false;
+        collectedFacts._intake_prompt_history = [...history, key];
+        collectedFacts._intake_prompt_count = history.length + 1;
+        return true;
+    }
+    function requiredLetterFieldsMissing() {
+        return ["employer_name", "addressee_name", "addressee_position", "client_name", "client_email", "incident_description"]
+            .filter(key => !hasKnownValue(collectedFacts[key]));
+    }
+    function queueUnconfirmedNarrativeFacts() {
+        const metadata = collectedFacts._fact_metadata || {};
+        const items = Object.entries(metadata)
+            .filter(([key, meta]) => meta?.source === "initial_narrative_ai" && meta.confirmed !== true && hasKnownValue(collectedFacts[key]))
+            .slice(0, 3)
+            .map(([key, meta]) => ({
+                field: key,
+                value: collectedFacts[key],
+                confidence: Number(meta.confidence || 0),
+                question: null
+            }));
+        if (items.length) collectedFacts._pending_confirmation = { items };
+    }
+    function mergeDirectExtractions(turn) {
+        if (!turn?.enabled || !Array.isArray(turn.direct_extractions)) return;
+        const metadata = { ...(collectedFacts._fact_metadata || {}) };
+
+        turn.direct_extractions.forEach(item => {
+            if (!item?.field || !hasKnownValue(item.value)) return;
+            const existingMeta = metadata[item.field];
+            if (hasKnownValue(collectedFacts[item.field]) && existingMeta?.confirmed === true) return;
+
+            collectedFacts[item.field] = item.value;
+            metadata[item.field] = {
+                source: "client_explicit_extraction",
+                confidence: 1,
+                confirmed: true,
+                evidence: item.evidence || null,
+                captured_at: new Date().toISOString()
+            };
+        });
+
+        collectedFacts._fact_metadata = metadata;
+
+        const pending = collectedFacts._pending_confirmation?.items || [];
+        const remaining = pending.filter(item => metadata[item.field]?.confirmed !== true);
+        if (remaining.length) collectedFacts._pending_confirmation = { items: remaining };
+        else delete collectedFacts._pending_confirmation;
+    }
+
+    function mergeConversationalInferences(turn) {
+        if (!turn?.enabled || !Array.isArray(turn.inferences)) return;
+        const metadata = { ...(collectedFacts._fact_metadata || {}) };
+        const pending = [];
+        turn.inferences.forEach(item => {
+            if (!item?.field || hasKnownValue(collectedFacts[item.field])) return;
+            collectedFacts[item.field] = item.value;
+            metadata[item.field] = {
+                source: "claude_inference",
+                confidence: Number(item.confidence || 0),
+                confirmed: false,
+                captured_at: new Date().toISOString()
+            };
+            pending.push({
+                field: item.field,
+                value: item.value,
+                confidence: Number(item.confidence || 0),
+                question: item.confirmation_question || null
+            });
+        });
+        collectedFacts._fact_metadata = metadata;
+        if (pending.length) collectedFacts._pending_confirmation = { items: pending.slice(0, 3) };
+    }
+    function pendingConfirmationText() {
+        const items = collectedFacts._pending_confirmation?.items || [];
+        if (!items.length) return null;
+        if (items.length === 1 && items[0].question) return items[0].question;
+        const summary = items.map(item => `${String(item.field || "").replace(/_/g, " ")}: ${String(item.value)}`).join("; ");
+        return `Just to check I understood you correctly: ${summary}. Is that right?`;
+    }
+    async function processWebTurn(step, answer, nextStateKey) {
+        try {
+            const planned = scriptFlow[nextStateKey]?.msg || "";
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "intake_turn",
+                    channel: "web",
+                    currentQuestion: step?.msg || "",
+                    currentField: step?.saveAs || null,
+                    answer,
+                    plannedNextQuestion: planned,
+                    facts: collectedFacts,
+                    promptCount: webPromptCount(),
+                    promptLimit: WEB_PROMPT_LIMIT
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || "intake turn failed");
+            mergeDirectExtractions(data);
+            mergeConversationalInferences(data);
+
+            let resolvedNextState = nextStateKey;
+            let guard = 0;
+            while (resolvedNextState && scriptFlow[resolvedNextState] && canSkipStep(scriptFlow[resolvedNextState]) && guard < 40) {
+                const answeredStep = scriptFlow[resolvedNextState];
+                let candidate = answeredStep.next;
+                if (answeredStep.type === "buttons") {
+                    const matched = matchedStoredOption(answeredStep, collectedFacts[answeredStep.saveAs]);
+                    if (matched?.next) candidate = matched.next;
+                }
+                if (!candidate || candidate === resolvedNextState) break;
+                resolvedNextState = candidate;
+                guard += 1;
+            }
+
+            if (resolvedNextState && resolvedNextState !== nextStateKey) {
+                collectedFacts._resolved_next_state = resolvedNextState;
+            }
+            if (data.next_question && resolvedNextState) {
+                collectedFacts._next_question_override = { state: resolvedNextState, text: scriptFlow[resolvedNextState]?.msg || data.next_question };
+            }
+            return { ...data, resolved_next_state: resolvedNextState };
+        } catch (error) {
+            console.warn("Conversational intake unavailable; using controlled flow:", error);
+            return { enabled: false };
+        }
+    }
+    async function handleWebPromptLimit(reason = "prompt_limit_incomplete") {
+        if (collectedFacts._handoff_started) return;
+        collectedFacts._handoff_started = true;
+        textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
+        showLoading();
+        try {
+            const missing = requiredLetterFieldsMissing();
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "intake_handoff", reason, missing, facts: collectedFacts })
+            });
+            const data = await res.json(); hideLoading();
+            appendMessage(data.message || "Thanks. I have saved your information and sent it to VRS for follow-up.", "bot");
+            if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}.`, "bot");
+        } catch (error) {
+            hideLoading();
+            appendMessage("Thanks. I have reached the end of the automated questions. Please contact VRS so a person can continue with you.", "bot");
+            console.error(error);
+        }
+    }
+    function renderPendingConfirmation() {
+        const text = pendingConfirmationText();
+        if (!text) return false;
+        const key = "confirm:" + collectedFacts._pending_confirmation.items.map(x => x.field).join(",");
+        if (!recordWebPrompt(key)) { handleWebPromptLimit(); return true; }
+        textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
+        setTimeout(() => {
+            appendMessage(text, "bot");
+            buttonContainer.innerHTML = '';
+            [["Yes", true], ["No", false]].forEach(([label, value]) => {
+                const btn = document.createElement('button');
+                btn.className = 'action-btn';
+                btn.innerText = label;
+                btn.onclick = () => handleInferenceConfirmation(value);
+                buttonContainer.appendChild(btn);
+            });
+            buttonContainer.style.display = 'flex';
+            scrollToBottom();
+        }, 300);
+        return true;
+    }
+    async function handleInferenceConfirmation(confirmed) {
+        buttonContainer.style.display = 'none';
+        appendMessage(confirmed ? "Yes" : "No", "user");
+        const confirmationQuestion = pendingConfirmationText();
+        const pending = collectedFacts._pending_confirmation?.items || [];
+        const metadata = { ...(collectedFacts._fact_metadata || {}) };
+        pending.forEach(item => {
+            if (confirmed) {
+                metadata[item.field] = { ...(metadata[item.field] || {}), source: "client_confirmed", confirmed: true, confidence: 1, captured_at: new Date().toISOString() };
+            } else {
+                delete collectedFacts[item.field];
+                delete metadata[item.field];
+            }
+        });
+        collectedFacts._fact_metadata = metadata;
+        delete collectedFacts._pending_confirmation;
+        await processWebTurn({ msg: confirmationQuestion, saveAs: null }, confirmed ? "Yes" : "No", currentState);
+        renderState();
+    }
     function hasKnownValue(value) { return value !== null && value !== undefined && !(typeof value === "string" && value.trim() === ""); }
     function normaliseChoice(value) { return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9+<>\- ]/g, " ").replace(/\s+/g, " "); }
     function matchedStoredOption(step, value) {
@@ -338,6 +562,7 @@
     function canSkipStep(step) {
         if (!step || !step.saveAs || !hasKnownValue(collectedFacts[step.saveAs])) return false;
         const meta = collectedFacts._fact_metadata?.[step.saveAs];
+        if (meta?.source === "initial_narrative_ai" && meta.confirmed !== true) return false;
         if (meta?.source === "initial_narrative_ai" && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
         if (step.type === "buttons") return Boolean(matchedStoredOption(step, collectedFacts[step.saveAs]));
         if (step.type === "date") return /^\d{4}-\d{2}-\d{2}$/.test(String(collectedFacts[step.saveAs]));
@@ -359,7 +584,7 @@
             const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
             if (confidence < AI_SKIP_CONFIDENCE) return;
             collectedFacts[key] = value;
-            metadata[key] = { source: "initial_narrative_ai", confidence, captured_at: new Date().toISOString() };
+            metadata[key] = { source: "initial_narrative_ai", confidence, confirmed: false, captured_at: new Date().toISOString() };
         });
         collectedFacts._fact_metadata = metadata;
         collectedFacts.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === "initial_narrative_ai");
@@ -373,6 +598,59 @@
     }
 
     function renderState() {
+        if (renderPendingConfirmation()) return;
+
+        if (currentState === "CONSENT") {
+            textContainer.style.display = 'none';
+            buttonContainer.style.display = 'none';
+            const cfg = consentConfig.website || {};
+            appendMessage((cfg.heading || "Before we start") + "\n\n" + (cfg.intro || []).join("\n\n"), "bot");
+            buttonContainer.innerHTML = `
+                <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+                  <input type="checkbox" id="consent-terms" style="margin-top:4px">
+                  <span>${escapeHtml(cfg.terms_label || "")}</span>
+                </label>
+                <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+                  <input type="checkbox" id="consent-sensitive" style="margin-top:4px">
+                  <span>${escapeHtml(cfg.sensitive_label || "")}</span>
+                </label>
+                <a href="${escapeHtml(consentConfig.notice_url || "/terms.html")}" target="_blank" rel="noopener" style="padding:8px 2px">${escapeHtml(cfg.link_label || "Read the full Terms of Use and Privacy Notice")}</a>
+                <button class="action-btn" id="consent-continue">Continue</button>`;
+            buttonContainer.style.display = 'flex';
+            setTimeout(() => {
+                const btn = document.getElementById('consent-continue');
+                if (btn) btn.onclick = () => {
+                    const terms = document.getElementById('consent-terms')?.checked === true;
+                    const sensitive = document.getElementById('consent-sensitive')?.checked === true;
+                    if (!terms || !sensitive) {
+                        appendMessage("Please tick both consent boxes before we continue.", "bot");
+                        return;
+                    }
+                    collectedFacts.consent_accepted = true;
+                    collectedFacts.consent = {
+                        accepted: true,
+                        terms_accepted: true,
+                        sensitive_information_consent: true,
+                        cross_border_processing_consent: true,
+                        age_18_or_over_confirmed: true,
+                        version: consentConfig.version,
+                        issued_date: consentConfig.issued_date || null,
+                        accepted_at: new Date().toISOString(),
+                        channel: "web"
+                    };
+                    collectedFacts._fact_metadata = {
+                        ...(collectedFacts._fact_metadata || {}),
+                        consent_accepted: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() }
+                    };
+                    buttonContainer.style.display = 'none';
+                    appendMessage("I accept and consent.", "user");
+                    currentState = "JUR_EMPLOYEE";
+                    renderState();
+                };
+            }, 0);
+            return;
+        }
+
         let step = scriptFlow[currentState];
         if (!step) { appendMessage("An error occurred in the intake flow. Please refresh and try again.", "bot"); console.error("Unknown state:", currentState); return; }
         while (step && canSkipStep(step)) {
@@ -382,7 +660,11 @@
             currentState = nextState; step = scriptFlow[currentState];
         }
         textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
-        if (step.action === "evaluate") { appendMessage("Thank you! Give me just a moment to review your details against South African Labour Law...", "bot"); triggerAIEvaluation(); return; }
+        if (step.action === "evaluate") {
+            const missing = requiredLetterFieldsMissing();
+            if (missing.length) { handleWebPromptLimit("incomplete_letter_facts"); return; }
+            appendMessage("Thank you. Give me a moment to prepare this for VRS review.", "bot"); triggerAIEvaluation(); return;
+        }
         if (step.type === "end") {
             setTimeout(async () => {
                 if (step.triageOutcome) await triggerJurisdictionTriage(step.triageOutcome);
@@ -390,8 +672,13 @@
             }, 500);
             return;
         }
+        const promptKey = "step:" + currentState;
+        if (currentState !== "CONSENT" && !recordWebPrompt(promptKey)) { handleWebPromptLimit(); return; }
         setTimeout(() => {
-            appendMessage(step.msg, "bot");
+            const override = collectedFacts._next_question_override;
+            const promptText = override?.state === currentState ? override.text : step.msg;
+            if (override?.state === currentState) delete collectedFacts._next_question_override;
+            appendMessage(promptText, "bot");
             if (step.type === "buttons") {
                 buttonContainer.innerHTML = '';
                 step.options.forEach(opt => { const btn = document.createElement('button'); btn.className = 'action-btn'; btn.innerText = opt.label; btn.onclick = () => handleUserInput(opt.val, opt.label, step.saveAs, opt.next); buttonContainer.appendChild(btn); });
@@ -412,7 +699,9 @@
             if (wordCount < step.minWords) { appendMessage(val, "user"); appendMessage(`Please add a little more detail. This answer needs at least ${step.minWords} words.`, "bot"); inputEl.value = val; textContainer.style.display = 'flex'; inputEl.focus(); return; }
         }
         if (step.action === "classify") {
-            textContainer.style.display = 'none'; appendMessage(val, "user"); collectedFacts["initial_query"] = val; showLoading();
+            textContainer.style.display = 'none'; appendMessage(val, "user"); collectedFacts["initial_query"] = val;
+            collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), initial_query: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } };
+            showLoading();
             try {
                 const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "classify", text: val }) });
                 const data = await res.json(); hideLoading();
@@ -427,11 +716,14 @@
                 if (finalCategory === "Ambiguous") currentState = "START_FALLBACK";
                 else {
                     mergeAIExtractedFacts(data);
+                    queueUnconfirmedNarrativeFacts();
                     if (!hasKnownValue(collectedFacts["employment_status"])) collectedFacts["employment_status"] = finalCategory;
                     if (!hasKnownValue(collectedFacts["dismissal_reason_type"]) && data.dismissal_reason_type) collectedFacts["dismissal_reason_type"] = data.dismissal_reason_type;
                     if (!hasKnownValue(collectedFacts["advisory_topic"]) && data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
                     const routeMap = { "Dismissed": "FIRED_DATE", "Resigned": "RESIGN_DATE", "Discrimination": "DISC_STATUS", "Advisory": "ADV_ISSUE", "UIF": "UIF_DESC" };
                     currentState = routeMap[finalCategory] || "START_FALLBACK";
+                    const turn = await processWebTurn(step, val, currentState);
+                    if (turn?.resolved_next_state) currentState = turn.resolved_next_state;
                 }
                 renderState();
             } catch(error) { hideLoading(); console.error("Classification error:", error); currentState = "START_FALLBACK"; renderState(); }
@@ -440,9 +732,42 @@
         handleUserInput(val, val, step.saveAs, step.next);
     };
 
-    function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
+    async function handleUserInput(actualValue, displayValue, saveKey, nextStateKey) {
         textContainer.style.display = 'none'; buttonContainer.style.display = 'none'; appendMessage(displayValue, "user");
-        if (saveKey) { collectedFacts[saveKey] = actualValue; collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), [saveKey]: { source: "user_answer", confidence: 1, captured_at: new Date().toISOString() } }; }
+
+        if (saveKey === "client_email") {
+            showLoading();
+            try {
+                const res = await fetch('/.netlify/functions/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: "validate_client_email",
+                        clientEmail: actualValue,
+                        employerEmail: collectedFacts.employer_contact_details || ""
+                    })
+                });
+                const data = await res.json();
+                hideLoading();
+                if (!res.ok || data.ok === false) {
+                    appendMessage(data.reason === "matches_employer_domain"
+                        ? "Please use a personal email address that is not controlled by your employer."
+                        : "Please enter a valid personal email address.", "bot");
+                    currentState = "CLIENT_EMAIL";
+                    renderState();
+                    return;
+                }
+                actualValue = data.client_email || actualValue;
+            } catch (error) {
+                hideLoading();
+                appendMessage("Please enter a valid personal email address.", "bot");
+                currentState = "CLIENT_EMAIL";
+                renderState();
+                return;
+            }
+        }
+        if (saveKey) { collectedFacts[saveKey] = actualValue; collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), [saveKey]: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } }; }
+        if (saveKey === "client_email") collectedFacts.contact_email = actualValue;
         if (saveKey === "whatsapp_number") {
             const normalised = normaliseWhatsAppNumber(actualValue);
             if (!normalised) { appendMessage("Please enter a valid WhatsApp number, including the country code where possible.", "bot"); currentState = "CLIENT_PHONE"; renderState(); return; }
@@ -467,12 +792,16 @@
         if (saveKey === "retrenchment_consultation") collectedFacts["proc_consultation"] = actualValue;
         if (saveKey === "retrenchment_alternatives") collectedFacts["retrenchment_alternatives_offered"] = actualValue;
         if (saveKey === "hearing_date") { collectedFacts["incident_date"] = actualValue; collectedFacts["event_type"] = "pre_dismissal_advisory"; }
+        if (saveKey === "employer_name") collectedFacts["employer_registered_name"] = actualValue;
         if (saveKey === "charge_sheet_received") collectedFacts["charge_sheet_received"] = actualValue;
         if (saveKey === "allegation_nature") collectedFacts["misconduct_category"] = actualValue;
         if (saveKey === "advisory_topic") { collectedFacts["ancillary_topic"] = actualValue; if (actualValue !== "Hearing Prep") { collectedFacts["employment_status"] = "Advisory"; collectedFacts["wp_eligible"] = false; collectedFacts["wp_type"] = null; } }
         if (saveKey === "relevant_event_date") collectedFacts["incident_date"] = actualValue;
         if (saveKey === "raised_internally") collectedFacts["internal_escalation"] = actualValue;
-        currentState = nextStateKey; renderState();
+        const currentStep = scriptFlow[currentState];
+        const turn = await processWebTurn(currentStep, String(displayValue ?? actualValue), nextStateKey);
+        currentState = turn?.resolved_next_state || nextStateKey;
+        renderState();
     }
 
     async function triggerJurisdictionTriage(outcome) {
@@ -496,7 +825,7 @@
             if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}. Please keep this and quote it if you contact VRS through another channel.`, "bot");
             buttonContainer.innerHTML = '';
             if (data.hasMerit) {
-                const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => closeCase(true, false);
+                const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => showPrePaymentConsent();
                 const btnNo = document.createElement('button'); btnNo.className = 'action-btn'; btnNo.innerText = "No thank you."; btnNo.onclick = () => closeCase(false, false);
                 buttonContainer.appendChild(btnYes); buttonContainer.appendChild(btnNo);
             } else {
@@ -506,13 +835,39 @@
         } catch (e) { hideLoading(); appendMessage("Sorry, I had trouble connecting to the legal database. Please refresh and try again.", "bot"); console.error(e); }
     }
 
+    function showPrePaymentConsent() {
+        buttonContainer.innerHTML = `
+            <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+              <input type="checkbox" id="prepay-consent" style="margin-top:4px">
+              <span>${escapeHtml(consentConfig.pre_payment?.text || "")}</span>
+            </label>
+            <button class="action-btn" id="prepay-continue">Continue to VRS review</button>
+            <button class="action-btn" id="prepay-cancel">Not now</button>`;
+        buttonContainer.style.display = 'flex';
+        document.getElementById('prepay-continue').onclick = () => {
+            if (document.getElementById('prepay-consent')?.checked !== true) {
+                appendMessage("Please tick the box before continuing.", "bot");
+                return;
+            }
+            collectedFacts.payment_start_consent = {
+                accepted: true,
+                version: consentConfig.version,
+                accepted_at: new Date().toISOString(),
+                channel: "web",
+                wording: consentConfig.pre_payment?.text || ""
+            };
+            closeCase(true, false);
+        };
+        document.getElementById('prepay-cancel').onclick = () => closeCase(false, false);
+    }
+
     async function closeCase(wantsLetter, isLowMerit) {
         buttonContainer.style.display = 'none';
         let userMsg = wantsLetter ? "Yes, please draft the letter." : "No thank you.";
         if (isLowMerit) userMsg = "Okay, thank you.";
         appendMessage(userMsg, "user"); showLoading();
         try {
-            const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter }) });
+            const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter, payment_start_consent: wantsLetter ? collectedFacts.payment_start_consent : null }) });
             const data = await res.json(); hideLoading();
             if (data.error) appendMessage("An error occurred: " + data.error, "bot"); else appendMessage(data.closing_message, "bot");
         } catch(e) { hideLoading(); appendMessage("An error occurred trying to close the case.", "bot"); console.error(e); }
@@ -524,7 +879,24 @@
         historyEl.appendChild(row); scrollToBottom();
     }
     function hideLoading() { const el = document.getElementById('loading-row'); if(el) el.remove(); }
-    renderState();
+    async function initialiseIntake() {
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "consent_config" })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                consentConfig = data;
+            }
+        } catch (error) {
+            console.warn("Consent configuration unavailable; using placeholder fallback.", error);
+        }
+        renderState();
+    }
+
+    initialiseIntake();
 </script>
 
 </body>
