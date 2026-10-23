@@ -589,12 +589,12 @@ async function processIncomingMessage(message) {
 
     try {
       const { handler: approveForPayment } = require('../approve_case_for_payment');
-      const internalAuth = String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '').trim();
-      if (!internalAuth) throw new Error('Payment approval service authentication is not configured');
+      const internalSecret = String(process.env.LETTER_GENERATION_INTERNAL_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+      if (!internalSecret) throw new Error('Payment approval service authentication is not configured');
 
       const paymentResponse = await approveForPayment({
         httpMethod: 'POST',
-        headers: { authorization: `Bearer ${internalAuth}` },
+        headers: { 'x-vrs-internal-payment-secret': internalSecret },
         body: JSON.stringify({ caseId: conversation.case_id })
       });
 
