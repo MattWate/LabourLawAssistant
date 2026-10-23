@@ -608,6 +608,7 @@
     }
 
     function paymentAction(c) {
+      const f = facts(c);
       const ed = effective(c);
       if (c.payment_status === 'paid') return '<span class="badge green">Payment received ' + esc(date(c.paid_at)) + '</span>';
       if (c.status === 'awaiting_payment_consent') return '<button class="btn ghost" disabled>Awaiting Client Consent</button>';
