@@ -587,7 +587,32 @@ async function processIncomingMessage(message) {
       last_inbound_at: now
     });
 
-    return 'Thank you. VRS has recorded your instruction to start work once you pay. Your payment link can now be issued.';
+    try {
+      const { handler: approveForPayment } = require('../approve_case_for_payment');
+      const internalAuth = String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '').trim();
+      if (!internalAuth) throw new Error('Payment approval service authentication is not configured');
+
+      const paymentResponse = await approveForPayment({
+        httpMethod: 'POST',
+        headers: { authorization: `Bearer ${internalAuth}` },
+        body: JSON.stringify({ caseId: conversation.case_id })
+      });
+
+      const paymentBody = JSON.parse(paymentResponse.body || '{}');
+      if (paymentResponse.statusCode >= 400) {
+        throw new Error(paymentBody.error || 'Could not create payment link');
+      }
+
+      return paymentBody.whatsapp_sent
+        ? 'Thank you. VRS has recorded your instruction to start work once you pay. Your PayFast payment link has now been sent.'
+        : `Thank you. VRS has recorded your instruction to start work once you pay. Your payment link is ready: ${paymentBody.payment_url}`;
+    } catch (paymentError) {
+      console.error('Automatic payment-link creation after consent failed:', {
+        caseId: conversation.case_id,
+        error: paymentError.message
+      });
+      return 'Thank you. VRS has recorded your instruction to start work once you pay. We could not issue the payment link automatically, so the VRS team will resend it from the case workstation.';
+    }
   }
 
   if (conversation.status === 'completed') return 'Your intake has already been submitted. Type RESTART for a new matter, or HELP for assistance.';
