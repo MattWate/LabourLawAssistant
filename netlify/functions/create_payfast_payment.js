@@ -20,6 +20,12 @@ function json(statusCode, body) {
 }
 
 async function authenticate(event) {
+  const internalSecret = String(process.env.LETTER_GENERATION_INTERNAL_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const suppliedInternal = String(event.headers?.['x-vrs-internal-payment-secret'] || event.headers?.['X-VRS-Internal-Payment-Secret'] || '').trim();
+  if (internalSecret && suppliedInternal && suppliedInternal === internalSecret) {
+    return { id: 'internal-whatsapp-consent', email: 'internal@vrs' };
+  }
+
   const auth = event.headers?.authorization || event.headers?.Authorization || '';
   if (!auth.startsWith('Bearer ')) throw new Error('Unauthorized');
   const { data, error } = await supabase.auth.getUser(auth.slice(7));
