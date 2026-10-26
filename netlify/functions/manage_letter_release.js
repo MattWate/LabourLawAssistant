@@ -1,5 +1,6 @@
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
-const { sendApprovedLetter, sendEmail } = require('./lib/email');
+const { sendApprovedLetter, sendClientReviewInvitation, sendEmail } = require('./lib/email');
 const { compareClientEmployerEmail } = require('./lib/emailPrivacy');
 const { assertReleaseAuthorised } = require('./lib/releaseAuthorization');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
@@ -9,6 +10,7 @@ const {
   storeLetterDocument,
   downloadStoredLetter
 } = require('./lib/letterDocument');
+const { renderReleasedLetterPdf } = require('./lib/pdfDocument');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -38,6 +40,28 @@ function employerEmail(caseData, facts) {
 
 function clientEmail(caseData, facts) {
   return cleanEmail(facts.client_email || facts.email || facts.contact_email || caseData.client_email || caseData.contact_info);
+}
+
+function siteBaseUrl(event) {
+  const host = event.headers?.host || event.headers?.['x-forwarded-host'];
+  const proto = event.headers?.['x-forwarded-proto'] || 'https';
+  if (host) return `${proto}://${host}`;
+  const configured = process.env.DEPLOY_PRIME_URL || process.env.URL;
+  if (configured) return configured.replace(/\/$/, '');
+  throw new Error('Could not determine site URL for client review');
+}
+
+function issueClientReview(event, draft) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = sha256(token);
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+  return {
+    token,
+    tokenHash,
+    expiresAt,
+    letterHash: sha256(draft),
+    url: `${siteBaseUrl(event)}/client-letter-review.html?token=${encodeURIComponent(token)}`
+  };
 }
 
 async function paymentConversation(caseId) {
@@ -168,34 +192,71 @@ exports.handler = async (event) => {
       if (!draft) return json(400, { error: 'The draft letter is empty' });
       if (caseData.payment_status !== 'paid') return json(403, { error: 'The letter cannot be approved until payment is confirmed' });
 
+      const reviewEmail = clientEmail(caseData, facts);
+      if (!reviewEmail) return json(400, { error: 'A valid personal client email address is required before the letter can be sent for client approval' });
+
+      const review = issueClientReview(event, draft);
       const baseFacts = {
         ...facts,
-        wp_letter_status: 'APPROVED',
+        wp_letter_status: 'APPROVED_INTERNAL',
         letter_last_edited_at: draft !== String(caseData.draft_letter || '').trim() ? now : facts.letter_last_edited_at,
         letter_last_edited_by: draft !== String(caseData.draft_letter || '').trim() ? (user.email || user.id) : facts.letter_last_edited_by,
         letter_approved_at: now,
-        letter_approved_by: user.email || user.id
+        letter_approved_by: user.email || user.id,
+        client_review_token_hash: review.tokenHash,
+        client_review_expires_at: review.expiresAt,
+        client_review_letter_hash: review.letterHash,
+        client_review_issued_at: now,
+        client_review_completed_at: null,
+        client_review_outcome: null,
+        client_letter_approved_at: null,
+        client_letter_approved_hash: null,
+        client_requested_changes: null
       };
       const generated = await generateApprovedDocument({ caseData, facts: baseFacts, draft, user, approvedAt: now });
+      const approvedFacts = {
+        ...generated.facts,
+        client_review_letter_hash: generated.document.approved_text_hash
+      };
       const { error } = await supabase.from('cases').update({
         draft_letter: draft,
-        status: 'letter_approved_ready_to_send',
-        letter_status: 'approved',
-        case_facts: generated.facts,
+        status: 'awaiting_client_approval',
+        letter_status: 'awaiting_client_approval',
+        case_facts: approvedFacts,
         updated_at: now
       }).eq('id', caseId);
       if (error) throw error;
+
+      try {
+        await sendClientReviewInvitation({
+          clientEmail: reviewEmail,
+          clientName: facts.client_name || caseData.client_name,
+          employerName: facts.employer_name,
+          caseReference: facts.case_reference || caseId,
+          reviewUrl: review.url,
+          expiresAt: review.expiresAt
+        });
+      } catch (reviewEmailError) {
+        console.error('Client review invitation failed:', { caseId, error: reviewEmailError.message });
+        return json(502, {
+          error: 'The letter was approved internally, but the client review email could not be sent. Approve the letter again to issue a new review link.',
+          client_review_pending: true
+        });
+      }
+
       return json(200, {
         success: true,
         action: 'approve',
-        letter_status: 'approved',
+        letter_status: 'awaiting_client_approval',
+        client_review_sent: true,
+        client_review_expires_at: review.expiresAt,
         document_ready: true,
         document_filename: generated.document.filename
       });
     }
 
     if (action === 'regenerate') {
-      if (caseData.letter_status !== 'approved') return json(409, { error: 'Approve the letter before generating the final document' });
+      if (!['awaiting_client_approval', 'client_approved'].includes(caseData.letter_status)) return json(409, { error: 'Approve the letter before generating the final document' });
       if (!draft) return json(400, { error: 'The approved letter is empty' });
       if (draft !== String(caseData.draft_letter || '').trim()) return json(409, { error: 'The letter has changed since approval. Save and approve it again.' });
       const generated = await generateApprovedDocument({
@@ -219,10 +280,11 @@ exports.handler = async (event) => {
       return json(status, { error: authError.message, code: authError.code || 'RELEASE_NOT_AUTHORISED' });
     }
 
-    if (caseData.letter_status !== 'approved') return json(409, { error: 'Approve the letter before sending it' });
+    if (caseData.letter_status !== 'client_approved') return json(409, { error: 'The client must approve this exact letter before it can be sent to the employer' });
     if (!draft) return json(400, { error: 'The approved letter is empty' });
     if (draft !== String(caseData.draft_letter || '').trim()) return json(409, { error: 'The letter has changed since approval. Save and approve the revised version before sending.' });
     if (facts.approved_text_hash !== sha256(draft)) return json(409, { error: 'The generated document does not match the approved letter. Regenerate it before sending.' });
+    if (facts.client_letter_approved_hash !== sha256(draft)) return json(409, { error: 'The current letter does not match the version approved by the client. Send it for client approval again.' });
     if (!facts.letter_document_path || !facts.letter_document_filename) return json(409, { error: 'Generate the final VRS document before sending.' });
 
     const to = employerEmail(caseData, facts);
@@ -234,10 +296,17 @@ exports.handler = async (event) => {
         return json(400, { error: 'The recorded client email appears to be employer-controlled. Add a personal client email before release.' });
       }
     }
-    const documentBuffer = await downloadStoredLetter({
+    // Keep the approved DOCX stored privately for audit/reference, but release a PDF to the employer.
+    await downloadStoredLetter({
       supabase,
       bucket: facts.letter_document_bucket || process.env.LETTER_DOCUMENT_BUCKET || 'case-documents',
       storagePath: facts.letter_document_path
+    });
+    const releasedPdf = await renderReleasedLetterPdf({
+      caseId,
+      facts,
+      draft,
+      approvedAt: facts.letter_approved_at || now
     });
 
     let emailResult;
@@ -249,7 +318,7 @@ exports.handler = async (event) => {
         employerName: facts.employer_name,
         letter: draft,
         caseId,
-        document: { filename: facts.letter_document_filename, buffer: documentBuffer }
+        document: { filename: releasedPdf.filename, buffer: releasedPdf.buffer, contentType: releasedPdf.content_type }
       });
     } catch (sendError) {
       const failedAt = new Date().toISOString();
@@ -290,7 +359,10 @@ exports.handler = async (event) => {
       resend_message_id: emailResult?.id || null,
       letter_sent_notification: notification,
       release_aal: releaseAuth?.aal || null,
-      release_permission_source: releaseAuth?.permission_source || null
+      release_permission_source: releaseAuth?.permission_source || null,
+      released_pdf_filename: releasedPdf.filename,
+      client_letter_approved_at: facts.client_letter_approved_at,
+      client_letter_approved_hash: facts.client_letter_approved_hash
     };
 
     const { error: updateError } = await supabase.from('cases').update({
@@ -307,7 +379,7 @@ exports.handler = async (event) => {
       letter_status: 'sent',
       sent_to: to,
       blind_copied_to: cc,
-      document_filename: facts.letter_document_filename,
+      document_filename: releasedPdf.filename,
       resend_message_id: emailResult?.id || null,
       whatsapp_notification: notification
     });
