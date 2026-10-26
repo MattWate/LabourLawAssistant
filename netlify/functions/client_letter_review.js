@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
+const { sendClientReviewInvitation } = require('./lib/email');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -47,6 +48,25 @@ async function findReviewCase(token) {
   return data || null;
 }
 
+function cleanEmail(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? match[0] : null;
+}
+
+function issueReplacementReview(event, draft) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = sha256(token);
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+  return {
+    token,
+    tokenHash,
+    expiresAt,
+    letterHash: sha256(draft),
+    url: `${siteBaseUrl(event)}/client-letter-review.html?token=${encodeURIComponent(token)}`
+  };
+}
+
 function validateReview(caseData) {
   const facts = caseData?.case_facts || {};
   const expiresAt = facts.client_review_expires_at ? new Date(facts.client_review_expires_at).getTime() : 0;
@@ -88,7 +108,14 @@ exports.handler = async (event) => {
       const caseData = await findReviewCase(token);
       if (!caseData) return json(404, { error: 'Review link not found.' });
       const validation = validateReview(caseData);
-      if (!validation.ok) return json(validation.status, { error: validation.error });
+      if (!validation.ok) {
+        const facts = caseData.case_facts || {};
+        return json(validation.status, {
+          error: validation.error,
+          can_request_new_link: validation.status === 410 && !facts.client_review_completed_at,
+          case_reference: facts.case_reference || caseData.id
+        });
+      }
 
       const facts = caseData.case_facts || {};
       return json(200, {
@@ -105,13 +132,59 @@ exports.handler = async (event) => {
 
     const caseData = await findReviewCase(token);
     if (!caseData) return json(404, { error: 'Review link not found.' });
-    const validation = validateReview(caseData);
-    if (!validation.ok) return json(validation.status, { error: validation.error });
 
     const request = JSON.parse(event.body || '{}');
     const action = String(request.action || '').trim().toLowerCase();
     const facts = caseData.case_facts || {};
     const now = new Date().toISOString();
+    const validation = validateReview(caseData);
+
+    if (action === 'request_new_link') {
+      if (facts.client_review_completed_at) {
+        return json(409, { error: 'This review has already been completed.' });
+      }
+      const currentHash = sha256(caseData.draft_letter || '');
+      if (!caseData.draft_letter || facts.approved_text_hash !== currentHash || facts.client_review_letter_hash !== currentHash) {
+        return json(409, { error: 'The letter has changed since this link was issued. VRS must review it before a new client link can be sent.' });
+      }
+      const clientEmail = cleanEmail(facts.client_email || facts.email || facts.contact_email || caseData.contact_info);
+      if (!clientEmail) return json(400, { error: 'No valid client email address is available. Please contact VRS.' });
+
+      const replacement = issueReplacementReview(event, caseData.draft_letter);
+      const updatedFacts = {
+        ...facts,
+        client_review_token_hash: replacement.tokenHash,
+        client_review_expires_at: replacement.expiresAt,
+        client_review_letter_hash: replacement.letterHash,
+        client_review_issued_at: now,
+        client_review_reissued_at: now,
+        client_review_reissue_count: Number(facts.client_review_reissue_count || 0) + 1
+      };
+      const { error: updateError } = await supabase.from('cases').update({
+        status: 'awaiting_client_approval',
+        letter_status: 'awaiting_client_approval',
+        case_facts: updatedFacts,
+        updated_at: now
+      }).eq('id', caseData.id);
+      if (updateError) throw updateError;
+
+      await sendClientReviewInvitation({
+        clientEmail,
+        clientName: facts.client_name || caseData.client_name,
+        employerName: facts.employer_name,
+        caseReference: facts.case_reference || caseData.id,
+        reviewUrl: replacement.url,
+        expiresAt: replacement.expiresAt
+      });
+      return json(200, {
+        success: true,
+        new_link_sent: true,
+        expires_at: replacement.expiresAt,
+        message: 'A new private review link has been emailed to you. It will be valid for another 12 hours.'
+      });
+    }
+
+    if (!validation.ok) return json(validation.status, { error: validation.error });
 
     if (action === 'approve') {
       const updatedFacts = {
