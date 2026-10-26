@@ -20,11 +20,6 @@ function assertReleaseAuthorised({ user, authHeader }) {
   const claims = decodeJwtPayload(token);
   const aal = String(claims.aal || 'aal1');
 
-  if (aal !== 'aal2') {
-    const error = new Error('MFA is required before releasing a letter. Sign in with a second factor and try again.');
-    error.code = 'MFA_REQUIRED';
-    throw error;
-  }
 
   return {
     aal,
