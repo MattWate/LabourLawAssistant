@@ -175,7 +175,14 @@ exports.handler = async (event) => {
         letter_approved_by: null,
         approved_text_hash: null,
         letter_document_path: null,
-        letter_document_filename: null
+        letter_document_filename: null,
+        client_review_token_hash: null,
+        client_review_expires_at: null,
+        client_review_letter_hash: null,
+        client_review_completed_at: null,
+        client_review_outcome: null,
+        client_letter_approved_at: null,
+        client_letter_approved_hash: null
       };
       const { error } = await supabase.from('cases').update({
         draft_letter: draft,
