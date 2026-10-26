@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Review Your VRS Letter</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+    :root{--navy:#000B4F;--blue:#20368F;--soft:#829CD0;--bg:#f5f7fb;--text:#172033;--muted:#59647d;--border:#d9e0ee;--green:#247553;--red:#a63d45}
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(145deg,#fff,#f5f7fb);color:var(--text);font-family:Quicksand,Arial,sans-serif}
+    .shell{max-width:920px;margin:0 auto;padding:32px 18px 64px}.brand{font-weight:700;color:var(--navy);letter-spacing:.02em}.card{background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 16px 50px rgba(0,11,79,.08);padding:24px;margin-top:20px}
+    h1{color:var(--navy);font-size:1.8rem;margin:8px 0} p{line-height:1.6;color:var(--muted)} .meta{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.pill{background:#eef2fa;border:1px solid var(--border);border-radius:999px;padding:7px 11px;font-size:.86rem}
+    .letter{white-space:pre-wrap;font-family:Arial,sans-serif;line-height:1.65;color:#202838;border-top:1px solid var(--border);padding-top:22px;margin-top:18px}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:700;cursor:pointer}.btn.primary{background:var(--green);color:#fff}.btn.secondary{background:var(--blue);color:#fff}.btn.ghost{background:#eef2fa;color:var(--navy)}
+    textarea{width:100%;min-height:130px;border:1px solid var(--border);border-radius:12px;padding:12px;font:inherit;resize:vertical}.hidden{display:none}.error{color:var(--red)}.success{color:var(--green);font-weight:700}
+    button:disabled{opacity:.55;cursor:not-allowed}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="brand">VAN RENSBURG SCHOON INC.</div>
+    <div class="card">
+      <div id="loading">Loading your letter…</div>
+      <div id="content" class="hidden">
+        <h1>Please review your letter</h1>
+        <p>VRS has reviewed the draft below. It cannot be sent to the employer until you approve this exact wording.</p>
+        <div class="meta">
+          <span class="pill" id="reference"></span>
+          <span class="pill" id="employer"></span>
+          <span class="pill" id="expiry"></span>
+        </div>
+        <div class="letter" id="letter"></div>
+        <div class="actions" id="main-actions">
+          <button class="btn primary" id="approve">Yes, I approve this letter</button>
+          <button class="btn secondary" id="changes">No, I need changes</button>
+        </div>
+        <div id="change-panel" class="hidden" style="margin-top:20px">
+          <p><strong>Tell VRS what you need changed.</strong> Please focus on factual corrections or specific wording you want reviewed. You do not need to rewrite the letter yourself.</p>
+          <textarea id="change-text" maxlength="4000" placeholder="For example: My job title should be..., the date in paragraph 2 should be..., please change the proposed settlement wording to..."></textarea>
+          <div class="actions">
+            <button class="btn secondary" id="submit-changes">Submit changes</button>
+            <button class="btn ghost" id="cancel-changes">Cancel</button>
+          </div>
+        </div>
+        <div id="result" style="margin-top:18px"></div>
+      </div>
+      <div id="fatal" class="error hidden"></div>
+    </div>
+  </main>
+<script>
+  const params=new URLSearchParams(location.search); const token=params.get('token')||'';
+  const endpoint='/.netlify/functions/client_letter_review?token='+encodeURIComponent(token);
+  const loading=document.getElementById('loading'), content=document.getElementById('content'), fatal=document.getElementById('fatal'), result=document.getElementById('result');
+  function done(message){document.getElementById('main-actions').classList.add('hidden');document.getElementById('change-panel').classList.add('hidden');result.className='success';result.textContent=message;}
+  function fail(message){loading.classList.add('hidden');content.classList.add('hidden');fatal.classList.remove('hidden');fatal.textContent=message;}
+  async function load(){
+    try{const r=await fetch(endpoint,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load this review.');
+      document.getElementById('reference').textContent='Reference: '+d.case_reference;
+      document.getElementById('employer').textContent='Employer: '+d.employer_name;
+      document.getElementById('expiry').textContent='Link expires: '+new Date(d.expires_at).toLocaleString();
+      document.getElementById('letter').textContent=d.letter;
+      loading.classList.add('hidden');content.classList.remove('hidden');
+    }catch(e){fail(e.message);}
+  }
+  async function submit(action,changes=''){
+    const buttons=document.querySelectorAll('button');buttons.forEach(b=>b.disabled=true);result.className='';result.textContent='Submitting…';
+    try{const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,changes})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not submit your response.');done(d.message||'Thank you. Your response has been recorded.');}
+    catch(e){result.className='error';result.textContent=e.message;buttons.forEach(b=>b.disabled=false);}
+  }
+  document.getElementById('approve').onclick=()=>{if(confirm('Approve this exact version for VRS to send to the employer?'))submit('approve');};
+  document.getElementById('changes').onclick=()=>document.getElementById('change-panel').classList.remove('hidden');
+  document.getElementById('cancel-changes').onclick=()=>document.getElementById('change-panel').classList.add('hidden');
+  document.getElementById('submit-changes').onclick=()=>{const v=document.getElementById('change-text').value.trim();if(v.length<5){result.className='error';result.textContent='Please briefly explain the change you need.';return;}submit('request_changes',v);};
+  load();
+</script>
+</body>
+</html>
