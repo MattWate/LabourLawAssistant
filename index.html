@@ -357,6 +357,7 @@
     }
 
     const AI_SKIP_CONFIDENCE = 0.8;
+    const AI_CAPTURE_CONFIDENCE = 0.65;
     const WEB_PROMPT_LIMIT = 25;
 
     function webPromptCount() { return Number(collectedFacts._intake_prompt_count || 0); }
@@ -375,7 +376,13 @@
     function queueUnconfirmedNarrativeFacts() {
         const metadata = collectedFacts._fact_metadata || {};
         const items = Object.entries(metadata)
-            .filter(([key, meta]) => meta?.source === "initial_narrative_ai" && meta.confirmed !== true && hasKnownValue(collectedFacts[key]))
+            .filter(([key, meta]) =>
+                meta?.source === "initial_narrative_ai" &&
+                meta.confirmed !== true &&
+                Number(meta.confidence || 0) >= AI_CAPTURE_CONFIDENCE &&
+                Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE &&
+                hasKnownValue(collectedFacts[key])
+            )
             .slice(0, 3)
             .map(([key, meta]) => ({
                 field: key,
@@ -562,8 +569,7 @@
     function canSkipStep(step) {
         if (!step || !step.saveAs || !hasKnownValue(collectedFacts[step.saveAs])) return false;
         const meta = collectedFacts._fact_metadata?.[step.saveAs];
-        if (meta?.source === "initial_narrative_ai" && meta.confirmed !== true) return false;
-        if (meta?.source === "initial_narrative_ai" && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
+        if (meta?.source === "initial_narrative_ai" && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE && meta.confirmed !== true) return false;
         if (step.type === "buttons") return Boolean(matchedStoredOption(step, collectedFacts[step.saveAs]));
         if (step.type === "date") return /^\d{4}-\d{2}-\d{2}$/.test(String(collectedFacts[step.saveAs]));
         if (step.minWords) return String(collectedFacts[step.saveAs]).split(/\s+/).filter(Boolean).length >= step.minWords;
@@ -582,9 +588,15 @@
         Object.entries(candidates).forEach(([key, value]) => {
             if (!hasKnownValue(value) || hasKnownValue(collectedFacts[key])) return;
             const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
-            if (confidence < AI_SKIP_CONFIDENCE) return;
+            if (confidence < AI_CAPTURE_CONFIDENCE) return;
             collectedFacts[key] = value;
-            metadata[key] = { source: "initial_narrative_ai", confidence, confirmed: false, captured_at: new Date().toISOString() };
+            metadata[key] = {
+                source: "initial_narrative_ai",
+                confidence,
+                confirmed: confidence >= AI_SKIP_CONFIDENCE,
+                trust_basis: confidence >= AI_SKIP_CONFIDENCE ? "high_confidence_initial_narrative" : "requires_client_confirmation",
+                captured_at: new Date().toISOString()
+            };
         });
         collectedFacts._fact_metadata = metadata;
         collectedFacts.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === "initial_narrative_ai");
