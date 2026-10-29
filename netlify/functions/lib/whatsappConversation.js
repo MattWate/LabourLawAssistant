@@ -325,6 +325,7 @@ async function restartConversation(conversation, message) {
   return renderPrompt('CONSENT');
 }
 const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8);
+const AI_CAPTURE_CONFIDENCE = Number(process.env.WHATSAPP_AI_CAPTURE_CONFIDENCE || 0.65);
 const { markClientConfirmedFact } = require('./factProvenance');
 
 const WHATSAPP_PROMPT_LIMIT = 18;
@@ -351,7 +352,13 @@ function requiredLetterFieldsMissing(facts = {}) {
 function queueUnconfirmedNarrativeFacts(facts = {}) {
   const metadata = facts._fact_metadata || {};
   const items = Object.entries(metadata)
-    .filter(([key, meta]) => meta?.source === 'initial_narrative_ai' && meta.confirmed !== true && hasValue(facts[key]))
+    .filter(([key, meta]) =>
+      meta?.source === 'initial_narrative_ai' &&
+      meta.confirmed !== true &&
+      Number(meta.confidence || 0) >= AI_CAPTURE_CONFIDENCE &&
+      Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE &&
+      hasValue(facts[key])
+    )
     .slice(0, 3)
     .map(([key, meta]) => ({
       field: key,
@@ -459,8 +466,7 @@ function stepIsAnswered(step, facts = {}) {
   if (!step?.saveAs || !hasValue(facts[step.saveAs])) return false;
   const value = facts[step.saveAs];
   const meta = facts._fact_metadata?.[step.saveAs];
-  if (meta?.source === 'initial_narrative_ai' && meta.confirmed !== true) return false;
-  if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE) return false;
+  if (meta?.source === 'initial_narrative_ai' && Number(meta.confidence || 0) < AI_SKIP_CONFIDENCE && meta.confirmed !== true) return false;
   if (step.type === 'date') return validateAndNormaliseDate(String(value), step.dateRules || {}).ok;
   if (step.type === 'buttons') return Boolean(choiceForStoredValue(step, value));
   if (step.minWords) return wordCount(String(value)) >= step.minWords;
@@ -502,7 +508,7 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
   Object.entries(candidates).forEach(([key, value]) => {
     if (!hasValue(value) || hasValue(merged[key])) return;
     const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
-    if (confidence < AI_SKIP_CONFIDENCE) return;
+    if (confidence < AI_CAPTURE_CONFIDENCE) return;
 
     if (['incident_date', 'dismissal_date', 'resignation_date', 'relevant_event_date', 'hearing_date'].includes(key)) {
       const dateResult = validateAndNormaliseDate(String(value), { allowFuture: key === 'hearing_date' });
@@ -512,7 +518,13 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
       merged[key] = value;
     }
 
-    metadata[key] = { source: 'initial_narrative_ai', confidence, confirmed: false, captured_at: new Date().toISOString() };
+    metadata[key] = {
+      source: 'initial_narrative_ai',
+      confidence,
+      confirmed: confidence >= AI_SKIP_CONFIDENCE,
+      trust_basis: confidence >= AI_SKIP_CONFIDENCE ? 'high_confidence_initial_narrative' : 'requires_client_confirmation',
+      captured_at: new Date().toISOString()
+    };
   });
 
   merged._fact_metadata = metadata;
