@@ -283,8 +283,7 @@ async function callClaude(prompt) {
     body: JSON.stringify({
       model: getClaudeModel(),
       max_tokens: 1800,
-      temperature: 0.2,
-      system: 'Return valid JSON only. You are a legal intake classification and data extraction layer, not a legal adviser.',
+system: 'Return valid JSON only. You are a legal intake classification and data extraction layer, not a legal adviser.',
       messages: [{ role: 'user', content: prompt }]
     })
   });
@@ -309,8 +308,7 @@ async function classifyAndHydrateMatter({ narrative = '', existingFacts = {} }) 
     governance.log = {
       provider: 'anthropic',
       model: getClaudeModel(),
-      temperature: 0.2,
-      started_at: startedAt,
+started_at: startedAt,
       completed_at: new Date().toISOString(),
       status: 'success',
       input_summary: String(narrative || '').slice(0, 500),
@@ -333,8 +331,7 @@ async function classifyAndHydrateMatter({ narrative = '', existingFacts = {} }) 
       log: {
         provider: 'anthropic',
         model: getClaudeModel(),
-        temperature: 0.2,
-        started_at: startedAt,
+started_at: startedAt,
         completed_at: new Date().toISOString(),
         status: 'failed_or_not_configured',
         error: error.message,
