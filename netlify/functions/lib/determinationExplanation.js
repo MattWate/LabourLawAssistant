@@ -146,8 +146,7 @@ ${JSON.stringify(base.verified_references, null, 2)}`;
       body: JSON.stringify({
         model: getClaudeModel(),
         max_tokens: 1200,
-        temperature: 0.1,
-        system: 'Return valid JSON only. Deterministic scores and posture are immutable.',
+system: 'Return valid JSON only. Deterministic scores and posture are immutable.',
         messages: [{ role: 'user', content: prompt }]
       })
     });
