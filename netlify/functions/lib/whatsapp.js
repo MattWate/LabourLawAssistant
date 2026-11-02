@@ -49,19 +49,23 @@ async function sendWhatsAppText({ to, body, phoneNumberId }) {
   });
 }
 
-async function sendWhatsAppTemplate({ to, templateName, languageCode = 'en', components = [], phoneNumberId }) {
+function buildWhatsAppTemplatePayload({ templateName, languageCode = 'en', components = [] }) {
   if (!templateName) throw new Error('WhatsApp template name is required');
+  return {
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(Array.isArray(components) && components.length ? { components } : {})
+    }
+  };
+}
+
+async function sendWhatsAppTemplate({ to, templateName, languageCode = 'en', components = [], phoneNumberId }) {
   return postWhatsAppMessage({
     to,
     phoneNumberId,
-    payload: {
-      type: 'template',
-      template: {
-        name: templateName,
-        language: { code: languageCode },
-        ...(Array.isArray(components) && components.length ? { components } : {})
-      }
-    }
+    payload: buildWhatsAppTemplatePayload({ templateName, languageCode, components })
   });
 }
 
@@ -127,6 +131,7 @@ async function sendWhatsAppList({ to, body, rows, phoneNumberId, buttonText = 'C
 
 module.exports = {
   postWhatsAppMessage,
+  buildWhatsAppTemplatePayload,
   sendWhatsAppText,
   sendWhatsAppTemplate,
   sendWhatsAppButtons,
