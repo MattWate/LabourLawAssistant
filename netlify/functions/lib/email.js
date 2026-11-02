@@ -80,7 +80,7 @@ async function sendClientReviewInvitation({ clientEmail, clientName, employerNam
       <p>This private review link expires at ${escapeHtml(expiryText)}.</p>
       <p>Regards,<br>VRS Labour Law Consultants</p>
     </div>`,
-    text: `${clientName ? `Hi ${clientName},` : 'Hello,'}\n\nVRS has prepared your letter${employerName ? ` for your matter with ${employerName}` : ''}. You must review and approve it before it can be sent to the employer.\n\nReview it here: ${reviewUrl}\n\nIf you need changes, submit them on the review page. This private link expires at ${expiryText}.\n\nRegards,\nVan Rensburg Schoon Inc.`
+    text: `${clientName ? `Hi ${clientName},` : 'Hello,'}\n\nVRS has prepared your letter${employerName ? ` for your matter with ${employerName}` : ''}. You must review and approve it before it can be sent to the employer.\n\nReview it here: ${reviewUrl}\n\nIf you need changes, submit them on the review page. This private link expires at ${expiryText}.\n\nRegards,\nVRS Labour Law Consultants`
   });
 }
 
@@ -101,7 +101,7 @@ async function sendApprovedLetter({ employerEmail, clientEmail, clientName, empl
     bcc: clientEmail ? [clientEmail] : [],
     subject,
     html: `<div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;color:#172033;line-height:1.6">${intro}${outro}</div>`,
-    text: `Please find attached formal correspondence issued by VRS Labour Law Consultants in relation to case ${caseId}.\n\nRegards,\nVan Rensburg Schoon Inc.`,
+    text: `Please find attached formal correspondence issued by VRS Labour Law Consultants in relation to case ${caseId}.\n\nRegards,\nVRS Labour Law Consultants`,
     attachments
   });
 }
