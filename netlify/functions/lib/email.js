@@ -78,7 +78,7 @@ async function sendClientReviewInvitation({ clientEmail, clientName, employerNam
       <p><a href="${safeUrl}" style="display:inline-block;background:#20368F;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Review your letter</a></p>
       <p>If you need changes, use the change-request box on the review page. VRS will review any revised draft before you are asked to approve it again.</p>
       <p>This private review link expires at ${escapeHtml(expiryText)}.</p>
-      <p>Regards,<br>Van Rensburg Schoon Inc.</p>
+      <p>Regards,<br>VRS Labour Law Consultants</p>
     </div>`,
     text: `${clientName ? `Hi ${clientName},` : 'Hello,'}\n\nVRS has prepared your letter${employerName ? ` for your matter with ${employerName}` : ''}. You must review and approve it before it can be sent to the employer.\n\nReview it here: ${reviewUrl}\n\nIf you need changes, submit them on the review page. This private link expires at ${expiryText}.\n\nRegards,\nVan Rensburg Schoon Inc.`
   });
@@ -86,8 +86,8 @@ async function sendClientReviewInvitation({ clientEmail, clientName, employerNam
 
 async function sendApprovedLetter({ employerEmail, clientEmail, clientName, employerName, letter, caseId, document }) {
   const subject = `WITHOUT PREJUDICE AND SUBJECT TO CONTRACT — ${clientName || 'VRS client'}${employerName ? ` / ${employerName}` : ''}`;
-  const intro = `<p>Please find attached formal correspondence issued by Van Rensburg Schoon Inc. in relation to the employment matter referenced ${escapeHtml(caseId)}.</p>`;
-  const outro = '<p>Regards,<br>Van Rensburg Schoon Inc.</p>';
+  const intro = `<p>Please find attached formal correspondence issued by VRS Labour Law Consultants in relation to the employment matter referenced ${escapeHtml(caseId)}.</p>`;
+  const outro = '<p>Regards,<br>VRS Labour Law Consultants</p>';
   const attachments = document?.buffer && document?.filename ? [{
     filename: document.filename,
     content: document.buffer,
@@ -101,7 +101,7 @@ async function sendApprovedLetter({ employerEmail, clientEmail, clientName, empl
     bcc: clientEmail ? [clientEmail] : [],
     subject,
     html: `<div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;color:#172033;line-height:1.6">${intro}${outro}</div>`,
-    text: `Please find attached formal correspondence issued by Van Rensburg Schoon Inc. in relation to case ${caseId}.\n\nRegards,\nVan Rensburg Schoon Inc.`,
+    text: `Please find attached formal correspondence issued by VRS Labour Law Consultants in relation to case ${caseId}.\n\nRegards,\nVan Rensburg Schoon Inc.`,
     attachments
   });
 }
