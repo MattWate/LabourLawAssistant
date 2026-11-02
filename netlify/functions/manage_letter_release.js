@@ -7,8 +7,7 @@ const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
 const {
   sha256,
   renderLetterDocument,
-  storeLetterDocument,
-  downloadStoredLetter
+  storeLetterDocument
 } = require('./lib/letterDocument');
 const { renderReleasedLetterPdf } = require('./lib/pdfDocument');
 
@@ -303,21 +302,18 @@ exports.handler = async (event) => {
         return json(400, { error: 'The recorded client email appears to be employer-controlled. Add a personal client email before release.' });
       }
     }
-    // Keep the approved DOCX stored privately for audit/reference, but release a PDF to the employer.
-    await downloadStoredLetter({
-      supabase,
-      bucket: facts.letter_document_bucket || process.env.LETTER_DOCUMENT_BUCKET || 'case-documents',
-      storagePath: facts.letter_document_path
-    });
-    const releasedPdf = await renderReleasedLetterPdf({
-      caseId,
-      facts,
-      draft,
-      approvedAt: facts.letter_approved_at || now
-    });
-
+    let releasedPdf;
     let emailResult;
     try {
+      // Generate the employer-facing PDF directly from the exact client-approved text.
+      // The privately stored DOCX remains available for audit/reference but is not a release dependency.
+      releasedPdf = await renderReleasedLetterPdf({
+        caseId,
+        facts,
+        draft,
+        approvedAt: facts.letter_approved_at || now
+      });
+
       emailResult = await sendApprovedLetter({
         employerEmail: to,
         clientEmail: cc,
@@ -336,6 +332,7 @@ exports.handler = async (event) => {
         letter_send_failed_at: failedAt,
         letter_send_failed_by: user.email || user.id,
         letter_send_failed_to: to,
+        letter_send_failure_stage: releasedPdf ? 'email_delivery' : 'pdf_generation',
         letter_send_failure_error: String(sendError.message || sendError),
         letter_send_failure_alert: alert,
         release_aal: releaseAuth?.aal || null,
@@ -343,13 +340,15 @@ exports.handler = async (event) => {
       };
       await supabase.from('cases').update({
         status: 'letter_send_failed',
-        letter_status: 'send_failed',
+        // Preserve the client's approval so VRS can safely retry the exact same letter.
+        letter_status: 'client_approved',
         case_facts: failedFacts,
         updated_at: failedAt
       }).eq('id', caseId);
       return json(502, {
-        error: 'The letter was not sent. The case has been marked as failed and VRS has been alerted where configured.',
+        error: 'The letter was not sent. The failure has been recorded and the exact client-approved version remains ready for retry.',
         send_failed: true,
+        failure_stage: releasedPdf ? 'email_delivery' : 'pdf_generation',
         alert
       });
     }
