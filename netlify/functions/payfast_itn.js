@@ -81,29 +81,45 @@ async function notifyPaymentConfirmed(caseData) {
   const clientName = facts.client_name || caseData.client_name || 'Client';
   const phoneNumberId = conversation.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
   const templateName = String(process.env.WHATSAPP_PAYMENT_CONFIRMED_TEMPLATE_NAME || '').trim();
-  const languageCode = String(process.env.WHATSAPP_PAYMENT_CONFIRMED_TEMPLATE_LANGUAGE || 'en').trim();
+  const configuredLanguage = String(process.env.WHATSAPP_PAYMENT_CONFIRMED_TEMPLATE_LANGUAGE || 'en').trim();
+
+  if (templateName) {
+    const languageCodes = [...new Set([configuredLanguage, 'en_US', 'en_GB', 'en'].filter(Boolean))];
+    let lastError = null;
+    for (const languageCode of languageCodes) {
+      try {
+        await sendWhatsAppTemplate({
+          to: conversation.from_number,
+          phoneNumberId,
+          templateName,
+          languageCode,
+          components: [{
+            type: 'body',
+            parameters: [{ type: 'text', text: clientName }]
+          }]
+        });
+        return { sent: true, mode: 'template', template_name: templateName, language_code: languageCode };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    console.warn('WhatsApp payment-confirmed template unavailable; falling back to active-session text', {
+      templateName,
+      languageCodes,
+      error: lastError?.message || 'unknown error'
+    });
+  }
 
   try {
-    if (templateName) {
-      await sendWhatsAppTemplate({
-        to: conversation.from_number,
-        phoneNumberId,
-        templateName,
-        languageCode,
-        bodyParameters: [clientName]
-      });
-      return { sent: true, mode: 'template', template_name: templateName, language_code: languageCode };
-    }
-
     await sendWhatsAppText({
       to: conversation.from_number,
       phoneNumberId,
       body: `Hi ${clientName}, your payment has been received. The VRS legal team will now prepare your letter for review. We will notify you once it has been completed.`
     });
-    return { sent: true, mode: 'session_text' };
+    return { sent: true, mode: templateName ? 'session_text_after_template_failure' : 'session_text' };
   } catch (error) {
     console.error('Payment confirmation WhatsApp notification failed:', error.message);
-    return { sent: false, mode: templateName ? 'template_failed' : 'session_text_failed', error: error.message };
+    return { sent: false, mode: templateName ? 'template_and_session_text_failed' : 'session_text_failed', error: error.message };
   }
 }
 
