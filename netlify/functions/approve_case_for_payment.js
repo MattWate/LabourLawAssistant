@@ -89,7 +89,11 @@ async function sendPaymentRequest({ conversation, caseData, payment }) {
       }
     }
 
-    throw new Error(`WhatsApp template ${templateName} was not found for language codes ${languageCodes.join(', ')}. Confirm that the template is approved in the same WhatsApp Business Account as this phone number. Last Meta error: ${lastError?.message || 'unknown error'}`);
+    console.warn('WhatsApp payment template unavailable; falling back to active-session text', {
+      templateName,
+      languageCodes,
+      error: lastError?.message || 'unknown error'
+    });
   }
 
   await sendWhatsAppText({
@@ -97,7 +101,7 @@ async function sendPaymentRequest({ conversation, caseData, payment }) {
     phoneNumberId,
     body: `Hi ${clientName}, VRS has reviewed your case. To proceed, please complete payment here: ${payment.payment_url}. Once payment is received, the legal team will prepare and review your letter.`
   });
-  return { sent: true, mode: 'session_text' };
+  return { sent: true, mode: templateName ? 'session_text_after_template_failure' : 'session_text' };
 }
 
 exports.handler = async (event) => {
