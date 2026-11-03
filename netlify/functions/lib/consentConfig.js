@@ -26,6 +26,20 @@ const CONSENT_CONFIG = {
       '3. VRS may use any sensitive information you share, and its service providers may process your information outside South Africa.'
     ].join('\n')
   },
+  mandate: {
+    version: '2026-11-03',
+    text: [
+      'Unfortunately, many of our clients do not always understand the basis upon which we accept instructions. In order to avoid any confusion or misunderstanding, we record that basis below:',
+      '',
+      'You, (“the client”) are always liable for payment of all fees and disbursements unless we have specifically agreed to the contrary in writing.',
+      '',
+      'All accounts are payable immediately against the rendering thereof, unless agreed otherwise with the consultant.',
+      '',
+      'If the firm considers that the complexity and/or substantial nature of the client’s case warrants it, the client acknowledges that it may be necessary for more than one Consultant or Agent to be involved in handling the client’s case at any one time, to which the client agrees. The client further agrees that non-litigious and/or commercial work will be billed taking into consideration the complexity, time spent, skills and experience of the Consultant or Agent involved, the nature of the agreement and the extent of any benefits derived for the client.',
+      '',
+      'By accepting this mandate, you authorise the Consultant or Agent to receive monies which may be due to you stemming from a labour matter, and to recover from such monies received on your behalf any amounts due to VRS Labour Law Consultants.'
+    ].join('\n')
+  },
   pre_payment: {
     text: 'Please start work on my matter as soon as I pay. I understand that once work has started the seven-day cooling-off right for online purchases no longer applies, and that VRS will refund my fee in full if it declines to act or does not release a letter.'
   }
@@ -43,6 +57,16 @@ function consentSnapshot(channel = 'unknown', extra = {}) {
     accepted_at: new Date().toISOString(),
     channel,
     ...extra
+  };
+}
+
+function mandateAcceptanceSnapshot(channel = 'unknown') {
+  return {
+    accepted: true,
+    version: CONSENT_CONFIG.mandate.version,
+    accepted_at: new Date().toISOString(),
+    channel,
+    wording: CONSENT_CONFIG.mandate.text
   };
 }
 
@@ -65,6 +89,7 @@ module.exports = {
   CONSENT_VERSION,
   CONSENT_ISSUED_DATE,
   consentSnapshot,
+  mandateAcceptanceSnapshot,
   paymentConsentSnapshot,
   whatsappConsentText
 };
