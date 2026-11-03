@@ -132,6 +132,51 @@ exports.handler = async (event) => {
       return json(409, { error: productRoute.reason || 'No payable product is available for this case', product_route: productRoute });
     }
 
+    if (facts.mandate_acceptance?.accepted !== true) {
+      const { data: mandateConversation } = await supabase
+        .from('whatsapp_conversations')
+        .select('id,from_number,phone_number_id')
+        .eq('case_id', caseId)
+        .maybeSingle();
+
+      if (!mandateConversation?.from_number) {
+        return json(409, {
+          error: 'Client mandate acceptance is required before payment can be requested. No linked WhatsApp conversation is available to request it.',
+          mandate_required: true
+        });
+      }
+
+      const phoneNumberId = mandateConversation.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
+      await sendWhatsAppText({
+        to: mandateConversation.from_number,
+        phoneNumberId,
+        body: `${CONSENT_CONFIG.mandate.text}\n\nReply YES to confirm that you have read and accept the VRS Labour Law Consultants mandate.`
+      });
+
+      const now = new Date().toISOString();
+      await supabase.from('whatsapp_conversations').update({
+        status: 'awaiting_mandate_acceptance',
+        updated_at: now
+      }).eq('id', mandateConversation.id);
+
+      await supabase.from('cases').update({
+        status: 'awaiting_mandate_acceptance',
+        case_facts: {
+          ...facts,
+          mandate_requested_at: now,
+          mandate_version: CONSENT_CONFIG.mandate.version
+        },
+        updated_at: now
+      }).eq('id', caseId);
+
+      return json(202, {
+        success: true,
+        mandate_required: true,
+        mandate_requested: true,
+        message: 'The VRS mandate has been sent to the client on WhatsApp. Ask the client to reply YES before payment consent is requested.'
+      });
+    }
+
     if (facts.payment_start_consent?.accepted !== true) {
       const { data: consentConversation } = await supabase
         .from('whatsapp_conversations')
