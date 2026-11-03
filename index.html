@@ -135,6 +135,10 @@
             sensitive_label: "I agree that VRS may use sensitive information I choose to share, such as my health, union membership or an allegation made against me, and that its service providers may process my information outside South Africa.",
             link_label: "Read the full Terms of Use and Privacy Notice"
         },
+        mandate: {
+            version: "2026-11-03",
+            text: "By accepting this mandate, I confirm that I have read and accept the VRS Labour Law Consultants mandate."
+        },
         pre_payment: {
             text: "Please start work on my matter as soon as I pay. I understand that once work has started the seven-day cooling-off right for online purchases no longer applies, and that VRS will refund my fee in full if it declines to act or does not release a letter."
         }
@@ -837,7 +841,7 @@
             if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}. Please keep this and quote it if you contact VRS through another channel.`, "bot");
             buttonContainer.innerHTML = '';
             if (data.hasMerit) {
-                const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => showPrePaymentConsent();
+                const btnYes = document.createElement('button'); btnYes.className = 'action-btn'; btnYes.innerText = "Yes, please draft the letter."; btnYes.onclick = () => showMandateAcceptance();
                 const btnNo = document.createElement('button'); btnNo.className = 'action-btn'; btnNo.innerText = "No thank you."; btnNo.onclick = () => closeCase(false, false);
                 buttonContainer.appendChild(btnYes); buttonContainer.appendChild(btnNo);
             } else {
@@ -845,6 +849,37 @@
             }
             buttonContainer.style.display = 'flex'; scrollToBottom();
         } catch (e) { hideLoading(); appendMessage("Sorry, I had trouble connecting to the legal database. Please refresh and try again.", "bot"); console.error(e); }
+    }
+
+    function showMandateAcceptance() {
+        const mandateText = consentConfig.mandate?.text || "";
+        buttonContainer.innerHTML = `
+            <div style="text-align:left;padding:14px;border:1px solid #e2e8f0;border-radius:8px;max-height:260px;overflow:auto;white-space:pre-wrap;line-height:1.5;">${escapeHtml(mandateText)}</div>
+            <label style="display:flex;gap:10px;align-items:flex-start;text-align:left;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
+              <input type="checkbox" id="mandate-acceptance" style="margin-top:4px">
+              <span>I have read and accept the VRS Labour Law Consultants mandate.</span>
+            </label>
+            <button class="action-btn" id="mandate-continue">Accept mandate and continue</button>
+            <button class="action-btn" id="mandate-cancel">Not now</button>`;
+        buttonContainer.style.display = 'flex';
+
+        document.getElementById('mandate-continue').onclick = () => {
+            if (document.getElementById('mandate-acceptance')?.checked !== true) {
+                appendMessage("Please confirm that you have read and accept the mandate before continuing.", "bot");
+                return;
+            }
+            collectedFacts.mandate_acceptance = {
+                accepted: true,
+                version: consentConfig.mandate?.version || "2026-11-03",
+                accepted_at: new Date().toISOString(),
+                channel: "web",
+                wording: mandateText
+            };
+            appendMessage("I have read and accept the VRS Labour Law Consultants mandate.", "user");
+            showPrePaymentConsent();
+        };
+
+        document.getElementById('mandate-cancel').onclick = () => closeCase(false, false);
     }
 
     function showPrePaymentConsent() {
@@ -879,7 +914,7 @@
         if (isLowMerit) userMsg = "Okay, thank you.";
         appendMessage(userMsg, "user"); showLoading();
         try {
-            const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter, payment_start_consent: wantsLetter ? collectedFacts.payment_start_consent : null }) });
+            const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "close", caseId: activeCaseId, wants_letter: wantsLetter, mandate_acceptance: wantsLetter ? collectedFacts.mandate_acceptance : null, payment_start_consent: wantsLetter ? collectedFacts.payment_start_consent : null }) });
             const data = await res.json(); hideLoading();
             if (data.error) appendMessage("An error occurred: " + data.error, "bot"); else appendMessage(data.closing_message, "bot");
         } catch(e) { hideLoading(); appendMessage("An error occurred trying to close the case.", "bot"); console.error(e); }
