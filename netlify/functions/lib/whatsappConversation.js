@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { validateAndNormaliseDate } = require('./dateValidation');
-const { CONSENT_CONFIG, consentSnapshot, paymentConsentSnapshot, whatsappConsentText } = require('./consentConfig');
+const { CONSENT_CONFIG, consentSnapshot, mandateAcceptanceSnapshot, paymentConsentSnapshot, whatsappConsentText } = require('./consentConfig');
 const { compareClientEmployerEmail } = require('./emailPrivacy');
 const { retentionMetadata } = require('./privacyGovernance');
 
@@ -565,6 +565,42 @@ async function processIncomingMessage(message) {
   const command = normalize(input);
   if (['restart', 'start again', 'reset'].includes(command)) return restartConversation(conversation, message);
   if (['help', 'human', 'agent', 'attorney', 'lawyer'].includes(command)) return markHandoff(conversation, message, 'USER_REQUESTED_HELP', conversation.collected_facts || {});
+  if (conversation.status === 'awaiting_mandate_acceptance') {
+    const answer = normalize(input);
+    if (answer !== 'yes') {
+      return `${CONSENT_CONFIG.mandate.text}\n\nReply YES to confirm that you have read and accept the VRS Labour Law Consultants mandate.`;
+    }
+
+    const { data: caseRow, error: caseError } = await supabase
+      .from('cases')
+      .select('case_facts')
+      .eq('id', conversation.case_id)
+      .single();
+    if (caseError || !caseRow) throw new Error('Could not load the case for mandate acceptance');
+
+    const mandate = mandateAcceptanceSnapshot('whatsapp');
+    const updatedFacts = {
+      ...(caseRow.case_facts || {}),
+      mandate_acceptance: mandate
+    };
+    const now = new Date().toISOString();
+    const { error: updateError } = await supabase.from('cases').update({
+      case_facts: updatedFacts,
+      status: 'awaiting_payment_consent',
+      updated_at: now
+    }).eq('id', conversation.case_id);
+    if (updateError) throw updateError;
+
+    await updateConversation(conversation.id, {
+      status: 'awaiting_payment_consent',
+      collected_facts: { ...(conversation.collected_facts || {}), mandate_acceptance: mandate },
+      processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id),
+      last_inbound_at: now
+    });
+
+    return `Thank you. Your mandate acceptance has been recorded.\n\n${CONSENT_CONFIG.pre_payment.text}\n\nReply YES to confirm.`;
+  }
+
   if (conversation.status === 'awaiting_payment_consent') {
     const answer = normalize(input);
     if (answer !== 'yes') {
