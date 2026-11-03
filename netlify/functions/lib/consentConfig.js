@@ -37,7 +37,7 @@ const CONSENT_CONFIG = {
       '',
       'If the firm considers that the complexity and/or substantial nature of the client’s case warrants it, the client acknowledges that it may be necessary for more than one Consultant or Agent to be involved in handling the client’s case at any one time, to which the client agrees. The client further agrees that non-litigious and/or commercial work will be billed taking into consideration the complexity, time spent, skills and experience of the Consultant or Agent involved, the nature of the agreement and the extent of any benefits derived for the client.',
       '',
-      'By accepting this mandate, you authorise the Consultant or Agent to receive monies which may be due to you stemming from a labour matter, and to recover from such monies received on your behalf any amounts due to VRS Labour Law Consultants.'
+      'By accepting this mandate, you authorise the Consultant or Agent to receive monies which may be due to you stemming from a labour case matter, and recover from such monies received on your behalf.'
     ].join('\n')
   },
   pre_payment: {
