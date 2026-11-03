@@ -416,7 +416,7 @@ exports.handler = async (event) => {
     }
 
     if (action === 'close') {
-      const { caseId, wants_letter, payment_start_consent } = body;
+      const { caseId, wants_letter, mandate_acceptance, payment_start_consent } = body;
       const { data: existing, error: readErr } = await supabase.from('cases').select('case_facts').eq('id', caseId).single();
       if (readErr) throw readErr;
       const caseFacts = existing?.case_facts || {};
@@ -426,6 +426,7 @@ exports.handler = async (event) => {
         case_facts: {
           ...caseFacts,
           wants_letter,
+          ...(wants_letter && mandate_acceptance?.accepted === true ? { mandate_acceptance } : {}),
           ...(wants_letter && payment_start_consent?.accepted === true ? { payment_start_consent } : {})
         }
       };
