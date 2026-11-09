@@ -1,0 +1,37 @@
+name: Temporary live drafting production check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'netlify/functions/live_drafting_harness.js'
+      - 'netlify/functions/lib/liveDraftingFixtures.js'
+      - 'drafting-harness.html'
+      - '.github/workflows/live-drafting-production-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check netlify/functions/live_drafting_harness.js
+      - run: node --check netlify/functions/lib/liveDraftingFixtures.js
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const fn=fs.readFileSync('netlify/functions/live_drafting_harness.js','utf8');
+          const page=fs.readFileSync('drafting-harness.html','utf8');
+          for(const marker of [
+            ".from('cases').insert",
+            'generate_letter-background',
+            'harness_test',
+            "action === 'status'",
+            "action === 'delete'"
+          ]) if(!fn.includes(marker)) throw new Error('Function missing '+marker);
+          for(const marker of ['activeCaseId','caseId','pollHarnessJob','readJsonResponse']) {
+            if(!page.includes(marker)) throw new Error('Page missing '+marker);
+          }
+          if(page.includes('activeJobId')||page.includes('jobId')) throw new Error('Stale job-store references remain');
+          console.log('PASS production harness flow checks');
+          NODE
