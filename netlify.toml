@@ -1,3 +1,3 @@
 [functions]
   node_bundler = "esbuild"
-  included_files = ["assets/templates/**", "node_modules/pdfkit/js/data/**"]
+  included_files = ["assets/templates/**", "node_modules/pdfkit/js/data/**", "node_modules/@fontsource/quicksand/files/**"]
