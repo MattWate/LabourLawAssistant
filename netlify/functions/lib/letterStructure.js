@@ -58,15 +58,26 @@ function letterStructureToPlainText(value = {}) {
   const structure = normaliseLetterStructure(value);
   const blocks = [];
 
-  blocks.push(...structure.opening_paragraphs);
+  if (structure.opening_paragraphs.length) {
+    blocks.push('Background');
+    structure.opening_paragraphs.forEach((paragraph, index) => {
+      blocks.push(`${index + 1}. ${paragraph}`);
+    });
+  }
 
-  structure.legal_claims.forEach((claim, index) => {
-    const label = claim.title && claim.text
-      ? `${claim.title}: ${claim.text}`
-      : (claim.title || claim.text);
-    if (label) blocks.push(`${index + 1}. ${label}`);
-  });
+  if (structure.legal_claims.length) {
+    blocks.push('Legal Claims');
+    structure.legal_claims.forEach((claim, index) => {
+      const label = claim.title && claim.text
+        ? `${claim.title}: ${claim.text}`
+        : (claim.title || claim.text);
+      if (label) blocks.push(`${index + 1}. ${label}`);
+    });
+  }
 
+  if (structure.settlement_intro || structure.settlement_terms.length) {
+    blocks.push('Without Prejudice Settlement Proposal');
+  }
   if (structure.settlement_intro) blocks.push(structure.settlement_intro);
   structure.settlement_terms.forEach(term => blocks.push(`• ${term}`));
   blocks.push(...structure.conclusion_paragraphs);
@@ -84,6 +95,10 @@ function parsePlainDraftToBlocks(draft = '') {
     .filter(Boolean);
 
   return rawBlocks.map(block => {
+    if (/^(background|legal claims|without prejudice settlement proposal)$/i.test(block)) {
+      return { type: 'heading', text: block };
+    }
+
     const numbered = block.match(/^(\d+)\.\s+([\s\S]+)$/);
     if (numbered) return { type: 'numbered', number: Number(numbered[1]), text: cleanBodyText(numbered[2]) };
 
@@ -98,15 +113,28 @@ function structureToBlocks(value = {}) {
   const structure = normaliseLetterStructure(value);
   const blocks = [];
 
-  structure.opening_paragraphs.forEach(text => blocks.push({ type: 'paragraph', text }));
-  structure.legal_claims.forEach((claim, index) => {
-    blocks.push({
-      type: 'numbered',
-      number: index + 1,
-      title: claim.title,
-      text: claim.text
+  if (structure.opening_paragraphs.length) {
+    blocks.push({ type: 'heading', text: 'Background' });
+    structure.opening_paragraphs.forEach((text, index) => {
+      blocks.push({ type: 'numbered', number: index + 1, text });
     });
-  });
+  }
+
+  if (structure.legal_claims.length) {
+    blocks.push({ type: 'heading', text: 'Legal Claims' });
+    structure.legal_claims.forEach((claim, index) => {
+      blocks.push({
+        type: 'numbered',
+        number: index + 1,
+        title: claim.title,
+        text: claim.text
+      });
+    });
+  }
+
+  if (structure.settlement_intro || structure.settlement_terms.length) {
+    blocks.push({ type: 'heading', text: 'Without Prejudice Settlement Proposal' });
+  }
   if (structure.settlement_intro) blocks.push({ type: 'paragraph', text: structure.settlement_intro });
   structure.settlement_terms.forEach(text => blocks.push({ type: 'bullet', text }));
   structure.conclusion_paragraphs.forEach(text => blocks.push({ type: 'paragraph', text }));
