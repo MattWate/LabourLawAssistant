@@ -243,14 +243,23 @@ function clientOutcomeFor(facts = {}, scorecard = facts) {
   const advisoryMatter = ['ANC', 'PDA', 'ULP'].includes(track) || employmentStatus.includes('advisory') || employmentStatus.includes('still employed');
 
   if (wpEligible) {
-    return 'Thank you for sharing your information with us. Based on what you have told us, it looks like your matter may have sufficient merit to take further and a Without Prejudice letter may be appropriate. Your information has been forwarded to VRS Labour Law Consultants for review and the next step in the letter process.';
+    const dismissalMatter = employmentStatus.includes('dismiss') ||
+      employmentStatus.includes('resign') ||
+      track.startsWith('UD-') ||
+      track === 'CD' ||
+      track === 'AUD';
+    const meritDescription = dismissalMatter
+      ? 'you may have a strong case for a possible unfair dismissal claim'
+      : 'your matter may have sufficient merit to take further';
+
+    return `Thank you for sharing your information with us. Based on what you have told us, it looks like ${meritDescription}. Your information has been forwarded to VRS Labour Law Consultants, who will be in touch to finalise your Without Prejudice letter.`;
   }
 
   if (advisoryMatter) {
     return 'Thank you for your submission. This looks like something we can help guide you on, though it is not a matter that calls for a Without Prejudice letter at this stage. One of our consultants will be in touch with practical next steps.';
   }
 
-  return 'Thank you for taking the time to share your information with us. Having carefully considered what you have told us, this is not something we are able to take further through the Without Prejudice letter process. Based on the details provided, there does not appear to be sufficient merit for that step at this stage. We are sorry we cannot assist with a letter on this occasion and we wish you all the very best.';
+  return 'Thank you for taking the time to share your information with us. Having carefully considered what you have told us, this is not something we are able to take further. Based on the details provided, it appears your employer followed a fair process and had a valid reason for their decision. We are sorry we cannot assist on this occasion and we wish you all the very best.';
 }
 
 function dedupeStory(text = '') {
