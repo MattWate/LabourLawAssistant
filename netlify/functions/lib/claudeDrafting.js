@@ -530,8 +530,8 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
     const redraftPrompt = prompt +
       '\n\n=== ORIGINAL DRAFT TO REVISE ===\n' + originalDraft +
       '\n\n=== REQUIRED REVISIONS FROM SEPARATE SUPERVISORY CHECK ===\n' + revisionInstructions(assessment) +
-      '\n\nRevise the ORIGINAL DRAFT above. Preserve accurate, useful content that already works; make targeted corrections for every supervisory issue. Do not ignore a required fix and do not introduce new facts.
-Mandatory redraft rules take priority over stylistic preference: use "Code of Practice: Dismissal, 2025" at first reference; anchor substantive dismissal fairness in LRA s188(1); frame BCEA s37 notice period and s38 payment-in-lieu together; and keep employee-side non-disparagement one-way unless mutuality is expressly authorised.';
+      '\n\nRevise the ORIGINAL DRAFT above. Preserve accurate, useful content that already works; make targeted corrections for every supervisory issue. Do not ignore a required fix and do not introduce new facts.' +
+      '\nMandatory redraft rules take priority over stylistic preference: use "Code of Practice: Dismissal, 2025" at first reference; anchor substantive dismissal fairness in LRA s188(1); frame BCEA s37 notice period and s38 payment-in-lieu together; and keep employee-side non-disparagement one-way unless mutuality is expressly authorised.';
     const redraftBody = {
       ...requestBody,
       messages: [{ role: 'user', content: redraftPrompt }]
