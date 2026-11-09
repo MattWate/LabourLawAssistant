@@ -187,7 +187,22 @@ async function pollHarnessJob(caseId){
       setStatus('run-status',data.status==='queued'?'Job queued…':'Claude drafting/supervision is running…');
       continue;
     }
-    if(data.status==='failed') throw new Error(data.error||'Background drafting failed');
+    if(data.status==='failed'){
+      lastResult=data;
+      document.getElementById('results').classList.remove('hidden');
+      document.getElementById('download-btn').disabled=false;
+      document.getElementById('score').textContent=data.run_summary?.drafting_quality_score ?? '—';
+      document.getElementById('floor').textContent='No';
+      document.getElementById('redraft').textContent=data.run_summary?.redraft_performed ? 'Yes' : 'No';
+      document.getElementById('model').textContent=data.model||'—';
+      document.getElementById('letter').textContent=data.letter||'';
+      document.getElementById('supervisor').textContent=JSON.stringify(data.supervisory_assessment,null,2);
+      document.getElementById('brief').textContent=JSON.stringify(data.case_brief,null,2);
+      document.getElementById('structure').textContent=JSON.stringify(data.structure,null,2);
+      setStatus('run-status',(data.error||'Background drafting failed')+' — export the JSON so we can inspect the failed redraft.',true);
+      const btn=document.getElementById('run-btn');btn.disabled=false;btn.textContent='Run live draft';
+      return;
+    }
     if(data.status!=='completed') throw new Error('Unexpected harness status: '+data.status);
 
     lastResult=data;
