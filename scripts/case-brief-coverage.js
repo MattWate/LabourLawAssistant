@@ -70,3 +70,5 @@ for (const test of cases) {
     case_brief:brief
   }));
 }
+
+// Coverage harness rerun after joined-up reasoning fix.
