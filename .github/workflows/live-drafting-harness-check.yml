@@ -1,0 +1,33 @@
+name: Temporary live drafting harness check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'netlify/functions/live_drafting_harness.js'
+      - 'drafting-harness.html'
+      - '.github/workflows/live-drafting-harness-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check netlify/functions/live_drafting_harness.js
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const page=fs.readFileSync('drafting-harness.html','utf8');
+          const fn=fs.readFileSync('netlify/functions/live_drafting_harness.js','utf8');
+          for(const s of ['misconduct','performance','retrenchment','custom']) {
+            if(!page.includes(s)) throw new Error('page missing '+s);
+          }
+          if(!page.includes('/.netlify/functions/live_drafting_harness')) throw new Error('function route missing');
+          if(!page.includes('Authorization')) throw new Error('auth header missing');
+          if(!page.includes('Export JSON')) throw new Error('export control missing');
+          if(!fn.includes('supabase.auth.getUser')) throw new Error('server auth missing');
+          if(!fn.includes('callClaudeForWpDraft')) throw new Error('real drafting path missing');
+          if(!fn.includes('loadWpSkillSet')) throw new Error('real skill set missing');
+          console.log('PASS live drafting harness static checks');
+          NODE
