@@ -164,6 +164,10 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     addressee_position: facts.addressee_position || null,
     incident_date: facts.incident_date || null,
     incident_description: story || null,
+    original_client_narrative: facts.original_client_narrative || facts.initial_query || null,
+    normalized_english_interpretation: facts.normalized_english_interpretation || null,
+    input_language_detected: facts.input_language_detected || null,
+    input_language_confidence: facts.input_language_confidence ?? null,
     employment_status: facts.employment_status || null,
     dismissal_reason_type: facts.dismissal_reason_type || null,
     advisory_topic: facts.advisory_topic || null,
@@ -372,8 +376,16 @@ exports.handler = async (event) => {
       const fullStory = dedupeStory(`${facts.initial_query ? `${facts.initial_query} ` : ''}${facts.incident_description || ''}`.trim());
       const contextText = await searchLegalContext(buildLegalKeywords(facts, fullStory));
       const scoringFacts = factsForDeterministicDecision(facts);
-      const scoringStory = dedupeStory(`${scoringFacts.initial_query ? `${scoringFacts.initial_query} ` : ''}${scoringFacts.incident_description || ''}`.trim());
-      const scoringInput = { ...scoringFacts, incident_description: scoringStory };
+      const scoringStory = dedupeStory(
+        facts.normalized_english_interpretation ||
+        `${scoringFacts.initial_query ? `${scoringFacts.initial_query} ` : ''}${scoringFacts.incident_description || ''}`.trim()
+      );
+      const scoringInput = {
+        ...scoringFacts,
+        incident_description: scoringStory,
+        original_client_narrative: fullStory,
+        normalized_english_interpretation: facts.normalized_english_interpretation || null
+      };
       const baseScorecard = scoreCase(scoringInput);
       const scorecard = applyOverridePostProcessing(scoringInput, scoringStory, baseScorecard);
       const determination = await explainDeterministicDetermination({
