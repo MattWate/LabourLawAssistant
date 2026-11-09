@@ -14,15 +14,15 @@ const TRACK_LABELS = {
 };
 
 const LEGAL_BASIS = {
-  'UD-MISCONDUCT': ['LRA s188', 'Schedule 8 Item 7', 'Schedule 8 Item 4'],
-  'UD-POOR_PERFORMANCE': ['LRA s188', 'Schedule 8 Item 9'],
-  'UD-INCAPACITY': ['LRA s188', 'Schedule 8 Items 10 and 11', 'EEA s15 where disability is implicated'],
+  'UD-MISCONDUCT': ['LRA s188', '2025 Code of Practice: Dismissal paras 7-11'],
+  'UD-POOR_PERFORMANCE': ['LRA s188', '2025 Code of Practice: Dismissal paras 19-20'],
+  'UD-INCAPACITY': ['LRA s188', '2025 Code of Practice: Dismissal para 21', 'EEA s15 where disability is implicated'],
   'UD-RETRENCHMENT': ['LRA s189', 'LRA s189A where applicable', 'BCEA s41'],
   CD: ['LRA s186(1)(e)'],
   AUD: ['LRA s187', 'LRA s186(2)', 'EEA s6', 'Protected Disclosures Act 26 of 2000'],
   ULP: ['LRA s186(2)', 'LRA s186(2)(b)', 'LRA s186(2)(c)'],
-  PDA: ['LRA Schedule 8 Item 4', 'LRA s186(2)(b)'],
-  ANC: ['LRA s186(2)', 'Schedule 8 Items 3 and 4']
+  PDA: ['2025 Code of Practice: Dismissal para 11 where disciplinary procedure is relevant', 'LRA s186(2)(b)'],
+  ANC: ['LRA s186(2)', '2025 Code of Practice: Dismissal paras 6-11 where disciplinary procedure is relevant']
 };
 
 const clean = value => String(value ?? '').trim().toLowerCase();
@@ -115,11 +115,11 @@ function meritBonus(facts = {}) {
 function tenurePoint(facts, breakdown) {
   const tenure = clean(facts.tenure || facts.length_of_service || facts.employment_length || facts.incident_description);
   if (hasAny(tenure, ['5 year', 'five year', '6 year', 'six year', '7 year', '8 year', '9 year', '10 year', '5+y'])) {
-    add(breakdown, 'substantive', 1, 'Long service strengthens proportionality', 'Schedule 8 proportionality');
+    add(breakdown, 'substantive', 1, 'Long service strengthens proportionality', '2025 Code of Practice: Dismissal paras 8-9');
     return 1;
   }
   if (hasAny(tenure, ['2-5', '2 year', '3 year', '4 year'])) {
-    add(breakdown, 'substantive', 0.5, 'Material service history may assist proportionality', 'Schedule 8 proportionality');
+    add(breakdown, 'substantive', 0.5, 'Material service history may assist proportionality', '2025 Code of Practice: Dismissal paras 8-9');
     return 0.5;
   }
   return 0;
@@ -130,19 +130,19 @@ function scoreMisconduct(facts, breakdown, story) {
   const admission = clean(facts.conduct_admission || facts.admission || facts.admit_dispute);
   const category = clean(facts.misconduct_category || facts.dismissal_reason_type || facts.reason_type);
   const gross = hasAny(`${category} ${story}`, ['theft', 'fraud', 'assault', 'dishonest', 'dishonesty', 'gross misconduct']);
-  if (admission.includes('partial')) { substantive += 1; substantiveCap = 5; add(breakdown, 'substantive', 1, 'Partial admission leaves limited proportionality room', 'Schedule 8 Item 7'); add(breakdown, 'substantive', -1, 'Partial admission caps substantive merit at 5/10', 'Schedule 8 Item 7'); }
-  else if (admission.includes('admit') && gross) { substantiveCap = 3; add(breakdown, 'substantive', -2, 'Gross misconduct appears admitted', 'Schedule 8 Item 7'); }
-  else if (admission.includes('admit')) { substantiveCap = 5; add(breakdown, 'substantive', -1, 'Misconduct appears admitted, so substantive merit is capped at 5/10', 'Schedule 8 Item 7'); }
+  if (admission.includes('partial')) { substantive += 1; substantiveCap = 5; add(breakdown, 'substantive', 1, 'Partial admission leaves limited proportionality room', '2025 Code of Practice: Dismissal paras 7-9'); add(breakdown, 'substantive', -1, 'Partial admission caps substantive merit at 5/10', '2025 Code of Practice: Dismissal paras 7-9'); }
+  else if (admission.includes('admit') && gross) { substantiveCap = 3; add(breakdown, 'substantive', -2, 'Gross misconduct appears admitted', '2025 Code of Practice: Dismissal paras 7-9'); }
+  else if (admission.includes('admit')) { substantiveCap = 5; add(breakdown, 'substantive', -1, 'Misconduct appears admitted, so substantive merit is capped at 5/10', '2025 Code of Practice: Dismissal paras 7-9'); }
   else if (admission.includes('dispute')) { substantive += 2; add(breakdown, 'substantive', 2, 'The alleged misconduct is disputed', 'LRA s188'); }
   const warnings = clean(facts.prior_warnings || facts.warnings);
-  if (warnings.includes('none') && !gross) { substantive += 2; add(breakdown, 'substantive', 2, 'No prior warning for a non-gross offence', 'Schedule 8 Item 7'); }
-  if (warnings.includes('multiple')) { substantive -= 1; add(breakdown, 'substantive', -1, 'Multiple prior warnings weaken proportionality', 'Schedule 8 Item 7'); }
+  if (warnings.includes('none') && !gross) { substantive += 2; add(breakdown, 'substantive', 2, 'No prior warning for a non-gross offence', '2025 Code of Practice: Dismissal paras 7-9'); }
+  if (warnings.includes('multiple')) { substantive -= 1; add(breakdown, 'substantive', -1, 'Multiple prior warnings weaken proportionality', '2025 Code of Practice: Dismissal paras 7-9'); }
   substantive += tenurePoint(facts, breakdown);
   if (substantiveCap !== null) substantive = Math.min(substantive, substantiveCap);
-  if (isNo(facts.hearing_held)) { procedural += 4; add(breakdown, 'procedural', 4, 'No formal disciplinary hearing before dismissal', 'Schedule 8 Item 4'); }
-  if (isNo(facts.proc_notice) || clean(facts.proc_notice).includes('same')) { procedural += 2; add(breakdown, 'procedural', 2, 'Insufficient notice of hearing or charges', 'Schedule 8 Item 4'); }
-  if (isNo(facts.proc_rep)) { procedural += 2; add(breakdown, 'procedural', 2, 'Representation was refused or not allowed', 'Schedule 8 Item 4'); }
-  if (isNo(facts.proc_chair) || hasAny(story, ['chair was my manager', 'biased chair'])) { procedural += 3; add(breakdown, 'procedural', 3, 'Chairperson independence appears defective', 'Schedule 8 Item 4'); }
+  if (isNo(facts.hearing_held)) { procedural += 4; add(breakdown, 'procedural', 4, 'No formal disciplinary hearing before dismissal', '2025 Code of Practice: Dismissal para 11'); }
+  if (isNo(facts.proc_notice) || clean(facts.proc_notice).includes('same')) { procedural += 2; add(breakdown, 'procedural', 2, 'Insufficient notice of hearing or charges', '2025 Code of Practice: Dismissal para 11'); }
+  if (isNo(facts.proc_rep)) { procedural += 2; add(breakdown, 'procedural', 2, 'Representation was refused or not allowed', '2025 Code of Practice: Dismissal para 11'); }
+  if (isNo(facts.proc_chair) || hasAny(story, ['chair was my manager', 'biased chair'])) { procedural += 3; add(breakdown, 'procedural', 3, 'Chairperson independence appears defective', '2025 Code of Practice: Dismissal para 11'); }
   return { substantive, procedural };
 }
 
@@ -154,28 +154,28 @@ function scorePoorPerformance(facts, breakdown, story) {
   const comparator = clean(facts.team_meeting_standards || facts.performance_comparator);
   const control = clean(facts.performance_control || facts.performance_external_factors);
   const warnings = clean(facts.prior_performance_warnings || facts.performance_warnings);
-  if (isNo(facts.performance_standards_communicated) || hasAny(story, ['unclear target', 'unclear standard', 'never told'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Performance standards may not have been clearly communicated', 'Schedule 8 Item 9'); }
-  else if (standards.includes('unclear')) { substantive += 1; add(breakdown, 'substantive', 1, 'Performance standards were unclear', 'Schedule 8 Item 9'); }
-  if (isNo(facts.pip_given) || hasAny(story, ['no pip', 'no performance improvement plan'])) { procedural += 4; add(breakdown, 'procedural', 4, 'No formal opportunity to improve', 'Schedule 8 Item 9'); }
-  if (pipDuration.includes('<2') || pipDuration.includes('less than 2')) { procedural += 2; add(breakdown, 'procedural', 2, 'The improvement period appears rushed', 'Schedule 8 Item 9'); }
-  else if (pipDuration.includes('2-4')) { procedural += 1; add(breakdown, 'procedural', 1, 'The improvement period may have been short', 'Schedule 8 Item 9'); }
-  else if (pipDuration.includes('3+')) { procedural -= 1; add(breakdown, 'procedural', -1, 'The employer appears to have allowed a longer improvement period', 'Schedule 8 Item 9'); }
-  if (isNo(facts.training_provided) || hasAny(story, ['no training', 'no support', 'no guidance'])) { procedural += 2; add(breakdown, 'procedural', 2, 'No training, instruction or guidance provided', 'Schedule 8 Item 9'); }
-  else if (training.includes('inadequate')) { procedural += 1; add(breakdown, 'procedural', 1, 'Training, instruction or guidance may have been inadequate', 'Schedule 8 Item 9'); }
-  if (comparator === 'no' || hasAny(story, ['nobody hit target', 'nobody on my team', 'team missed target', 'comparator'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Comparator evidence suggests the standard may not have been reasonable', 'Schedule 8 Item 9'); }
-  if (control.includes('external')) { substantive += 2; add(breakdown, 'substantive', 2, 'External factors may have affected performance', 'Schedule 8 Item 9'); }
-  else if (control.includes('both')) { substantive += 1; add(breakdown, 'substantive', 1, 'Performance may have been partly affected by external factors', 'Schedule 8 Item 9'); }
-  if (warnings.includes('none')) { procedural += 2; add(breakdown, 'procedural', 2, 'No prior performance warnings were given before dismissal', 'Schedule 8 Item 9'); }
+  if (isNo(facts.performance_standards_communicated) || hasAny(story, ['unclear target', 'unclear standard', 'never told'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Performance standards may not have been clearly communicated', '2025 Code of Practice: Dismissal paras 19-20'); }
+  else if (standards.includes('unclear')) { substantive += 1; add(breakdown, 'substantive', 1, 'Performance standards were unclear', '2025 Code of Practice: Dismissal paras 19-20'); }
+  if (isNo(facts.pip_given) || hasAny(story, ['no pip', 'no performance improvement plan'])) { procedural += 4; add(breakdown, 'procedural', 4, 'No formal opportunity to improve', '2025 Code of Practice: Dismissal paras 19-20'); }
+  if (pipDuration.includes('<2') || pipDuration.includes('less than 2')) { procedural += 2; add(breakdown, 'procedural', 2, 'The improvement period appears rushed', '2025 Code of Practice: Dismissal paras 19-20'); }
+  else if (pipDuration.includes('2-4')) { procedural += 1; add(breakdown, 'procedural', 1, 'The improvement period may have been short', '2025 Code of Practice: Dismissal paras 19-20'); }
+  else if (pipDuration.includes('3+')) { procedural -= 1; add(breakdown, 'procedural', -1, 'The employer appears to have allowed a longer improvement period', '2025 Code of Practice: Dismissal paras 19-20'); }
+  if (isNo(facts.training_provided) || hasAny(story, ['no training', 'no support', 'no guidance'])) { procedural += 2; add(breakdown, 'procedural', 2, 'No training, instruction or guidance provided', '2025 Code of Practice: Dismissal paras 19-20'); }
+  else if (training.includes('inadequate')) { procedural += 1; add(breakdown, 'procedural', 1, 'Training, instruction or guidance may have been inadequate', '2025 Code of Practice: Dismissal paras 19-20'); }
+  if (comparator === 'no' || hasAny(story, ['nobody hit target', 'nobody on my team', 'team missed target', 'comparator'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Comparator evidence suggests the standard may not have been reasonable', '2025 Code of Practice: Dismissal paras 19-20'); }
+  if (control.includes('external')) { substantive += 2; add(breakdown, 'substantive', 2, 'External factors may have affected performance', '2025 Code of Practice: Dismissal paras 19-20'); }
+  else if (control.includes('both')) { substantive += 1; add(breakdown, 'substantive', 1, 'Performance may have been partly affected by external factors', '2025 Code of Practice: Dismissal paras 19-20'); }
+  if (warnings.includes('none')) { procedural += 2; add(breakdown, 'procedural', 2, 'No prior performance warnings were given before dismissal', '2025 Code of Practice: Dismissal paras 19-20'); }
   substantive += tenurePoint(facts, breakdown);
   return { substantive, procedural };
 }
 
 function scoreIncapacity(facts, breakdown, story) {
   let substantive = 3, procedural = 3;
-  if (hasAny(`${facts.incapacity_duration || ''} ${story}`, ['temporary', 'recover', 'medical certificate', 'sick note'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Temporary incapacity or medical evidence supports accommodation', 'Schedule 8 Items 10 and 11'); }
-  if (isNo(facts.proc_consultation) || hasAny(`${facts.proc_consultation || ''} ${story}`, ['brief meeting', 'no consultation', 'only one meeting'])) { procedural += 4; add(breakdown, 'procedural', 4, 'Inadequate consultation about the incapacity', 'Schedule 8 Items 10 and 11'); }
-  if (isNo(facts.medical_review) || isNo(facts.proc_medical_review) || hasAny(story, ['no medical review', 'ignored medical'])) { procedural += 3; add(breakdown, 'procedural', 3, 'Employer may not have reviewed medical evidence properly', 'Schedule 8 Items 10 and 11'); }
-  if (isNo(facts.alternatives_explored) || isNo(facts.proc_alternatives_explored) || hasAny(story, ['no alternative', 'no accommodation', 'refused accommodation', 'adapted duties'])) { procedural += 3; substantive += 2; add(breakdown, 'procedural', 3, 'Alternatives to dismissal may not have been explored', 'Schedule 8 Items 10 and 11'); add(breakdown, 'substantive', 2, 'Failure to consider accommodation strengthens the employee position', 'EEA s15'); }
+  if (hasAny(`${facts.incapacity_duration || ''} ${story}`, ['temporary', 'recover', 'medical certificate', 'sick note'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Temporary incapacity or medical evidence supports accommodation', '2025 Code of Practice: Dismissal para 21'); }
+  if (isNo(facts.proc_consultation) || hasAny(`${facts.proc_consultation || ''} ${story}`, ['brief meeting', 'no consultation', 'only one meeting'])) { procedural += 4; add(breakdown, 'procedural', 4, 'Inadequate consultation about the incapacity', '2025 Code of Practice: Dismissal para 21'); }
+  if (isNo(facts.medical_review) || isNo(facts.proc_medical_review) || hasAny(story, ['no medical review', 'ignored medical'])) { procedural += 3; add(breakdown, 'procedural', 3, 'Employer may not have reviewed medical evidence properly', '2025 Code of Practice: Dismissal para 21'); }
+  if (isNo(facts.alternatives_explored) || isNo(facts.proc_alternatives_explored) || hasAny(story, ['no alternative', 'no accommodation', 'refused accommodation', 'adapted duties'])) { procedural += 3; substantive += 2; add(breakdown, 'procedural', 3, 'Alternatives to dismissal may not have been explored', '2025 Code of Practice: Dismissal para 21'); add(breakdown, 'substantive', 2, 'Failure to consider accommodation strengthens the employee position', 'EEA s15'); }
   substantive += tenurePoint(facts, breakdown);
   return { substantive, procedural };
 }
@@ -256,7 +256,7 @@ function scoreAncillary(facts, breakdown, story) {
     procedural = 4;
     if (hasAny(story, ['bereavement', 'death in the family', 'funeral', 'compassionate'])) { substantive += 2; add(breakdown, 'substantive', 2, 'Bereavement or compassionate context may provide a substantive defence to the warning', 'Schedule 8 Item 3'); }
     if (hasAny(story, ['delegated authority', 'acting manager', 'manager approved', 'authorised', 'permission'])) { substantive += 2; add(breakdown, 'substantive', 2, 'Delegated authority or approval may undermine the misconduct basis for the warning', 'Schedule 8 Item 3'); }
-    if (hasAny(story, ['no hearing', 'not heard', 'no chance to explain', 'without asking me'])) { procedural += 3; add(breakdown, 'procedural', 3, 'No meaningful opportunity to respond before the warning', 'Schedule 8 Item 4'); }
+    if (hasAny(story, ['no hearing', 'not heard', 'no chance to explain', 'without asking me'])) { procedural += 3; add(breakdown, 'procedural', 3, 'No meaningful opportunity to respond before the warning', '2025 Code of Practice: Dismissal para 11'); }
     if (hasAny(story, ['final written warning', 'final warning'])) { substantive += 1; add(breakdown, 'substantive', 1, 'A final written warning raises proportionality concerns where the underlying facts are disputed', 'Schedule 8 Items 3 and 4'); }
     if (hasAny(story, ['appealed', 'appeal', 'grievance', 'emailed hr', 'raised internally'])) { procedural += 1; add(breakdown, 'procedural', 1, 'Internal challenge or escalation has been attempted', 'LRA s186(2)(c)'); }
     substantive += tenurePoint(facts, breakdown);
@@ -299,8 +299,8 @@ function scoreByTrack(track, facts, breakdown) {
     if (hasAny(story, ['role refilled', 'replaced me', 'same role advertised', 'sham retrenchment'])) { substantive += 3; add(breakdown, 'substantive', 3, 'Facts may indicate a sham retrenchment', 'LRA s189'); }
   }
   if (track === 'PDA') {
-    if (isNo(facts.proc_notice) || hasAny(story, ['less than 48 hours', 'same day notice', 'no charge sheet'])) { procedural += 3; add(breakdown, 'procedural', 3, 'Charge sheet or notice period appears defective', 'Schedule 8 Item 4'); }
-    if (isNo(facts.proc_rep) || hasAny(story, ['no representative', 'not allowed representation'])) { procedural += 2; add(breakdown, 'procedural', 2, 'Representation may have been refused', 'Schedule 8 Item 4'); }
+    if (isNo(facts.proc_notice) || hasAny(story, ['less than 48 hours', 'same day notice', 'no charge sheet'])) { procedural += 3; add(breakdown, 'procedural', 3, 'Charge sheet or notice period appears defective', '2025 Code of Practice: Dismissal para 11'); }
+    if (isNo(facts.proc_rep) || hasAny(story, ['no representative', 'not allowed representation'])) { procedural += 2; add(breakdown, 'procedural', 2, 'Representation may have been refused', '2025 Code of Practice: Dismissal para 11'); }
     if (facts.paid_suspension === false || hasAny(story, ['suspended without pay'])) { substantive += 5; add(breakdown, 'substantive', 5, 'Suspension without pay creates strong ULP leverage', 'LRA s186(2)(b)'); }
     substantive += tenurePoint(facts, breakdown);
   }
@@ -320,8 +320,8 @@ function ancillarySubtype(facts = {}) {
 
 function ancillaryLegalBasis(facts = {}) {
   const subtype = ancillarySubtype(facts);
-  if (subtype === 'SUSPENSION') return ['LRA s186(2)(b)', 'LRA s186(2)(c)', 'Schedule 8 Item 4'];
-  if (subtype === 'WARNING') return ['LRA s186(2)(c)', 'Schedule 8 Item 3', 'Schedule 8 Item 4'];
+  if (subtype === 'SUSPENSION') return ['LRA s186(2)(b)', 'LRA s186(2)(c)', '2025 Code of Practice: Dismissal para 11'];
+  if (subtype === 'WARNING') return ['LRA s186(2)(c)', 'Schedule 8 Item 3', '2025 Code of Practice: Dismissal para 11'];
   if (subtype === 'PAY') return ['BCEA s34', 'BCEA s77'];
   if (subtype === 'GRIEVANCE') return ['Internal grievance procedure', 'LRA s186(2) where applicable'];
   return ['LRA s186(2) where applicable', 'Internal disciplinary or grievance procedure'];
