@@ -262,6 +262,7 @@ function buildTemplateData({ caseId, facts = {}, draft = '', approvedAt }) {
     closing_sentence: safeText(facts.closing_sentence, 'It is trusted that you will find same to be in order.'),
     signatory_firm: safeText(process.env.VRS_FIRM_NAME, 'VRS LABOUR LAW CONSULTANTS'),
     signatory_name: signatoryName,
+    signatory_title: safeText(process.env.VRS_DEFAULT_SIGNATORY_TITLE || facts.signatory_title, 'Director & Labour Law Consultant'),
     electronic_signature_note: safeText(process.env.VRS_ELECTRONIC_SIGNATURE_NOTE, 'Not signed due to electronic submission')
   };
 }
