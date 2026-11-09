@@ -1,0 +1,57 @@
+name: Temporary outward draft canonicaliser check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'netlify/functions/lib/claudeDrafting.js'
+      - '.github/workflows/outward-draft-canonicaliser-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --ignore-scripts
+      - run: node --check netlify/functions/lib/claudeDrafting.js
+      - run: |
+          node - <<'NODE'
+          const { __test } = require('./netlify/functions/lib/claudeDrafting');
+          const draft = {
+            part_a_letter: {
+              opening_paragraphs: [
+                "Our client has, according to his instructions, been employed by Northstar Logistics for a period of approximately five years. To the extent that this is confirmed as continuous service, it is relevant."
+              ],
+              legal_claims: [{
+                title: "Unfair dismissal",
+                text: "The Code of Practice: Dismissal, 2025, which repealed the former Schedule 8 Code of Good Practice on Dismissal, applies. We record, for completeness, that the employer may seek to characterise the refusal itself as the dismissible act regardless of the safety context; our client's position is stronger, but we accept this substantive question is not free from dispute."
+              }],
+              settlement_intro: "Proposal",
+              settlement_terms: [
+                "Compensation on an ex gratia basis. Given the HIGH merit assessment and the short notice, denied representation and chair bias, settlement should reflect the risk.",
+                "Payment in lieu of notice under section 38 of the BCEA, with the period under section 37.",
+                "Payment in lieu of notice under section 38 of the BCEA, with the period under section 37.",
+                "An agreed reference"
+              ],
+              conclusion_paragraphs: [
+                "Our client's position is well-founded. We record that the employer's substantive position on insubordination is not without force and that the matter is accordingly not one-sided, which is reflected in the calibration proposed above."
+              ]
+            }
+          };
+          const out = __test.enforceOutwardDraftRules(draft, {
+            track: 'UD-MISCONDUCT',
+            merit_band: 'HIGH',
+            structured_case_facts: { length_of_service: '5 years' }
+          });
+          const s = out.part_a_letter;
+          if (s.settlement_terms.filter(x=>/payment in lieu of notice/i.test(x)).length !== 1) throw new Error('Notice term not deduped');
+          if (s.settlement_terms.filter(x=>/^Compensation on an ex gratia/i.test(x)).length !== 1) throw new Error('Compensation term missing');
+          if (!s.settlement_terms[0].startsWith('Compensation on an ex gratia')) throw new Error('Compensation not first');
+          const all=JSON.stringify(s);
+          if (/Schedule 8/i.test(all)) throw new Error('Schedule 8 leaked');
+          if (/HIGH merit/i.test(all)) throw new Error('Internal merit label leaked');
+          if (/not free from dispute|not without force|not one-sided/i.test(all)) throw new Error('Self-undermining concession leaked');
+          if (/approximately five years|according to his instructions|continuous service/i.test(s.opening_paragraphs[0])) throw new Error('Confirmed service still hedged');
+          console.log('PASS outward drafting canonicaliser regression');
+          NODE
