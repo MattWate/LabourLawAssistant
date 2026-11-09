@@ -586,6 +586,17 @@
         const overallConfidence = Number(governance.confidence ?? data.confidence ?? 0);
         const metadata = { ...(collectedFacts._fact_metadata || {}) };
         const candidates = { ...hydrated };
+        const detectedLanguage = governance.input_language_detected || data.input_language_detected;
+        const languageConfidence = Number(governance.input_language_confidence ?? data.input_language_confidence ?? 0);
+        const englishInterpretation = governance.normalized_english_interpretation || data.normalized_english_interpretation || null;
+        if (detectedLanguage) {
+            collectedFacts.input_language_detected = detectedLanguage;
+            collectedFacts.input_language_confidence = languageConfidence;
+        }
+        if (englishInterpretation) collectedFacts.normalized_english_interpretation = englishInterpretation;
+        if (!collectedFacts.original_client_narrative && collectedFacts.initial_query) {
+            collectedFacts.original_client_narrative = collectedFacts.initial_query;
+        }
         if (!hasKnownValue(candidates.employment_status) && hasKnownValue(data.category)) candidates.employment_status = data.category;
         if (!hasKnownValue(candidates.dismissal_reason_type) && hasKnownValue(data.dismissal_reason_type)) candidates.dismissal_reason_type = data.dismissal_reason_type;
         if (!hasKnownValue(candidates.advisory_topic) && hasKnownValue(data.advisory_topic)) candidates.advisory_topic = data.advisory_topic;
