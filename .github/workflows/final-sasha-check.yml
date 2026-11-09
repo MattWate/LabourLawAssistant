@@ -1,0 +1,32 @@
+name: Temporary final Sasha requirements check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/final-sasha-check.js'
+      - 'netlify/functions/lib/letterStructure.js'
+      - 'netlify/functions/lib/letterDocument.js'
+      - 'netlify/functions/lib/pdfDocument.js'
+      - 'netlify/functions/lib/claudeDrafting.js'
+      - 'netlify/functions/lib/consentConfig.js'
+      - 'netlify/functions/lib/whatsappProductionConversation.js'
+      - 'netlify/functions/ask.js'
+      - 'package.json'
+      - 'netlify.toml'
+      - '.github/workflows/final-sasha-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --ignore-scripts
+      - run: node --check netlify/functions/lib/letterStructure.js
+      - run: node --check netlify/functions/lib/letterDocument.js
+      - run: node --check netlify/functions/lib/pdfDocument.js
+      - run: node --check netlify/functions/lib/claudeDrafting.js
+      - run: node --check netlify/functions/ask.js
+      - run: node scripts/final-sasha-check.js
