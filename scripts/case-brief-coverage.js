@@ -56,9 +56,15 @@ for (const test of cases) {
   const present = [];
   const missing = [];
   for (const key of test.material) {
-    if (Object.prototype.hasOwnProperty.call(brief,key)) present.push(key);
-    else missing.push(key);
+    if (
+      Object.prototype.hasOwnProperty.call(brief,key) ||
+      Object.prototype.hasOwnProperty.call(brief.structured_case_facts || {},key)
+    ) present.push(key);
+    else if (test.facts[key] === null || test.facts[key] === undefined || test.facts[key] === '') {
+      // Intentionally absent facts should not be invented or counted as lost.
+    } else missing.push(key);
   }
+  assert.strictEqual(missing.length, 0, `${test.id} lost material drafting facts: ${missing.join(', ')}`);
   console.log(JSON.stringify({
     case:test.id,
     material_fact_count:test.material.length,
