@@ -6,7 +6,7 @@ const FIXTURES = {
       employer_name: 'Northstar Logistics (Pty) Ltd',
       employer_contact_details: 'HR Manager',
       incident_date: '2026-10-21',
-      incident_description: 'Thabo worked for the employer for six years. He was accused of insubordination after refusing to drive a delivery vehicle that he said had faulty brakes. He asked for the instruction to be put in writing. He was told at 08:00 that a disciplinary hearing would take place at 10:00 the same day. He was not allowed to bring a colleague. His direct manager, who had issued the instruction, chaired the hearing. Thabo denied being insubordinate and said he was concerned about safety. He was dismissed immediately after the hearing.',
+      incident_description: 'Thabo worked for the employer for five years. He was accused of insubordination after refusing to drive a delivery vehicle that he said had faulty brakes. He asked for the instruction to be put in writing. He was told at 08:00 that a disciplinary hearing would take place at 10:00 the same day. He was not allowed to bring a colleague. His direct manager, who had issued the instruction, chaired the hearing. Thabo denied being insubordinate and said he was concerned about safety. He was dismissed immediately after the hearing.',
       original_client_narrative: 'I refused to drive the truck because the brakes were faulty. My manager said I was insubordinate and then chaired my hearing two hours later. I was not allowed anyone with me and I was fired the same day.',
       employment_status: 'Dismissed',
       dismissal_reason_type: 'Misconduct',
@@ -24,7 +24,7 @@ const FIXTURES = {
       procedural_score: 9,
       merit_band: 'HIGH',
       wp_type: 'FULL',
-      legal_basis: ['LRA Schedule 8 Code of Good Practice: Dismissal', 'Occupational Health and Safety Act context'],
+      legal_basis: ['LRA s188', '2025 Code of Practice: Dismissal paras 7-11', 'Occupational Health and Safety Act context'],
       scoring_breakdown: [
         { points: 3, label: 'Short notice before hearing', legalHook: 'procedural fairness' },
         { points: 3, label: 'Representation denied', legalHook: 'procedural fairness' },
@@ -61,7 +61,7 @@ const FIXTURES = {
       procedural_score: 8,
       merit_band: 'HIGH',
       wp_type: 'FULL',
-      legal_basis: ['LRA Schedule 8 Code of Good Practice: Dismissal'],
+      legal_basis: ['LRA s188', '2025 Code of Practice: Dismissal paras 19-20'],
       scoring_breakdown: [
         { points: 3, label: 'No proper opportunity to improve', legalHook: 'poor performance fairness' },
         { points: 2, label: 'Targets affected by understaffing', legalHook: 'reasonableness' },
