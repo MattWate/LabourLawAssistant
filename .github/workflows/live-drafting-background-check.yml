@@ -1,0 +1,33 @@
+name: Temporary live drafting background check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'netlify/functions/live_drafting_harness.js'
+      - 'netlify/functions/live_drafting_harness-background.js'
+      - 'netlify/functions/lib/liveDraftingFixtures.js'
+      - 'drafting-harness.html'
+      - '.github/workflows/live-drafting-background-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --ignore-scripts
+      - run: node --check netlify/functions/live_drafting_harness.js
+      - run: node --check netlify/functions/live_drafting_harness-background.js
+      - run: node --check netlify/functions/lib/liveDraftingFixtures.js
+      - run: node -e "const b=require('@netlify/blobs'); if(typeof b.getStore!=='function') throw new Error('getStore unavailable'); console.log('Netlify Blobs CommonJS load OK')"
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const page=fs.readFileSync('drafting-harness.html','utf8');
+          for(const marker of ['pollHarnessJob','action:\'status\'','readJsonResponse','Export JSON']) {
+            if(!page.includes(marker)) throw new Error('Missing '+marker);
+          }
+          console.log('Harness UI polling markers OK');
+          NODE
