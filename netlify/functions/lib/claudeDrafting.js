@@ -86,13 +86,14 @@ The SERVER CASE BRIEF includes an explicit audience value. Apply the matching au
 
 === CURRENT LAW OVERRIDE — VERIFIED 9 NOVEMBER 2026 ===
 This server-side current-law block overrides any conflicting or outdated citation in the protected skill assets below.
-- The Code of Practice: Dismissal published on 4 September 2025 repealed the former Schedule 8 Code of Good Practice on Dismissal.
-- For misconduct dismissals, use the 2025 Code of Practice: Dismissal, especially paragraphs 7-10 for fair reason/sanction/consistency and paragraph 11 for fair procedure.
+- The current instrument is the "Code of Practice: Dismissal, 2025", published on 4 September 2025. It repealed the former Schedule 8 Code of Good Practice on Dismissal.
+- When citing the Code in a letter, identify it at first use as the "Code of Practice: Dismissal, 2025" so there is no ambiguity with the repealed Schedule 8 Code.
+- For misconduct dismissals, anchor the fairness analysis first in LRA section 188(1), then apply the Code of Practice: Dismissal, 2025, especially paragraphs 7-10 for fair reason/sanction/consistency and paragraph 11 for fair procedure.
 - For poor work performance after probation, use paragraphs 19-20 of the 2025 Code.
 - For incapacity due to ill health, injury or other incapacity, use paragraph 21 of the 2025 Code.
 - For operational-requirements dismissals, use paragraphs 22-24 of the 2025 Code alongside LRA section 189/189A where applicable.
 - Do NOT cite or describe the repealed Schedule 8 Code as current law.
-- BCEA section 37 deals with notice periods. BCEA section 38 deals with payment instead of notice. If seeking notice pay/payment in lieu of notice, cite section 38, not section 37.
+- BCEA section 37 determines the applicable notice period; BCEA section 38 creates the entitlement to payment instead of notice. Treat them as complementary, not alternatives. If seeking payment in lieu of notice, use wording equivalent to: "payment in lieu of the applicable notice period under section 38 of the BCEA, calculated by reference to the notice period in section 37 and/or any more favourable contractual term".
 - Keep all statutory references proportionate to the confirmed facts; do not add a statutory claim merely because it appears in this current-law block.
 === END CURRENT LAW OVERRIDE ===
 
@@ -144,6 +145,10 @@ Rules for this API output:
 - If the narrative and structured_case_facts conflict on a material fact, do not silently choose one version. Omit the disputed detail from the outward-facing letter where possible and flag the conflict in the supervisory assessment/forensic questions for human confirmation.
 - Do not state or imply that VRS holds a "written mandate" unless the SERVER CASE BRIEF expressly confirms a written mandate. The safe default is simply that VRS is instructed by the client.
 - Avoid unnecessary credibility assertions such as "we have no reason to doubt" and avoid self-evaluative phrases such as "the strength of our client's position". State the facts and legal significance directly.
+- For an employee-side dismissal letter, the first substantive-fairness claim must expressly anchor the dismissal analysis in LRA section 188(1) before moving to the applicable Code factors or factual argument.
+- The first reference to the dismissal Code must call it the "Code of Practice: Dismissal, 2025". Later references may shorten this to "the Code".
+- If a settlement proposal includes notice pay, sections 37 and 38 of the BCEA must be framed together: section 37 for the notice period and section 38 for payment instead of notice. Never present them as alternative statutory bases.
+- Employee-side non-disparagement is one-way by default: require the employer and its representatives not to disparage the client. Do not make non-disparagement mutual unless the SERVER CASE BRIEF or client_requested_changes expressly authorises mutuality.
 - Use conditional wording for anything that is not confirmed.
 - Give the recipient seven calendar days to respond.
 - Draft the factual narrative as coherent prose in "opening_paragraphs". The renderer will place it under a visible "Background" heading and number each background paragraph. Do not type the heading or paragraph numbers into the field values.
@@ -265,7 +270,14 @@ Important scope rule: you are reviewing ONLY the structured Part A body returned
 The Word template supplies the opening reference block, WITHOUT PREJUDICE line, RE line, salutation, closing, firm/signatory details and signature. Do NOT penalise the Part A draft for their absence and do NOT request that the redraft add them.
 The legal_claims.title values are rendered as short claim headings under the visible Legal Claims section. They should be concise and legally meaningful. Do not penalise them merely for being headings.
 Assess only content the drafting model is responsible for: opening narrative paragraphs, legal claim text, settlement intro, settlement terms and conclusion paragraphs.
-Apply the CURRENT LAW OVERRIDE from the drafting instructions when supervising. A reference to the repealed Schedule 8 Code as current law is a drafting defect. A notice-pay/payment-in-lieu clause that cites BCEA section 37 instead of section 38 is a drafting defect. If source facts conflict materially, the draft should not resolve the conflict by choosing one value without qualification or review.
+Apply the CURRENT LAW OVERRIDE from the drafting instructions when supervising.
+Mandatory current-law checks:
+- The first Code citation must identify the current instrument as "Code of Practice: Dismissal, 2025"; a bare "Code of Practice: Dismissal" that could be confused with the repealed Schedule 8 instrument is a defect.
+- A misconduct/substantive dismissal analysis must anchor fairness in LRA section 188(1) before applying the Code and factual reasoning.
+- A notice-pay clause must treat BCEA section 37 (notice period) and section 38 (payment instead of notice) as complementary. Describing them as alternatives is a defect.
+- Employee-side non-disparagement must be one-way against the employer and its representatives unless mutuality is expressly authorised in the case brief.
+- If source facts conflict materially, the draft should not resolve the conflict by choosing one value without qualification or review.
+If any of these mandatory checks fails, quality_floor_met must be false and drafting_quality_score must be below ${DRAFT_QUALITY_FLOOR} so the redraft path is triggered.
 
 For every criterion, identify the concrete problem, brief evidence from the draft, the required fix and severity. Use empty strings and severity "none" where there is no problem.
 The overall drafting_quality_score must reflect the draft as a whole and be consistent with the six criterion scores. Do not inflate it merely to pass.
@@ -455,7 +467,8 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
     const redraftPrompt = prompt +
       '\n\n=== ORIGINAL DRAFT TO REVISE ===\n' + originalDraft +
       '\n\n=== REQUIRED REVISIONS FROM SEPARATE SUPERVISORY CHECK ===\n' + revisionInstructions(assessment) +
-      '\n\nRevise the ORIGINAL DRAFT above. Preserve accurate, useful content that already works; make targeted corrections for every supervisory issue. Do not ignore a required fix and do not introduce new facts.';
+      '\n\nRevise the ORIGINAL DRAFT above. Preserve accurate, useful content that already works; make targeted corrections for every supervisory issue. Do not ignore a required fix and do not introduce new facts.
+Mandatory redraft rules take priority over stylistic preference: use "Code of Practice: Dismissal, 2025" at first reference; anchor substantive dismissal fairness in LRA s188(1); frame BCEA s37 notice period and s38 payment-in-lieu together; and keep employee-side non-disparagement one-way unless mutuality is expressly authorised.';
     const redraftBody = {
       ...requestBody,
       messages: [{ role: 'user', content: redraftPrompt }]
