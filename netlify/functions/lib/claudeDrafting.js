@@ -391,6 +391,65 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
   };
 }
 
+
+function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
+  const structure = draft?.part_a_letter || draft || {};
+  const legalClaims = Array.isArray(structure.legal_claims) ? structure.legal_claims : [];
+  const settlementTerms = Array.isArray(structure.settlement_terms) ? structure.settlement_terms : [];
+  const allText = JSON.stringify(structure).toLowerCase();
+  const defects = [];
+
+  if (allText.includes('schedule 8')) {
+    defects.push('Remove the repealed Schedule 8 citation and use the current Code of Practice: Dismissal, 2025.');
+  }
+
+  if (allText.includes('code of practice: dismissal') && !allText.includes('code of practice: dismissal, 2025')) {
+    defects.push('Identify the current instrument at first use as the Code of Practice: Dismissal, 2025.');
+  }
+
+  const track = String(caseBrief.track || '').toUpperCase();
+  if (['UD-MISCONDUCT','UD-POOR_PERFORMANCE','UD-INCAPACITY'].includes(track)) {
+    const claimsText = legalClaims.map(item => `${item?.title || ''} ${item?.text || ''}`).join(' ').toLowerCase();
+    if (!claimsText.includes('section 188(1)') && !claimsText.includes('s188(1)')) {
+      defects.push('Anchor substantive dismissal fairness expressly in LRA section 188(1) before applying the Code.');
+    }
+  }
+
+  const noticeTerms = settlementTerms.filter(term => /notice|payment in lieu/i.test(String(term || '')));
+  for (const term of noticeTerms) {
+    const text = String(term || '').toLowerCase();
+    const mentions37 = /section\s*37|s\s*37/.test(text);
+    const mentions38 = /section\s*38|s\s*38/.test(text);
+    if (mentions37 !== mentions38) {
+      defects.push('Frame BCEA section 37 (notice period) and section 38 (payment instead of notice) together in any notice-pay settlement term.');
+      break;
+    }
+  }
+
+  const nonDisparagement = settlementTerms.find(term => /disparag/i.test(String(term || '')));
+  if (nonDisparagement) {
+    const text = String(nonDisparagement).toLowerCase();
+    if (/mutual|both parties|neither party|each party/.test(text)) {
+      defects.push('Employee-side non-disparagement must be one-way against the employer and its representatives unless mutuality is expressly authorised.');
+    }
+  }
+
+  return [...new Set(defects)];
+}
+
+function applyMandatoryDefectsToAssessment(assessment = {}, defects = []) {
+  if (!defects.length) return assessment;
+  const result = { ...(assessment || {}) };
+  const existing = Array.isArray(result.what_needs_work) ? result.what_needs_work : [];
+  const amendments = Array.isArray(result.recommended_amendments) ? result.recommended_amendments : [];
+  result.what_needs_work = [...new Set([...existing, ...defects])];
+  result.recommended_amendments = [...new Set([...amendments, ...defects])];
+  result.mandatory_drafting_defects = defects;
+  result.drafting_quality_score = Math.min(Number(result.drafting_quality_score || DRAFT_QUALITY_FLOOR - 0.5), DRAFT_QUALITY_FLOOR - 0.5);
+  result.quality_floor_met = false;
+  return result;
+}
+
 function revisionInstructions(assessment = {}) {
   const criterionFixes = (Array.isArray(assessment.criteria) ? assessment.criteria : [])
     .filter(item => item && item.required_fix && String(item.severity || '').toLowerCase() !== 'none')
@@ -458,6 +517,10 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   });
   callLogs.push(supervisor.log);
   let assessment = supervisor.assessment;
+  assessment = applyMandatoryDefectsToAssessment(
+    assessment,
+    mandatoryDraftingDefects({ draft: parsed, caseBrief })
+  );
   const initialAssessment = JSON.parse(JSON.stringify(assessment || {}));
   let redraftPerformed = false;
 
@@ -503,10 +566,13 @@ Mandatory redraft rules take priority over stylistic preference: use "Code of Pr
       purpose: 'supervision_after_redraft'
     });
     callLogs.push(supervisor.log);
-    assessment = supervisor.assessment;
+    assessment = applyMandatoryDefectsToAssessment(
+      supervisor.assessment,
+      mandatoryDraftingDefects({ draft: parsed, caseBrief })
+    );
   }
 
-  assessment.quality_floor_met = Number(assessment.drafting_quality_score || 0) >= DRAFT_QUALITY_FLOOR;
+  assessment.quality_floor_met = Number(assessment.drafting_quality_score || 0) >= DRAFT_QUALITY_FLOOR && !(assessment.mandatory_drafting_defects || []).length;
   assessment.quality_floor = DRAFT_QUALITY_FLOOR;
   assessment.redraft_performed = redraftPerformed;
   assessment.initial_assessment = initialAssessment;
