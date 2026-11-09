@@ -1,12 +1,12 @@
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
-const { getStore } = require('@netlify/blobs');
+const { FIXTURES } = require('./lib/liveDraftingFixtures');
+const { buildCaseBrief } = require('./lib/claudeDrafting');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const INTERNAL_SIGNING_KEY = process.env.LETTER_GENERATION_INTERNAL_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
-const STORE_NAME = 'justine-drafting-harness';
 
 function json(statusCode, body) {
   return {
@@ -34,13 +34,31 @@ function siteBaseUrl(event) {
   throw new Error('Could not determine site URL');
 }
 
-function sign(raw) {
-  if (!INTERNAL_SIGNING_KEY) throw new Error('Harness signing key is not configured');
-  return crypto.createHmac('sha256', INTERNAL_SIGNING_KEY).update(raw, 'utf8').digest('hex');
+function sign(rawBody) {
+  if (!INTERNAL_SIGNING_KEY) throw new Error('Internal drafting signing key is not configured');
+  return crypto.createHmac('sha256', INTERNAL_SIGNING_KEY).update(rawBody, 'utf8').digest('hex');
 }
 
-function store() {
-  return getStore(STORE_NAME);
+function fixtureFacts(key, customFacts) {
+  if (key === 'custom') {
+    if (!customFacts || typeof customFacts !== 'object' || Array.isArray(customFacts)) {
+      throw new Error('Custom test requires a facts object');
+    }
+    return { label: 'Custom facts', facts: customFacts };
+  }
+  const fixture = FIXTURES[key];
+  if (!fixture) throw new Error('Unknown test fixture');
+  return { label: fixture.name, facts: fixture.facts };
+}
+
+async function loadHarnessCase(caseId) {
+  const { data, error } = await supabase
+    .from('cases')
+    .select('id,client_name,status,letter_status,draft_letter,case_facts,payment_status,wp_generation_unlocked,created_at,updated_at')
+    .eq('id', caseId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }
 
 exports.handler = async (event) => {
@@ -48,76 +66,153 @@ exports.handler = async (event) => {
 
   try {
     const user = await authenticate(event);
+    const requestedBy = user.email || user.id;
     const body = JSON.parse(event.body || '{}');
     const action = String(body.action || 'start');
 
     if (action === 'status') {
-      const jobId = String(body.jobId || '');
-      if (!jobId) return json(400, { error: 'jobId required' });
-      const data = await store().get(jobId, { type: 'json', consistency: 'strong' });
-      if (!data) return json(404, { error: 'Harness job not found' });
-      if (data.requested_by !== (user.email || user.id)) return json(403, { error: 'Forbidden' });
-      return json(200, data);
+      const caseId = String(body.caseId || '');
+      if (!caseId) return json(400, { error: 'caseId required' });
+
+      const row = await loadHarnessCase(caseId);
+      if (!row) return json(404, { error: 'Harness test case not found' });
+
+      const facts = row.case_facts || {};
+      if (facts.harness_test !== true || facts.harness_requested_by !== requestedBy) {
+        return json(403, { error: 'Forbidden' });
+      }
+
+      const failed = row.letter_status === 'generation_failed' || ['GENERATION_FAILED','QUALITY_REVIEW_FAILED','QUEUE_FAILED'].includes(facts.wp_letter_status);
+      const completed = row.letter_status === 'pending_review' && Boolean(row.draft_letter);
+
+      if (failed) {
+        return json(200, {
+          status: 'failed',
+          caseId,
+          stage: facts.wp_letter_status || row.letter_status,
+          error: facts.wp_generation_error || 'Drafting failed',
+          case_status: row.status,
+          letter_status: row.letter_status
+        });
+      }
+
+      if (!completed) {
+        return json(200, {
+          status: 'running',
+          caseId,
+          stage: facts.wp_letter_status || row.letter_status || row.status,
+          case_status: row.status,
+          letter_status: row.letter_status,
+          updated_at: row.updated_at
+        });
+      }
+
+      const sourceFacts = facts.harness_source_facts || {};
+      return json(200, {
+        status: 'completed',
+        harness: 'production-background-drafting',
+        caseId,
+        fixture: facts.harness_fixture || 'custom',
+        label: facts.harness_label || 'Harness case',
+        generated_at: facts.wp_generation_completed_at || row.updated_at,
+        run_by: requestedBy,
+        source_facts: sourceFacts,
+        case_brief: buildCaseBrief({ facts: sourceFacts, senderVariant: 'VRS', clientSide: 'employee' }),
+        letter: row.draft_letter,
+        structure: facts.wp_letter_structure || null,
+        supervisory_assessment: facts.wp_supervisory_assessment || null,
+        run_summary: {
+          drafting_quality_score: facts.wp_supervisory_assessment?.drafting_quality_score ?? null,
+          quality_floor_met: facts.wp_supervisory_assessment?.quality_floor_met ?? null,
+          redraft_performed: facts.wp_supervisory_assessment?.redraft_performed ?? false,
+          initial_drafting_quality_score: facts.wp_supervisory_assessment?.initial_drafting_quality_score ?? null,
+          final_drafting_quality_score: facts.wp_supervisory_assessment?.final_drafting_quality_score ?? null
+        },
+        skill_hash: facts.wp_skill_hash || null,
+        skill_manifest: facts.wp_skill_manifest || null,
+        llm_call_logs: facts.llm_call_logs || []
+      });
     }
 
     if (action === 'delete') {
-      const jobId = String(body.jobId || '');
-      if (!jobId) return json(400, { error: 'jobId required' });
-      const data = await store().get(jobId, { type: 'json', consistency: 'strong' });
-      if (data && data.requested_by !== (user.email || user.id)) return json(403, { error: 'Forbidden' });
-      await store().delete(jobId);
+      const caseId = String(body.caseId || '');
+      if (!caseId) return json(400, { error: 'caseId required' });
+      const row = await loadHarnessCase(caseId);
+      if (!row) return json(200, { success: true, already_deleted: true });
+      const facts = row.case_facts || {};
+      if (facts.harness_test !== true || facts.harness_requested_by !== requestedBy) {
+        return json(403, { error: 'Forbidden' });
+      }
+      const { error } = await supabase.from('cases').delete().eq('id', caseId);
+      if (error) throw error;
       return json(200, { success: true });
     }
 
     const fixture = String(body.fixture || '').trim();
-    if (!['misconduct','performance','retrenchment','custom'].includes(fixture)) {
-      return json(400, { error: 'Unknown test fixture' });
-    }
-    if (fixture === 'custom' && (!body.facts || typeof body.facts !== 'object' || Array.isArray(body.facts))) {
-      return json(400, { error: 'Custom test requires a facts object' });
-    }
+    const selected = fixtureFacts(fixture, body.facts);
+    const now = new Date().toISOString();
 
-    const jobId = crypto.randomUUID();
-    const requestedBy = user.email || user.id;
-    const queued = {
-      harness: 'live_drafting_harness',
-      jobId,
-      status: 'queued',
-      fixture,
-      requested_by: requestedBy,
-      queued_at: new Date().toISOString()
+    const testFacts = {
+      ...selected.facts,
+      wp_eligible: true,
+      payment_status: 'paid',
+      wp_generation_unlocked: true,
+      hard_disqualifier: false,
+      harness_test: true,
+      harness_fixture: fixture,
+      harness_label: selected.label,
+      harness_requested_by: requestedBy,
+      harness_created_at: now,
+      harness_source_facts: selected.facts,
+      wp_letter_status: 'HARNESS_QUEUED'
     };
-    await store().setJSON(jobId, queued);
 
-    const payload = {
-      jobId,
-      fixture,
-      facts: fixture === 'custom' ? body.facts : null,
-      requested_by: requestedBy
-    };
-    const raw = JSON.stringify(payload);
-    const endpoint = `${siteBaseUrl(event)}/.netlify/functions/live_drafting_harness-background`;
-    const response = await fetch(endpoint, {
+    const { data: inserted, error: insertError } = await supabase.from('cases').insert({
+      client_name: '[HARNESS] ' + (selected.facts.client_name || selected.label),
+      contact_info: 'temporary-drafting-harness',
+      issue_summary: '[TEMPORARY QA] ' + (selected.facts.incident_description || selected.label),
+      case_facts: testFacts,
+      status: 'paid_ready_for_drafting',
+      letter_status: 'not_drafted',
+      payment_status: 'paid',
+      paid_at: now,
+      wp_generation_unlocked: true
+    }).select('id').single();
+
+    if (insertError) throw new Error('Could not create temporary harness case: ' + insertError.message);
+
+    const caseId = inserted.id;
+    const rawBody = JSON.stringify({ caseId, sender_variant: 'VRS', client_side: 'employee' });
+    const endpoint = `${siteBaseUrl(event)}/.netlify/functions/generate_letter-background`;
+    const queued = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-vrs-internal-signature': sign(raw)
+        'x-vrs-internal-signature': sign(rawBody)
       },
-      body: raw
+      body: rawBody
     });
 
-    if (!response.ok && response.status !== 202) {
-      const text = await response.text();
-      await store().setJSON(jobId, {
-        ...queued,
-        status: 'failed',
-        completed_at: new Date().toISOString(),
-        error: `Could not queue background drafting: ${response.status} ${text.slice(0, 300)}`
+    if (!queued.ok && queued.status !== 202) {
+      const responseText = await queued.text();
+      await supabase.from('cases').update({
+        status: 'harness_failed',
+        letter_status: 'generation_failed',
+        case_facts: {
+          ...testFacts,
+          wp_letter_status: 'HARNESS_QUEUE_FAILED',
+          wp_generation_error: `${queued.status} ${responseText.slice(0, 500)}`
+        }
+      }).eq('id', caseId);
+      return json(500, {
+        error: 'Production background function could not be queued',
+        caseId,
+        http_status: queued.status,
+        detail: responseText.slice(0, 500)
       });
-      return json(500, { error: 'Could not queue live drafting job', detail: text.slice(0, 300) });
     }
 
-    return json(202, { success: true, jobId, status: 'queued' });
+    return json(202, { success: true, caseId, status: 'queued', fixture, label: selected.label });
   } catch (error) {
     const message = String(error.message || 'Unknown error');
     return json(message === 'Unauthorized' ? 401 : 500, { error: message });
