@@ -4,7 +4,7 @@ const TRACK_CITATIONS = {
   AUD: ['LRA s187', 'EEA s6', 'LRA s194(3)'],
   CD: ['LRA s186(1)(e)'],
   ULP: ['LRA s186(2)'],
-  PDA: ['LRA Schedule 8 Item 4', 'LRA s186(2)(b)'],
+  PDA: ['2025 Code of Practice: Dismissal para 11 where disciplinary procedure is relevant', 'LRA s186(2)(b)'],
   'UD-RETRENCHMENT': ['LRA s189', 'LRA s189A where applicable', 'BCEA s41']
 };
 
