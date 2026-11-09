@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Justine Live Drafting QA</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
+body{font-family:Quicksand,Arial,sans-serif;margin:0;background:#f6f7fb;color:#111735}
+main{max-width:1200px;margin:32px auto;padding:0 20px}.card{background:#fff;border:1px solid #dfe4f1;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 12px 32px rgba(0,11,79,.08)}
+h1,h2{color:#000B4F}button,select,input{font:inherit}.row{display:flex;gap:10px;flex-wrap:wrap}.field{padding:11px 12px;border:1px solid #cdd6e8;border-radius:10px;min-width:240px}.btn{padding:11px 16px;border:0;border-radius:10px;font-weight:700;cursor:pointer}.primary{background:#20368F;color:white}.ghost{background:#edf1f8;color:#20368F}.danger{background:#8d2f3a;color:white}
+pre{white-space:pre-wrap;word-break:break-word;background:#0b153f;color:#edf2ff;padding:16px;border-radius:12px;max-height:520px;overflow:auto}.letter{white-space:pre-wrap;background:#fff;border:1px solid #dfe4f1;padding:20px;border-radius:12px;line-height:1.55}
+.muted{color:#667085}.score{font-size:2rem;font-weight:700;color:#20368F}.hidden{display:none}.status{padding:10px 12px;background:#eef3ff;border-radius:10px;margin-top:12px}
+</style>
+</head>
+<body><main>
+<div class="card">
+<h1>Justine Live Drafting QA</h1>
+<p class="muted">Temporary authenticated harness. Runs the real protected VRS skills, real Claude draft, supervisory QA and any automatic redraft. It does not create a case, take payment, email anyone or send WhatsApp messages.</p>
+<div id="login">
+<div class="row"><input id="email" class="field" type="email" placeholder="VRS login email"><input id="password" class="field" type="password" placeholder="Password"><button class="btn primary" onclick="login()">Sign in</button></div>
+<div id="loginStatus" class="status hidden"></div>
+</div>
+<div id="controls" class="hidden">
+<div class="row">
+<select id="caseSelect" class="field">
+<option value="misconduct">Misconduct — procedural unfairness + safety context</option>
+<option value="performance">Poor performance — no proper PIP + unrealistic targets</option>
+<option value="retrenchment">Retrenchment — pregnancy + no consultation</option>
+<option value="constructive">Constructive dismissal — repeated salary breach + retaliation</option>
+</select>
+<button id="runBtn" class="btn primary" onclick="runTest()">Run live draft</button>
+<button id="downloadBtn" class="btn ghost" onclick="downloadResult()" disabled>Download JSON</button>
+<button class="btn danger" onclick="logout()">Sign out</button>
+</div>
+<div id="status" class="status">Ready.</div>
+</div>
+</div>
+
+<div id="summaryCard" class="card hidden"><h2>Result summary</h2><div id="summary"></div></div>
+<div id="letterCard" class="card hidden"><h2>Generated letter body</h2><div id="letter" class="letter"></div></div>
+<div id="qaCard" class="card hidden"><h2>Supervisor assessment</h2><pre id="qa"></pre></div>
+<div id="briefCard" class="card hidden"><h2>Case brief sent to Claude</h2><pre id="brief"></pre></div>
+<div id="rawCard" class="card hidden"><h2>Full export</h2><pre id="raw"></pre></div>
+</main>
+<script>
+const SUPABASE_URL=window.JUSTINE_SUPABASE_URL||'https://pdjhgszpndwykeqlusho.supabase.co';
+const SUPABASE_ANON_KEY=window.JUSTINE_SUPABASE_ANON_KEY||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);let latest=null;
+const $=id=>document.getElementById(id);
+async function session(){const {data}=await db.auth.getSession();return data.session}
+async function init(){const s=await session();if(s){$('login').classList.add('hidden');$('controls').classList.remove('hidden')}}
+async function login(){const email=$('email').value.trim(),password=$('password').value;const box=$('loginStatus');box.classList.remove('hidden');box.textContent='Signing in...';const {data,error}=await db.auth.signInWithPassword({email,password});if(error){box.textContent=error.message;return}$('login').classList.add('hidden');$('controls').classList.remove('hidden')}
+async function logout(){await db.auth.signOut();location.reload()}
+async function runTest(){
+ latest=null;$('downloadBtn').disabled=true;$('runBtn').disabled=true;$('status').textContent='Running real Claude drafting + supervisor QA. This can take a little while...';
+ ['summaryCard','letterCard','qaCard','briefCard','rawCard'].forEach(id=>$(id).classList.add('hidden'));
+ try{
+  let s=await session();if(!s)throw new Error('Session expired. Sign in again.');
+  const res=await fetch('/.netlify/functions/drafting_quality_harness',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.access_token},body:JSON.stringify({test_case:$('caseSelect').value})});
+  const data=await res.json();if(!res.ok)throw new Error(data.error||'Harness failed');
+  latest=data;
+  const a=data.supervisory_assessment||{},l=data.drafting_log||{};
+  $('summary').innerHTML='<div class="score">'+(a.drafting_quality_score??l.drafting_quality_score??'n/a')+'/10</div><p><b>Quality floor met:</b> '+String(a.quality_floor_met??l.quality_floor_met)+'</p><p><b>Automatic redraft:</b> '+String(a.redraft_performed??l.redraft_performed)+'</p><p><b>Model:</b> '+(l.model||'unknown')+'</p><p><b>Skill hash:</b> '+data.skill_hash+'</p>';
+  $('letter').textContent=data.generated_letter||'';
+  $('qa').textContent=JSON.stringify(data.supervisory_assessment,null,2);
+  $('brief').textContent=JSON.stringify(data.case_brief,null,2);
+  $('raw').textContent=JSON.stringify(data,null,2);
+  ['summaryCard','letterCard','qaCard','briefCard','rawCard'].forEach(id=>$(id).classList.remove('hidden'));
+  $('downloadBtn').disabled=false;$('status').textContent='Completed. Download the JSON and send it to Matt/ChatGPT for independent review.';
+ }catch(e){$('status').textContent='Error: '+e.message}finally{$('runBtn').disabled=false}
+}
+function downloadResult(){if(!latest)return;const blob=new Blob([JSON.stringify(latest,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='justine-drafting-qa-'+latest.test_case+'-'+Date.now()+'.json';a.click();URL.revokeObjectURL(a.href)}
+init();
+</script></body></html>
