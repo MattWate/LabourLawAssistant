@@ -413,46 +413,108 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
 }
 
 
+function cleanOutwardText(value = '') {
+  return String(value || '')
+    .replace(/,?\s*which\s+repealed\s+the\s+former\s+Schedule\s+8\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal/gi, '')
+    .replace(/\bSchedule\s+8\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal\b/gi, 'Code of Practice: Dismissal, 2025')
+    .replace(/\bSchedule\s+8\b/gi, 'Code of Practice: Dismissal, 2025')
+    .replace(/\b(?:HIGH|MEDIUM|LOW)\s+merit\s+(?:assessment|band)\b/gi, 'assessment')
+    .replace(/\bmerit\s+band\b/gi, 'assessment')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function enforceOutwardDraftRules(draft = {}, caseBrief = {}) {
   const output = JSON.parse(JSON.stringify(draft || {}));
   const structure = output.part_a_letter || output;
   if (!structure || typeof structure !== 'object') return output;
 
+  const track = String(caseBrief.track || '').toUpperCase();
+  const merit = String(caseBrief.merit_band || '').toUpperCase();
+  const isHighMeritUd = merit === 'HIGH' && track.startsWith('UD-');
+  const canonicalCompensation =
+    "Compensation on an ex gratia, total cost to company basis. In light of the cumulative procedural defects identified above, together with the disputed substantive basis for dismissal and the safety context giving rise to the allegation, our client's position is that settlement should be calibrated toward the higher end of the compensation range available under section 194(1) of the LRA, being up to twelve months' remuneration";
+  const canonicalNotice =
+    'Payment in lieu of notice calculated by reference to the applicable notice period under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, with payment made in accordance with section 38 of the BCEA';
+
   if (Array.isArray(structure.settlement_terms)) {
-    structure.settlement_terms = structure.settlement_terms.map(term => {
-      const text = String(term || '');
+    let sawCompensation = false;
+    let sawNotice = false;
+    const mapped = [];
 
-      if (/notice|payment in lieu/i.test(text)) {
-        return 'Payment in lieu of notice calculated by reference to the applicable notice period under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, with payment made in accordance with section 38 of the BCEA';
+    for (const rawTerm of structure.settlement_terms) {
+      const text = cleanOutwardText(rawTerm);
+
+      if (/^\s*(?:compensation|ex gratia|settlement amount)\b/i.test(text)) {
+        if (!sawCompensation) {
+          mapped.push(isHighMeritUd ? canonicalCompensation : text);
+          sawCompensation = true;
+        }
+        continue;
       }
 
-      const track = String(caseBrief.track || '').toUpperCase();
-      const merit = String(caseBrief.merit_band || '').toUpperCase();
       if (
-        merit === 'HIGH' &&
-        track.startsWith('UD-') &&
-        /ex gratia|compensation|settlement amount/i.test(text)
+        /^\s*payment\s+in\s+lieu\s+of\s+notice\b/i.test(text) ||
+        (/section\s*37/i.test(text) && /section\s*38/i.test(text) && /notice/i.test(text))
       ) {
-        return "Compensation on an ex gratia, total cost to company basis. In light of the cumulative procedural shortcomings identified above and the disputed substantive basis for dismissal, our client's position is that settlement should be calibrated toward the higher end of the compensation range available under section 194(1) of the LRA, being up to twelve months' remuneration";
+        if (!sawNotice) {
+          mapped.push(canonicalNotice);
+          sawNotice = true;
+        }
+        continue;
       }
 
-      return text
-        .replace(/\b(?:HIGH|MEDIUM|LOW)\s+merit\s+(?:assessment|band)\b/gi, 'assessment')
-        .replace(/\bmerit\s+band\b/gi, 'assessment');
-    });
+      if (text) mapped.push(text);
+    }
+
+    if (isHighMeritUd && !sawCompensation) mapped.unshift(canonicalCompensation);
+    if (!sawNotice && mapped.some(term => /notice/i.test(term))) mapped.push(canonicalNotice);
+
+    structure.settlement_terms = [...new Set(mapped)];
   }
 
   if (Array.isArray(structure.opening_paragraphs)) {
     structure.opening_paragraphs = structure.opening_paragraphs.map(paragraph => {
-      let text = String(paragraph || '');
+      let text = cleanOutwardText(paragraph);
+      const service = caseBrief?.structured_case_facts?.length_of_service;
+      if (service) {
+        text = text
+          .replace(/has,\s+according\s+to\s+(?:his|her|their)\s+instructions,\s+been\s+employed/gi, 'was employed')
+          .replace(/for\s+a\s+period\s+of\s+approximately\s+/gi, 'for a period of ')
+          .replace(/\s*To the extent that this is confirmed as continuous service,?[^.]*\.?/gi, '');
+      }
       if (!caseBrief?.structured_case_facts?.continuous_service) {
         text = text
-          .replace(/\s*To the extent that it has not already been confirmed, our client's account is that (?:his|her|their) employment was continuous throughout that period\.?/gi, '')
-          .replace(/\s{2,}/g, ' ')
-          .trim();
+          .replace(/\s*To the extent that it has not already been confirmed, our client's account is that (?:his|her|their) employment was continuous throughout that period\.?/gi, '');
       }
-      return text;
+      return text.replace(/\s{2,}/g, ' ').trim();
     });
+  }
+
+  if (Array.isArray(structure.legal_claims)) {
+    structure.legal_claims = structure.legal_claims.map(claim => {
+      const item = { ...(claim || {}) };
+      item.title = cleanOutwardText(item.title);
+      item.text = cleanOutwardText(item.text)
+        .replace(/\s*We record, for completeness, that the employer may seek to characterise[^.]*\.[^]*?we accept this substantive question is not free from dispute\.?/gi, '')
+        .replace(/\s*but we accept this substantive question is not free from dispute\.?/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      return item;
+    });
+  }
+
+  if (typeof structure.settlement_intro === 'string') {
+    structure.settlement_intro = cleanOutwardText(structure.settlement_intro);
+  }
+
+  if (Array.isArray(structure.conclusion_paragraphs)) {
+    structure.conclusion_paragraphs = structure.conclusion_paragraphs.map(paragraph =>
+      cleanOutwardText(paragraph)
+        .replace(/\s*We record that the employer's substantive position on insubordination is not without force and that the matter is accordingly not one-sided[^.]*\.?/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+    );
   }
 
   return output;
