@@ -1,0 +1,16 @@
+name: Temporary case brief coverage harness
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/case-brief-coverage.js'
+      - '.github/workflows/case-brief-coverage.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/case-brief-coverage.js
