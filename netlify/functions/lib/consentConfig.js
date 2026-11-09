@@ -10,7 +10,8 @@ const CONSENT_CONFIG = {
     heading: 'Before we start',
     intro: [
       'Hi, I’m Justine, the AI assistant of VRS Labour Law Consultants. I’m here to help you explain what has happened at work in your own words.',
-      'I’ll ask you a few questions so we can understand your situation better. The information you provide is handled as confidential case information and is used to assess your matter and help VRS decide the appropriate next step.',
+      'I’ll ask you a few questions so we can understand your situation better. You can answer in English, Afrikaans, isiZulu or isiXhosa. I’ll continue the conversation in English, and all VRS assessments and letters are prepared in English.',
+      'The information you provide is handled as confidential case information and is used to assess your matter and help VRS decide the appropriate next step.',
       'I’m not a person and I don’t give legal advice. I can get things wrong, so a VRS Labour Law Consultant reviews matters before any letter is sent.',
       'Using Justine does not stop legal deadlines: a dismissal dispute must usually be referred to the CCMA within 30 days.'
     ],
@@ -21,6 +22,7 @@ const CONSENT_CONFIG = {
   whatsapp: {
     first_message: [
       'Hi, I’m Justine, the AI assistant of VRS Labour Law Consultants. I’m here to help you explain what has happened at work in your own words. I’ll ask a few questions so VRS can understand your situation better.',
+      'You can answer in English, Afrikaans, isiZulu or isiXhosa. I’ll continue in English, and all VRS assessments and letters are prepared in English.',
       'The information you provide is handled as confidential case information. I’m not a person and my answers are general information, not legal advice. A VRS Labour Law Consultant checks matters before any letter is sent, and using me does not stop legal deadlines.',
       'Please read our Terms of Use and Privacy Notice before we start: {NOTICE_URL}',
       'Reply YES to confirm that:',
