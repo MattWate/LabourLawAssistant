@@ -25,7 +25,7 @@ function formatDate(value = new Date()) {
 }
 
 function resolveQuicksand(weight) {
-  const filename = `quicksand-latin-${weight}-normal.woff2`;
+  const filename = `quicksand-latin-${weight}-normal.woff`;
   const candidates = [
     path.join(process.cwd(), 'node_modules', '@fontsource', 'quicksand', 'files', filename),
     path.join('/var/task', 'node_modules', '@fontsource', 'quicksand', 'files', filename)
