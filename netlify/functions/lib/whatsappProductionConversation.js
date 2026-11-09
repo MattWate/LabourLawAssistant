@@ -8,7 +8,7 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 
 const CLIENT_EMAIL_PROMPT = 'What email address should VRS use to contact you and copy you on any approved letter sent to your employer?';
 const COMPLETION_MESSAGE = 'Thank you. Your information has been submitted securely to VRS Labour Law Consultants for review. You will receive feedback on the appropriate next step for your matter.';
-const INFO_REPLY_CONFIRMATION = 'Thank you. I have added your response to your case and notified the VRS legal team for review.';
+const INFO_REPLY_CONFIRMATION = 'Thank you. I have added your response to your case and notified the VRS Labour Law Consultants team for review.';
 
 const DEFLECTION_COPY = {
   contractor: 'Thank you for sharing this with us. Based on what you have told us, it looks like you are engaged as an independent contractor rather than an employee, which means your situation falls outside the labour law framework we work within. This is not a reflection of the merits of your case, just a difference in the legal relationship involved. We recommend getting advice on your specific contract, as different rules may apply there.',
@@ -120,7 +120,7 @@ async function capturePendingInfoReply(conversation, message) {
   if (pendingIndex === -1) return null;
 
   const answer = clean(message.text_body);
-  if (!answer) return 'Please type your answer to the VRS legal team’s question.';
+  if (!answer) return 'Please type your answer to the VRS Labour Law Consultants team’s question.';
 
   const now = new Date().toISOString();
   const pending = { ...questions[pendingIndex] };
