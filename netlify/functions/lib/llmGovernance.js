@@ -174,6 +174,10 @@ function normaliseGovernance(raw = {}, source = 'claude') {
   }
   if (overrideFlags.length) hydratedFacts.override_flags = overrideFlags;
 
+  const language = cleanString(raw.input_language_detected || raw.language_detected || '') || 'unknown';
+  const languageConfidence = Number(raw.input_language_confidence || raw.language_confidence || 0);
+  const englishInterpretation = cleanString(raw.normalized_english_interpretation || raw.english_interpretation || '') || null;
+
   const normalised = {
     source,
     ok: Boolean(primaryTrack || Object.keys(hydratedFacts).length || overrideFlags.length),
@@ -185,6 +189,9 @@ function normaliseGovernance(raw = {}, source = 'claude') {
     confidence: Number(raw.confidence || 0),
     confidence_per_field: raw.confidence_per_field || {},
     reasoning: cleanString(raw.reasoning) || null,
+    input_language_detected: language,
+    input_language_confidence: languageConfidence,
+    normalized_english_interpretation: englishInterpretation,
     raw_response: raw
   };
 
@@ -229,6 +236,20 @@ Override flags enum:
 - PROTECTED_GROUND_DISCRIMINATION
 - SHAM_RETRENCHMENT
 
+Supported client input languages for launch:
+- English
+- Afrikaans
+- isiZulu
+- isiXhosa
+
+Language handling rules:
+- Detect the dominant language of the user's narrative. Code-switching is allowed.
+- If the narrative is in Afrikaans, isiZulu or isiXhosa, provide a faithful English interpretation in "normalized_english_interpretation".
+- If the narrative is already English, "normalized_english_interpretation" may repeat it or be null.
+- Never discard, rewrite or replace the original user narrative. The original is stored separately by the application.
+- Do not add facts that are not present in the original narrative when translating or normalising.
+- Always return structured field values in English where practical so the downstream scoring engine remains language-stable.
+
 Important rules:
 - If the user is still employed and describes a warning, grievance, suspension or pay dispute, primary_track is usually ANC unless the narrative clearly fits PDA or ULP.
 - "final written warning" maps to advisory_topic E1_WARNING.
@@ -246,6 +267,9 @@ Return this JSON shape exactly:
   "override_flags": [],
   "confidence": 0.0,
   "reasoning": "one concise sentence",
+  "input_language_detected": "English|Afrikaans|isiZulu|isiXhosa|Other|Unknown",
+  "input_language_confidence": 0.0,
+  "normalized_english_interpretation": "faithful English interpretation of the full user narrative, or null if unnecessary",
   "hydrated_facts": {
     "incident_date": null,
     "dismissal_reason_type": null,
@@ -327,6 +351,9 @@ started_at: startedAt,
       confidence: 0,
       confidence_per_field: {},
       reasoning: null,
+      input_language_detected: 'unknown',
+      input_language_confidence: 0,
+      normalized_english_interpretation: null,
       compatibility: { category: 'Ambiguous', dismissal_reason_type: null, advisory_topic: null, confidence: 0 },
       log: {
         provider: 'anthropic',
@@ -384,8 +411,19 @@ function mergeGovernanceFacts(existingFacts = {}, governance = {}) {
     override_flags: governance.override_flags,
     confidence: governance.confidence,
     confidence_per_field: governance.confidence_per_field,
-    reasoning: governance.reasoning
+    reasoning: governance.reasoning,
+    input_language_detected: governance.input_language_detected || 'unknown',
+    input_language_confidence: Number(governance.input_language_confidence || 0),
+    normalized_english_interpretation: governance.normalized_english_interpretation || null
   };
+
+  if (governance.input_language_detected && governance.input_language_detected !== 'unknown') {
+    merged.input_language_detected = governance.input_language_detected;
+    merged.input_language_confidence = Number(governance.input_language_confidence || 0);
+  }
+  if (governance.normalized_english_interpretation) {
+    merged.normalized_english_interpretation = governance.normalized_english_interpretation;
+  }
 
   merged.llm_call_logs = [...(Array.isArray(existingFacts.llm_call_logs) ? existingFacts.llm_call_logs : []), governance.log].filter(Boolean);
 
