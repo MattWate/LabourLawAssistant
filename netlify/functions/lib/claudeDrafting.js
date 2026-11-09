@@ -103,11 +103,11 @@ Rules for this API output:
 - Do not guess names, job titles, dates, addresses or facts. Use a clear placeholder such as [ADDRESSEE NAME] where required information is unknown.
 - Use conditional wording for anything that is not confirmed.
 - Give the recipient seven calendar days to respond.
-- Do not use section headings in the body. The background must read as coherent essay-style paragraphs.
+- Draft the factual narrative as coherent prose in "opening_paragraphs". The renderer will place it under a visible "Background" heading and number each background paragraph. Do not type the heading or paragraph numbers into the field values.
 - Do not include specific rand figures in the body of the letter unless explicitly authorised as a settlement figure by VRS.
 - Apply the audience profile from VRS_HOUSE_STYLE consistently throughout Part A. Do not add contradictory tone instructions of your own.
-- "legal_claims" is a structural API field only. Its items become numbered paragraphs in the final document; they must not create visible section headings. Do not put manual numbers such as "1." or "2." inside the claim text.
-- "settlement_terms" must contain each proposed settlement term as a separate item. Do not put bullet characters or numbering inside the item text.
+- "legal_claims" must contain each distinct legal claim with a short heading/title and the reasoning for that claim. The renderer will place these under a visible "Legal Claims" heading and number each claim. Do not put manual numbers such as "1." or "2." inside the claim text.
+- "settlement_terms" must contain each proposed settlement term as a separate item. The renderer will place these under a visible "Without Prejudice Settlement Proposal" heading and render them as clean bullet points, not sub-numbered clauses. Do not put bullet characters or numbering inside the item text.
 - Keep ordinary narrative text in "opening_paragraphs", "settlement_intro" and "conclusion_paragraphs".
 - Do NOT include the letter salutation, subject heading, "It is trusted that you will find same to be in order.", "Yours faithfully", the firm name, attorney/signatory name, electronic-signature note, or any other closing/signature block in Part A. Those are supplied exactly once by the Word template.
 - Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term.
