@@ -165,6 +165,8 @@ Rules for this API output:
 - Employee-side non-disparagement is one-way by default: require the employer and its representatives not to disparage the client. Do not make non-disparagement mutual unless the SERVER CASE BRIEF or client_requested_changes expressly authorises mutuality.
 - Do not infer that a manager laid, initiated or formulated a disciplinary charge merely because that manager issued the underlying instruction, complained about the conduct or chaired the hearing. Attribute the charging decision only if charge_initiator or equivalent confirmed evidence is present; otherwise use neutral wording such as "the charge concerned..." or "the allegation arose from...".
 - For HIGH-merit employee-side WP matters, the compensation/ex gratia proposal should be commercially meaningful and explicitly linked to the material procedural and substantive defects identified in the case. Do not use a generic placeholder formulation. Without inventing a rand figure, frame the proposal as a substantial settlement amount calibrated to the identified litigation/CCMA risk and the available statutory compensation framework.
+- Internal scoring labels such as "HIGH merit", "MEDIUM merit", "LOW merit", merit-band names or numeric internal scores must never appear in outward-facing correspondence. Translate them into narrative legal reasoning.
+- Do not add continuity-of-service assertions unless continuous_service or equivalent is expressly confirmed in the case brief. A stated length of service does not by itself prove uninterrupted service.
 - Use conditional wording for anything that is not confirmed.
 - Give the recipient seven calendar days to respond.
 - Draft the factual narrative as coherent prose in "opening_paragraphs". The renderer will place it under a visible "Background" heading and number each background paragraph. Do not type the heading or paragraph numbers into the field values.
@@ -367,7 +369,7 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
       }
     }],
     tool_choice: { type: 'tool', name: 'submit_supervisory_assessment' },
-    messages: [{ role: 'user', content: supervisoryPrompt({ skillContext, caseBrief, draft }) }]
+    messages: [{ role: 'user', content: supervisoryPrompt({ skillContext: currentLawSkillContext(skillContext), caseBrief, draft }) }]
   };
   const startedAt = new Date().toISOString();
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -410,6 +412,51 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
   };
 }
 
+
+function enforceOutwardDraftRules(draft = {}, caseBrief = {}) {
+  const output = JSON.parse(JSON.stringify(draft || {}));
+  const structure = output.part_a_letter || output;
+  if (!structure || typeof structure !== 'object') return output;
+
+  if (Array.isArray(structure.settlement_terms)) {
+    structure.settlement_terms = structure.settlement_terms.map(term => {
+      const text = String(term || '');
+
+      if (/notice|payment in lieu/i.test(text)) {
+        return 'Payment in lieu of notice calculated by reference to the applicable notice period under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, with payment made in accordance with section 38 of the BCEA';
+      }
+
+      const track = String(caseBrief.track || '').toUpperCase();
+      const merit = String(caseBrief.merit_band || '').toUpperCase();
+      if (
+        merit === 'HIGH' &&
+        track.startsWith('UD-') &&
+        /ex gratia|compensation|settlement amount/i.test(text)
+      ) {
+        return "Compensation on an ex gratia, total cost to company basis. In light of the cumulative procedural shortcomings identified above and the disputed substantive basis for dismissal, our client's position is that settlement should be calibrated toward the higher end of the compensation range available under section 194(1) of the LRA, being up to twelve months' remuneration";
+      }
+
+      return text
+        .replace(/\b(?:HIGH|MEDIUM|LOW)\s+merit\s+(?:assessment|band)\b/gi, 'assessment')
+        .replace(/\bmerit\s+band\b/gi, 'assessment');
+    });
+  }
+
+  if (Array.isArray(structure.opening_paragraphs)) {
+    structure.opening_paragraphs = structure.opening_paragraphs.map(paragraph => {
+      let text = String(paragraph || '');
+      if (!caseBrief?.structured_case_facts?.continuous_service) {
+        text = text
+          .replace(/\s*To the extent that it has not already been confirmed, our client's account is that (?:his|her|their) employment was continuous throughout that period\.?/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+      }
+      return text;
+    });
+  }
+
+  return output;
+}
 
 function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
   const structure = draft?.part_a_letter || draft || {};
@@ -534,7 +581,7 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   }
 
   const data = await response.json();
-  let parsed = extractDraftPayload(data, 'draft');
+  let parsed = enforceOutwardDraftRules(extractDraftPayload(data, 'draft'), caseBrief);
   const callLogs = [{
     ...modelAuditMetadata(),
     purpose: 'draft',
@@ -584,7 +631,7 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
       throw new Error(`Claude WP redraft failed using ${model}: ${redraftResponse.status} ${text.slice(0, 500)}`);
     }
     const redraftData = await redraftResponse.json();
-    parsed = extractDraftPayload(redraftData, 'redraft');
+    parsed = enforceOutwardDraftRules(extractDraftPayload(redraftData, 'redraft'), caseBrief);
     callLogs.push({
       ...modelAuditMetadata(),
       purpose: 'redraft',
