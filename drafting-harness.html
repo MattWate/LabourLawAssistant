@@ -98,7 +98,7 @@ const SUPABASE_URL = window.JUSTINE_SUPABASE_URL || 'https://pdjhgszpndwykeqlush
 const SUPABASE_ANON_KEY = window.JUSTINE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 let lastResult=null;
-let activeJobId=null;
+let activeCaseId=null;
 
 async function readJsonResponse(res){
   const text=await res.text();
@@ -142,7 +142,7 @@ function toggleCustom(){
 }
 async function runTest(){
   const btn=document.getElementById('run-btn'); btn.disabled=true; btn.textContent='Queuing…';
-  lastResult=null; activeJobId=null;
+  lastResult=null; activeCaseId=null;
   document.getElementById('download-btn').disabled=true;
   document.getElementById('results').classList.add('hidden');
   setStatus('run-status','Queuing the live drafting job…');
@@ -160,26 +160,26 @@ async function runTest(){
     });
     const queued=await readJsonResponse(res);
     if(!res.ok) throw new Error(queued.error||'Harness could not queue');
-    activeJobId=queued.jobId;
+    activeCaseId=queued.caseId;
     btn.textContent='Drafting…';
     setStatus('run-status','Drafting is running in the background. Waiting for Claude and the supervisor…');
-    await pollHarnessJob(activeJobId);
+    await pollHarnessJob(activeCaseId);
   }catch(e){
     setStatus('run-status',e.message||'Harness failed',true);
     btn.disabled=false;btn.textContent='Run live draft';
   }
 }
 
-async function pollHarnessJob(jobId){
+async function pollHarnessJob(caseId){
   const started=Date.now();
   while(true){
-    if(Date.now()-started>8*60*1000) throw new Error('Harness job did not complete within 8 minutes.');
+    if(Date.now()-started>8*60*1000) throw new Error('Harness test case did not complete within 8 minutes.');
     await new Promise(r=>setTimeout(r,3000));
     const token=await sessionToken();
     const res=await fetch('/.netlify/functions/live_drafting_harness',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({action:'status',jobId})
+      body:JSON.stringify({action:'status',caseId})
     });
     const data=await readJsonResponse(res);
     if(!res.ok) throw new Error(data.error||'Could not read harness job');
@@ -214,15 +214,15 @@ async function downloadResult(){
   a.href=url;a.download='justine-drafting-harness-'+(lastResult.fixture||'test')+'-'+Date.now()+'.json';
   document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
 
-  if(activeJobId){
+  if(activeCaseId){
     try{
       const token=await sessionToken();
       await fetch('/.netlify/functions/live_drafting_harness',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-        body:JSON.stringify({action:'delete',jobId:activeJobId})
+        body:JSON.stringify({action:'delete',caseId:activeCaseId})
       });
-      activeJobId=null;
+      activeCaseId=null;
     }catch(e){}
   }
 }
