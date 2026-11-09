@@ -499,6 +499,16 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
   const metadata = { ...(facts._fact_metadata || {}) };
   const merged = { ...facts };
 
+  const detectedLanguage = governance.input_language_detected || classification.input_language_detected;
+  const languageConfidence = Number(governance.input_language_confidence ?? classification.input_language_confidence ?? 0);
+  const englishInterpretation = governance.normalized_english_interpretation || classification.normalized_english_interpretation || null;
+  if (detectedLanguage) {
+    merged.input_language_detected = detectedLanguage;
+    merged.input_language_confidence = languageConfidence;
+  }
+  if (englishInterpretation) merged.normalized_english_interpretation = englishInterpretation;
+  if (!merged.original_client_narrative && merged.initial_query) merged.original_client_narrative = merged.initial_query;
+
   const candidates = { ...hydrated };
   const overallConfidence = Number(governance.confidence ?? classification.confidence ?? 0);
   if (!hasValue(candidates.employment_status) && hasValue(classification.category)) candidates.employment_status = classification.category;
