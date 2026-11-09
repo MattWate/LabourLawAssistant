@@ -1,0 +1,52 @@
+name: Temporary mandatory drafting guard check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'netlify/functions/lib/claudeDrafting.js'
+      - 'netlify/functions/lib/scoringEngine.js'
+      - '.github/workflows/mandatory-drafting-guard-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --check netlify/functions/lib/claudeDrafting.js
+      - run: node --check netlify/functions/lib/scoringEngine.js
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const src=fs.readFileSync('netlify/functions/lib/claudeDrafting.js','utf8');
+          for(const marker of [
+            'function mandatoryDraftingDefects',
+            "allText.includes('schedule 8')",
+            "code of practice: dismissal, 2025",
+            "section 188(1)",
+            "section 37 (notice period) and section 38",
+            "Employee-side non-disparagement must be one-way",
+            'applyMandatoryDefectsToAssessment'
+          ]) if(!src.includes(marker)) throw new Error('Missing drafting guard: '+marker);
+
+          const {scoreCase}=require('./netlify/functions/lib/scoringEngine');
+          const scored=scoreCase({
+            employment_status:'Dismissed',
+            dismissal_reason_type:'Misconduct',
+            conduct_admission:'Dispute',
+            prior_warnings:'None',
+            hearing_held:true,
+            proc_notice:false,
+            proc_rep:false,
+            proc_chair:false,
+            length_of_service:'5 years',
+            incident_date:'2026-10-21',
+            incident_description:'Dismissed for alleged insubordination.'
+          });
+          const blob=JSON.stringify(scored);
+          if(blob.includes('Schedule 8')) throw new Error('Stale Schedule 8 still emitted');
+          if(!blob.includes('2025 Code of Practice: Dismissal')) throw new Error('Current Code missing');
+          if(scored.wp_eligible !== true) throw new Error('Scoring behaviour unexpectedly changed');
+          console.log('PASS mandatory drafting guard regression');
+          NODE
