@@ -14,6 +14,31 @@ function parseJsonOnly(text = '') {
   }
 }
 
+const STRUCTURED_DRAFT_FACT_FIELDS = [
+  'worker_status','contractor_control_test','south_african_employer','public_service_or_excluded_agency',
+  'schedule_2_soe_ccma_eligible','employment_status','dismissal_reason_type','misconduct_category',
+  'conduct_admission','hearing_held','proc_notice','proc_rep','proc_chair','prior_warnings',
+  'length_of_service','performance_standards_communicated','pip_given','pip_duration',
+  'training_provided','performance_control','team_meeting_standards','prior_performance_warnings',
+  'incapacity_nature','incapacity_duration','proc_consultation','medical_review','alternatives_explored',
+  'opportunity_to_state_case','retrenchment_headcount','s189_notice','retrenchment_consultation',
+  'selection_criteria_objective','retrenchment_alternatives','severance_pay','operational_reason_plausible',
+  'role_refilled','intolerable_conduct','intolerable_duration','grievance_raised','protected_ground',
+  'discrimination_status','discrimination_type','paid_suspension','advisory_topic','ancillary_topic',
+  'incident_date','hearing_date','employer_name','employer_registered_name','addressee_name',
+  'addressee_position','employer_contact_details'
+];
+
+function structuredDraftFacts(facts = {}) {
+  const result = {};
+  STRUCTURED_DRAFT_FACT_FIELDS.forEach(key => {
+    const value = facts[key];
+    if (value === undefined || value === null || value === '') return;
+    result[key] = value;
+  });
+  return result;
+}
+
 function buildCaseBrief({ facts = {}, senderVariant = 'VRS', clientSide = 'employee', audience = 'counterparty' }) {
   return {
     client_side: clientSide,
@@ -45,6 +70,7 @@ function buildCaseBrief({ facts = {}, senderVariant = 'VRS', clientSide = 'emplo
     merit_bonus_trigger: facts.merit_bonus_trigger || null,
     strengths: facts.strengths || [],
     weaknesses: facts.weaknesses || [],
+    structured_case_facts: structuredDraftFacts(facts),
     client_requested_changes: facts.client_requested_changes || null,
     revision_source_letter: facts.client_revision_source_letter || null,
     revision_round: Number(facts.client_revision_round || 0)
@@ -113,6 +139,9 @@ Rules for this API output:
 - Keep ordinary narrative text in "opening_paragraphs", "settlement_intro" and "conclusion_paragraphs".
 - Do NOT include the letter salutation, subject heading, "It is trusted that you will find same to be in order.", "Yours faithfully", the firm name, attorney/signatory name, electronic-signature note, or any other closing/signature block in Part A. Those are supplied exactly once by the Word template.
 - Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term.
+- Connect the dots explicitly. Do not merely list events or restate the scorecard. For every material legal claim, identify the confirmed facts that matter, explain why those facts are legally or strategically significant, and show how they support the claim being advanced.
+- Use the structured_case_facts as evidence, not as a checklist to reproduce mechanically. Reconcile them with the narrative and scoring breakdown. Where a structured fact supplies an important detail that the narrative omits (for example denied representation, absence of consultation, lack of a PIP, prior warnings, selection criteria or a grievance), incorporate that fact into the appropriate Background or Legal Claims reasoning.
+- The reader should be able to follow a clear chain from what happened, to what was defective or unlawful, to why that creates settlement risk for the employer, to the resolution sought.
 - If wp_type is PROCEDURAL_ONLY, treat that as a structural instruction, not merely a tone preference. Do NOT create a standalone substantive-fairness claim or develop a substantive merits argument. Record any denial of misconduct or dispute about the employer's allegation once, briefly, as factual context in the chronology. The legal analysis must then focus on the procedural defects as the primary and dominant basis of the letter. Any substantive issue may be acknowledged in one brief sentence only where necessary for context, and must not read as a co-equal ground of challenge.
 - Any police, criminal-complaint or SAPS-related wording must track the confirmed case facts narrowly. Do not imply that a complaint was made or contemplated unless the case brief says so; use conditional wording only where genuinely necessary.
 - Settlement terms should cover the standing VRS settlement categories where supported by the facts, including compensation, notice pay, leave pay, UIF/UI-19, certificate of service, reference, confidentiality/non-disparagement, pension or provident-fund confirmation where applicable, and a clean-record/expungement term where an unresolved misconduct allegation may remain on the employer's records.
@@ -211,15 +240,15 @@ ${JSON.stringify(draft, null, 2)}
 
 Score these six criteria separately from 0 to 10 and return one criteria item for each:
 1. Factual fidelity — every material assertion is supported by the fixed case brief; no invented facts, names, dates, titles, addresses or salary figures.
-2. Legal and strategic alignment — the draft reflects the deterministic WP posture and protected VRS skill context without overstating the merits.
+2. Legal and strategic alignment — the draft reflects the deterministic WP posture and protected VRS skill context without overstating the merits, and explicitly connects the material confirmed facts to the legal claims and settlement leverage.
 3. VRS tone and house style — counterparty-facing tone is professional, confident, proportionate and consistent with the protected style.
-4. Structure and readability — coherent essay-style background, distinct numbered legal claims, clear flow, no visible section headings or duplicated template content.
+4. Structure and readability — coherent factual Background, distinct numbered legal claims with short headings, clear progression from facts to legal significance to settlement position, and no duplicated template content.
 5. Settlement clarity and actionability — settlement proposal is clear, commercially usable, appropriately framed and gives no more than seven calendar days to respond.
 6. Safety and drafting compliance — no case-law citations, salary figures, unsupported certainty, duplicate salutation/closing/signature, or other prohibited content.
 
 Important scope rule: you are reviewing ONLY the structured Part A body returned by the drafting model, not the final rendered Word document.
 The Word template supplies the opening reference block, WITHOUT PREJUDICE line, RE line, salutation, closing, firm/signatory details and signature. Do NOT penalise the Part A draft for their absence and do NOT request that the redraft add them.
-The legal_claims.title values are structural metadata used by the renderer and are not visible section headings. Do NOT penalise those title fields unless the claim text itself contains prohibited heading-like text.
+The legal_claims.title values are rendered as short claim headings under the visible Legal Claims section. They should be concise and legally meaningful. Do not penalise them merely for being headings.
 Assess only content the drafting model is responsible for: opening narrative paragraphs, legal claim text, settlement intro, settlement terms and conclusion paragraphs.
 
 For every criterion, identify the concrete problem, brief evidence from the draft, the required fix and severity. Use empty strings and severity "none" where there is no problem.
