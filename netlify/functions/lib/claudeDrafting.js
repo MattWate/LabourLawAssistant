@@ -439,10 +439,17 @@ function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
     const text = String(term || '').toLowerCase();
     const mentions37 = /section\s*37|s\s*37/.test(text);
     const mentions38 = /section\s*38|s\s*38/.test(text);
-    if (mentions37 !== mentions38) {
-      defects.push('Frame BCEA section 37 (notice period) and section 38 (payment instead of notice) together in any notice-pay settlement term.');
+    const hasAndOr = /section\s*37[\s\S]{0,120}and\/or[\s\S]{0,120}section\s*38|section\s*38[\s\S]{0,120}and\/or[\s\S]{0,120}section\s*37/i.test(String(term || ''));
+    if (mentions37 !== mentions38 || hasAndOr) {
+      defects.push('Frame BCEA section 37 (notice period) and section 38 (payment instead of notice) together, without "and/or", in any notice-pay settlement term.');
       break;
     }
+  }
+
+  const outwardText = JSON.stringify(structure);
+  const chargeInitiatorConfirmed = Boolean(caseBrief?.structured_case_facts?.charge_initiator);
+  if (!chargeInitiatorConfirmed && /(?:laid|initiated|formulated)\s+(?:the\s+)?charge/i.test(outwardText)) {
+    defects.push('Do not attribute the disciplinary charge to a specific manager unless the charge initiator is expressly confirmed in the case brief.');
   }
 
   const nonDisparagement = settlementTerms.find(term => /disparag/i.test(String(term || '')));
@@ -450,6 +457,17 @@ function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
     const text = String(nonDisparagement).toLowerCase();
     if (/mutual|both parties|neither party|each party/.test(text)) {
       defects.push('Employee-side non-disparagement must be one-way against the employer and its representatives unless mutuality is expressly authorised.');
+    }
+  }
+
+  if (String(caseBrief.merit_band || '').toUpperCase() === 'HIGH') {
+    const compensationTerm = settlementTerms.find(term => /ex gratia|compensation|settlement amount/i.test(String(term || '')));
+    if (compensationTerm) {
+      const text = String(compensationTerm).toLowerCase();
+      const linksRisk = /procedural|substantive|ccma|statutory compensation|section 194|dismissal risk|litigation risk/.test(text);
+      if (!linksRisk) {
+        defects.push('For a HIGH-merit matter, calibrate the compensation/ex gratia proposal to the identified procedural and substantive risk rather than using a generic settlement amount formulation.');
+      }
     }
   }
 
