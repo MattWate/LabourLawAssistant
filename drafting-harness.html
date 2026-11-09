@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Justine Live Drafting Harness</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+body{font-family:Quicksand,Arial,sans-serif;background:#f6f7fb;color:#111735;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding:28px}
+.card{background:#fff;border:1px solid #dfe4f1;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 10px 30px rgba(0,11,79,.06)}
+h1,h2{color:#000B4F}.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1 1 220px}
+input,select,textarea,button{font:inherit}.field,select,textarea{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cfd7e8;border-radius:10px;background:#fff}
+textarea{min-height:220px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+button{border:0;border-radius:10px;padding:11px 15px;font-weight:700;cursor:pointer}
+.primary{background:#20368F;color:#fff}.ghost{background:#e9edf7;color:#20368F}.danger{background:#8d2f3a;color:#fff}
+.hidden{display:none}.status{padding:10px 12px;border-radius:10px;background:#edf2ff;margin-top:12px}.error{background:#fdecec;color:#8d2f3a}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.mono{white-space:pre-wrap;background:#f8f9fc;border-radius:12px;padding:16px;border:1px solid #e1e5ee;max-height:640px;overflow:auto}
+.score{font-size:2rem;font-weight:700;color:#20368F}
+@media(max-width:850px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Justine Live Drafting Harness</h1>
+    <p>This temporary tool uses the real production skill set and Claude drafting/supervision path. It does not create or modify live cases.</p>
+  </div>
+
+  <div id="login" class="card">
+    <h2>Sign in</h2>
+    <div class="row">
+      <input id="email" class="field" type="email" placeholder="Email">
+      <input id="password" class="field" type="password" placeholder="Password">
+      <button class="primary" onclick="login()">Sign in</button>
+    </div>
+    <div id="login-status" class="status hidden"></div>
+  </div>
+
+  <div id="tool" class="hidden">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Test scenario</label>
+          <select id="fixture" onchange="toggleCustom()">
+            <option value="misconduct">Misconduct / procedural fairness</option>
+            <option value="performance">Poor performance</option>
+            <option value="retrenchment">Retrenchment / pregnancy</option>
+            <option value="custom">Custom facts JSON</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:end;gap:10px">
+          <button id="run-btn" class="primary" onclick="runTest()">Run live draft</button>
+          <button class="ghost" onclick="downloadResult()" id="download-btn" disabled>Export JSON</button>
+          <button class="ghost" onclick="logout()">Sign out</button>
+        </div>
+      </div>
+      <div id="custom-wrap" class="hidden" style="margin-top:14px">
+        <label>Custom case facts JSON</label>
+        <textarea id="custom-json">{}</textarea>
+      </div>
+      <div id="run-status" class="status hidden"></div>
+    </div>
+
+    <div id="results" class="hidden">
+      <div class="card">
+        <div class="row">
+          <div><div>Supervisor score</div><div id="score" class="score">—</div></div>
+          <div><div>Quality floor met</div><div id="floor">—</div></div>
+          <div><div>Redraft performed</div><div id="redraft">—</div></div>
+          <div><div>Model</div><div id="model">—</div></div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h2>Generated letter</h2>
+          <div id="letter" class="mono"></div>
+        </div>
+        <div class="card">
+          <h2>Supervisor assessment</h2>
+          <div id="supervisor" class="mono"></div>
+        </div>
+        <div class="card">
+          <h2>Case brief sent to Claude</h2>
+          <div id="brief" class="mono"></div>
+        </div>
+        <div class="card">
+          <h2>Structured output</h2>
+          <div id="structure" class="mono"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const SUPABASE_URL = window.JUSTINE_SUPABASE_URL || 'https://pdjhgszpndwykeqlusho.supabase.co';
+const SUPABASE_ANON_KEY = window.JUSTINE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkamhnc3pwbmR3eWtlcWx1c2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTgwNjAsImV4cCI6MjA4NTY5NDA2MH0.5Y_YlNa16Z6LbK12DQQ-zAWX6QeY-hgPJt3jl_t4dLU';
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+let lastResult=null;
+
+function setStatus(id,msg,isError=false){
+  const el=document.getElementById(id);
+  el.textContent=msg; el.classList.remove('hidden','error');
+  if(isError) el.classList.add('error');
+}
+async function sessionToken(){
+  const {data,error}=await db.auth.getSession();
+  if(error||!data?.session?.access_token) throw new Error('Not signed in');
+  return data.session.access_token;
+}
+async function login(){
+  try{
+    const email=document.getElementById('email').value.trim();
+    const password=document.getElementById('password').value;
+    const {data,error}=await db.auth.signInWithPassword({email,password});
+    if(error) throw error;
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('tool').classList.remove('hidden');
+  }catch(e){setStatus('login-status',e.message||'Login failed',true)}
+}
+async function logout(){
+  await db.auth.signOut(); lastResult=null;
+  document.getElementById('tool').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+  document.getElementById('results').classList.add('hidden');
+}
+function toggleCustom(){
+  document.getElementById('custom-wrap').classList.toggle('hidden',document.getElementById('fixture').value!=='custom');
+}
+async function runTest(){
+  const btn=document.getElementById('run-btn'); btn.disabled=true; btn.textContent='Drafting…';
+  setStatus('run-status','Running the real drafting and supervisory calls. This can take a little while.');
+  try{
+    const fixture=document.getElementById('fixture').value;
+    const body={fixture};
+    if(fixture==='custom'){
+      try{body.facts=JSON.parse(document.getElementById('custom-json').value)}catch(e){throw new Error('Custom facts must be valid JSON')}
+    }
+    const token=await sessionToken();
+    const res=await fetch('/.netlify/functions/live_drafting_harness',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify(body)
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Harness failed');
+    lastResult=data;
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('download-btn').disabled=false;
+    document.getElementById('score').textContent=data.run_summary?.drafting_quality_score ?? '—';
+    document.getElementById('floor').textContent=data.run_summary?.quality_floor_met ? 'Yes' : 'No';
+    document.getElementById('redraft').textContent=data.run_summary?.redraft_performed ? 'Yes' : 'No';
+    document.getElementById('model').textContent=data.model||'—';
+    document.getElementById('letter').textContent=data.letter||'';
+    document.getElementById('supervisor').textContent=JSON.stringify(data.supervisory_assessment,null,2);
+    document.getElementById('brief').textContent=JSON.stringify(data.case_brief,null,2);
+    document.getElementById('structure').textContent=JSON.stringify(data.structure,null,2);
+    setStatus('run-status','Completed. Export the JSON and send it back to me for review.');
+  }catch(e){setStatus('run-status',e.message||'Harness failed',true)}
+  finally{btn.disabled=false;btn.textContent='Run live draft'}
+}
+function downloadResult(){
+  if(!lastResult)return;
+  const blob=new Blob([JSON.stringify(lastResult,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='justine-drafting-harness-'+(lastResult.fixture||'test')+'-'+Date.now()+'.json';
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+(async()=>{
+  try{
+    await sessionToken();
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('tool').classList.remove('hidden');
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
