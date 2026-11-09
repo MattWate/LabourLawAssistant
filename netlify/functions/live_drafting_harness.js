@@ -86,13 +86,32 @@ exports.handler = async (event) => {
       const completed = row.letter_status === 'pending_review' && Boolean(row.draft_letter);
 
       if (failed) {
+        const sourceFacts = facts.harness_source_facts || {};
         return json(200, {
           status: 'failed',
           caseId,
           stage: facts.wp_letter_status || row.letter_status,
           error: facts.wp_generation_error || 'Drafting failed',
           case_status: row.status,
-          letter_status: row.letter_status
+          letter_status: row.letter_status,
+          fixture: facts.harness_fixture || 'custom',
+          label: facts.harness_label || 'Harness case',
+          source_facts: sourceFacts,
+          case_brief: buildCaseBrief({ facts: sourceFacts, senderVariant: 'VRS', clientSide: 'employee' }),
+          letter: facts.wp_failed_draft_preview || '',
+          structure: facts.wp_letter_structure || null,
+          supervisory_assessment: facts.wp_supervisory_assessment || null,
+          run_summary: {
+            drafting_quality_score: facts.wp_supervisory_assessment?.drafting_quality_score ?? null,
+            quality_floor_met: false,
+            redraft_performed: facts.wp_supervisory_assessment?.redraft_performed ?? false,
+            initial_drafting_quality_score: facts.wp_supervisory_assessment?.initial_drafting_quality_score ?? null,
+            final_drafting_quality_score: facts.wp_supervisory_assessment?.final_drafting_quality_score ?? null,
+            mandatory_drafting_defects: facts.wp_supervisory_assessment?.mandatory_drafting_defects || []
+          },
+          skill_hash: facts.wp_skill_hash || null,
+          skill_manifest: facts.wp_skill_manifest || null,
+          llm_call_logs: facts.llm_call_logs || []
         });
       }
 
