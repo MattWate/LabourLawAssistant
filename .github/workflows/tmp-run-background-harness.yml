@@ -1,0 +1,63 @@
+name: Temporary background live drafting run
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/tmp-run-background-harness.yml']
+jobs:
+  run:
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [misconduct, performance, retrenchment]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run production background drafting for ${{ matrix.fixture }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tmp-harness-results
+          base='https://labourlawassist.netlify.app/.netlify/functions/tmp_background_harness_71c9e4'
+          echo 'Waiting for temporary runner deployment...'
+          for i in {1..40}; do
+            code=$(curl -sS --connect-timeout 10 --max-time 20 -o /tmp/probe -w '%{http_code}' "$base?action=status&caseId=probe" || true)
+            if grep -q 'case not found' /tmp/probe 2>/dev/null; then break; fi
+            if [ "$i" = 40 ]; then echo 'Runner did not deploy'; cat /tmp/probe || true; exit 1; fi
+            sleep 5
+          done
+          start=$(curl -sS --connect-timeout 10 --max-time 25 "$base?action=start&fixture=${{ matrix.fixture }}")
+          echo "$start"
+          case_id=$(python -c 'import json,sys; print(json.load(sys.stdin)["caseId"])' <<< "$start")
+          echo "CASE_ID=$case_id"
+          final=''
+          for i in {1..120}; do
+            sleep 5
+            out=$(curl -sS --connect-timeout 10 --max-time 20 "$base?action=status&caseId=$case_id")
+            status=$(python -c 'import json,sys; print(json.load(sys.stdin).get("status",""))' <<< "$out")
+            stage=$(python -c 'import json,sys; print(json.load(sys.stdin).get("stage",""))' <<< "$out")
+            echo "poll $i status=$status stage=$stage"
+            if [ "$status" = 'completed' ] || [ "$status" = 'failed' ]; then final="$out"; break; fi
+          done
+          if [ -z "$final" ]; then
+            curl -sS "$base?action=delete&caseId=$case_id" || true
+            echo 'Timed out waiting for background drafting'
+            exit 1
+          fi
+          printf '%s' "$final" > "tmp-harness-results/${{ matrix.fixture }}.json"
+          python -m json.tool "tmp-harness-results/${{ matrix.fixture }}.json" >/dev/null
+          curl -sS "$base?action=delete&caseId=$case_id" || true
+      - name: Commit result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "tmp-harness-results/${{ matrix.fixture }}.json"
+          git commit -m "Store temporary background drafting result: ${{ matrix.fixture }}"
+          for i in {1..8}; do
+            if git push; then exit 0; fi
+            git pull --rebase origin main
+          done
+          exit 1
