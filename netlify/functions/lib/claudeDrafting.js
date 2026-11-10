@@ -756,5 +756,7 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
 
 module.exports = {
   buildCaseBrief,
-  callClaudeForWpDraft
+  callClaudeForWpDraft,
+  enforceOutwardDraftRules,
+  cleanOutwardText
 };
