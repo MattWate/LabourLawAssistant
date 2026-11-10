@@ -22,7 +22,7 @@ jobs:
           base='https://labourlawassist.netlify.app/.netlify/functions/tmp_background_harness_71c9e4'
           echo 'Waiting for temporary runner deployment...'
           for i in {1..40}; do
-            code=$(curl -sS --connect-timeout 10 --max-time 20 -o /tmp/probe -w '%{http_code}' "$base?action=status&caseId=probe" || true)
+            code=$(curl -sS --connect-timeout 10 --max-time 20 -o /tmp/probe -w '%{http_code}' "$base?action=status&caseId=00000000-0000-0000-0000-000000000000" || true)
             if grep -q 'case not found' /tmp/probe 2>/dev/null; then break; fi
             if [ "$i" = 40 ]; then echo 'Runner did not deploy'; cat /tmp/probe || true; exit 1; fi
             sleep 5
