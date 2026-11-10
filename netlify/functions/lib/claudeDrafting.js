@@ -415,7 +415,7 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
 
 function cleanOutwardText(value = '') {
   return String(value || '')
-    .replace(/,?\s*which\s+repealed\s+the\s+former\s+Schedule\s+8\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal/gi, '')
+    .replace(/,?\s*which\s+(?:replaced|repealed)\s+the\s+former\s+(?:Schedule\s+8(?:\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal)?|Code\s+of\s+Practice:\s*Dismissal,?\s*2025)/gi, '')
     .replace(/\bSchedule\s+8\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal\b/gi, 'Code of Practice: Dismissal, 2025')
     .replace(/\bSchedule\s+8\b/gi, 'Code of Practice: Dismissal, 2025')
     .replace(/\b(?:HIGH|MEDIUM|LOW)\s+merit\s+(?:assessment|band)\b/gi, 'assessment')
@@ -429,13 +429,8 @@ function enforceOutwardDraftRules(draft = {}, caseBrief = {}) {
   const structure = output.part_a_letter || output;
   if (!structure || typeof structure !== 'object') return output;
 
-  const track = String(caseBrief.track || '').toUpperCase();
-  const merit = String(caseBrief.merit_band || '').toUpperCase();
-  const isHighMeritUd = merit === 'HIGH' && track.startsWith('UD-');
-  const canonicalCompensation =
-    "Compensation on an ex gratia, total cost to company basis. In light of the cumulative procedural defects identified above, together with the disputed substantive basis for dismissal and the safety context giving rise to the allegation, our client's position is that settlement should be calibrated toward the higher end of the compensation range available under section 194(1) of the LRA, being up to twelve months' remuneration";
   const canonicalNotice =
-    'Payment in lieu of notice calculated by reference to the applicable notice period under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, with payment made in accordance with section 38 of the BCEA';
+    'Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked';
 
   if (Array.isArray(structure.settlement_terms)) {
     let sawCompensation = false;
@@ -445,9 +440,9 @@ function enforceOutwardDraftRules(draft = {}, caseBrief = {}) {
     for (const rawTerm of structure.settlement_terms) {
       const text = cleanOutwardText(rawTerm);
 
-      if (/^\s*(?:compensation|ex gratia|settlement amount)\b/i.test(text)) {
+      if (/^\s*(?:compensation|ex gratia|settlement amount|payment\s+of\s+(?:an?\s+)?(?:ex\s+gratia\s+)?(?:compensation|settlement amount)|payment\s+of\s+ex\s+gratia\s+compensation)\b/i.test(text)) {
         if (!sawCompensation) {
-          mapped.push(isHighMeritUd ? canonicalCompensation : text);
+          mapped.push(text);
           sawCompensation = true;
         }
         continue;
@@ -467,7 +462,6 @@ function enforceOutwardDraftRules(draft = {}, caseBrief = {}) {
       if (text) mapped.push(text);
     }
 
-    if (isHighMeritUd && !sawCompensation) mapped.unshift(canonicalCompensation);
     if (!sawNotice && mapped.some(term => /notice/i.test(term))) mapped.push(canonicalNotice);
 
     structure.settlement_terms = [...new Set(mapped)];
