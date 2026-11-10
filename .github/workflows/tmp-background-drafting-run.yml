@@ -1,0 +1,56 @@
+name: Temporary background drafting run
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/tmp-background-drafting-run.yml'
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run three background drafting fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tmp-harness-results
+          base="https://labourlawassist.netlify.app/.netlify/functions/tmp_background_harness_71c9e4"
+          sleep 25
+          for fixture in misconduct performance retrenchment; do
+            echo "START $fixture"
+            start=""
+            for i in {1..20}; do
+              start=$(curl -sS -L --max-time 30 "$base?action=start&fixture=$fixture" || true)
+              if echo "$start" | python -c 'import sys,json; d=json.load(sys.stdin); assert d.get("caseId")' 2>/dev/null; then break; fi
+              echo "start attempt $i failed: $start"
+              sleep 8
+            done
+            case_id=$(echo "$start" | python -c 'import sys,json; print(json.load(sys.stdin)["caseId"])')
+            echo "$case_id" > "tmp-harness-results/$fixture.caseid"
+            echo "CASE $case_id"
+
+            final=""
+            for i in {1..80}; do
+              final=$(curl -sS -L --max-time 30 "$base?action=status&caseId=$case_id" || true)
+              state=$(echo "$final" | python -c 'import sys,json; print(json.load(sys.stdin).get("status",""))' 2>/dev/null || true)
+              stage=$(echo "$final" | python -c 'import sys,json; print(json.load(sys.stdin).get("stage",""))' 2>/dev/null || true)
+              echo "$fixture poll $i: $state $stage"
+              if [ "$state" = "completed" ] || [ "$state" = "failed" ]; then break; fi
+              sleep 15
+            done
+            echo "$final" | python -m json.tool > "tmp-harness-results/$fixture.json"
+            state=$(echo "$final" | python -c 'import sys,json; print(json.load(sys.stdin).get("status",""))')
+            if [ "$state" != "completed" ] && [ "$state" != "failed" ]; then
+              echo "Timed out waiting for $fixture"
+              exit 1
+            fi
+          done
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tmp-harness-results
+          git commit -m "Store temporary background drafting results"
+          git push
