@@ -88,7 +88,9 @@ function currentLawSkillContext(skillContext = '') {
     .replace(/Schedule 8 Items 3 and 4/gi, 'Code of Practice: Dismissal, 2025 paragraphs 6-11')
     .replace(/Schedule 8 proportionality/gi, 'Code of Practice: Dismissal, 2025 paragraphs 8-9')
     .replace(/(?:LRA\s+)?Schedule 8 Code of Good Practice:?\s*Dismissal/gi, 'Code of Practice: Dismissal, 2025')
-    .replace(/Schedule 8/gi, 'Code of Practice: Dismissal, 2025');
+    .replace(/Schedule 8/gi, 'Code of Practice: Dismissal, 2025')
+    .replace(/former\s+Code of Practice:\s*Dismissal,\s*2025/gi, 'former Schedule 8 Code of Good Practice on Dismissal')
+    .replace(/repealed\s+Code of Practice:\s*Dismissal,\s*2025/gi, 'repealed Schedule 8 Code of Good Practice on Dismissal');
 }
 
 function buildDraftingPrompt({ skillContext, caseBrief, skillManifest }) {
@@ -107,7 +109,9 @@ This server-side current-law block overrides any conflicting or outdated citatio
 - For incapacity due to ill health, injury or other incapacity, use paragraph 21 of the 2025 Code.
 - For operational-requirements dismissals, use paragraphs 22-24 of the 2025 Code alongside LRA section 189/189A where applicable.
 - Do NOT cite or describe the repealed Schedule 8 Code as current law.
-- BCEA section 37 determines the applicable notice period; BCEA section 38 creates the entitlement to payment instead of notice. Treat them as complementary, not alternatives. If seeking payment in lieu of notice, use wording equivalent to: "payment in lieu of the applicable notice period under section 38 of the BCEA, with the applicable notice period determined under section 37, subject to any more favourable contractual notice entitlement". Do not use "and/or" between sections 37 and 38.
+- BCEA section 37 determines the applicable notice period; BCEA section 38 is the mechanism permitting payment instead of working that notice period. Treat them as complementary, not alternatives. If seeking payment in lieu of notice, wording such as either "payment in lieu of the applicable notice period under section 38 of the BCEA, with the applicable notice period determined under section 37" OR "payment in lieu of the notice period to which the client is entitled under section 37, such payment to be made under section 38" is compliant. Do not use "and/or" between sections 37 and 38.
+- The Code of Practice: Dismissal, 2025 did NOT repeal or replace another instrument with the same 2025 title. If historical repeal context is relevant, the correct historical point is that the 2025 Code repealed the former Schedule 8 Code of Good Practice on Dismissal and the former operational-requirements code. Usually no historical repeal sentence is needed in the outward-facing letter.
+- For poor work performance, paragraphs 19-20 require appropriate evaluation/instruction/training/guidance/counselling, a reasonable opportunity to improve, awareness of the standard, a fair opportunity to meet it, and a reasonably achievable standard. They do NOT prescribe a formal written Performance Improvement Plan, fixed PIP duration or documented milestones. A missing PIP may be relevant evidence of an inadequate improvement process, but never state that the Code itself requires a formal PIP.
 - Keep all statutory references proportionate to the confirmed facts; do not add a statutory claim merely because it appears in this current-law block.
 === END CURRENT LAW OVERRIDE ===
 
@@ -156,6 +160,9 @@ Rules for this API output:
 - Do not include case-law citations in the letter.
 - Do not include salary figures or salary amounts anywhere in the letter.
 - Do not guess names, job titles, dates, addresses or facts. Use a clear placeholder such as [ADDRESSEE NAME] where required information is unknown.
+- Treat incident_date as a generic case date unless the case brief explicitly ties that date to a specific event. In a multi-event narrative, do not assign incident_date to a pregnancy disclosure, grievance, hearing, dismissal, consultation or other event merely because it is the only date available.
+- Do not invent possession of documents, emails, recordings, meeting notes, contracts, HR records or other evidence. Never say that the client or VRS "holds", "has records of", "can produce" or "will rely on" documentary evidence unless the case brief expressly confirms it.
+- If representation was denied, do not expand the type of representative beyond what the case brief confirms. For example, if the narrative confirms only that a colleague was refused, do not add that a trade union representative was also refused merely because the Code permits either form of assistance.
 - If the narrative and structured_case_facts conflict on a material fact, do not silently choose one version. Omit the disputed detail from the outward-facing letter where possible and flag the conflict in the supervisory assessment/forensic questions for human confirmation.
 - Do not state or imply that VRS holds a "written mandate" unless the SERVER CASE BRIEF expressly confirms a written mandate. The safe default is simply that VRS is instructed by the client.
 - Avoid unnecessary credibility assertions such as "we have no reason to doubt" and avoid self-evaluative phrases such as "the strength of our client's position". State the facts and legal significance directly.
@@ -176,9 +183,11 @@ Rules for this API output:
 - "settlement_terms" must contain each proposed settlement term as a separate item. The renderer will place these under a visible "Without Prejudice Settlement Proposal" heading and render them as clean bullet points, not sub-numbered clauses. Do not put bullet characters or numbering inside the item text.
 - Keep ordinary narrative text in "opening_paragraphs", "settlement_intro" and "conclusion_paragraphs".
 - Do NOT include the letter salutation, subject heading, "It is trusted that you will find same to be in order.", "Yours faithfully", the firm name, attorney/signatory name, electronic-signature note, or any other closing/signature block in Part A. Those are supplied exactly once by the Word template.
-- Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term.
+- Do not repeat the same sentence in both a substantive paragraph and a legal claim or settlement term. Each legal claim should have a distinct analytical job; avoid re-arguing the same facts in multiple claims unless the overlap is genuinely necessary.
+- Settlement bullets should state the requested term and, where useful, one concise sentence of calibration. Do not reproduce the full legal analysis inside the settlement proposal.
 - Connect the dots explicitly. Do not merely list events or restate the scorecard. For every material legal claim, identify the confirmed facts that matter, explain why those facts are legally or strategically significant, and show how they support the claim being advanced.
-- Use the structured_case_facts as evidence, not as a checklist to reproduce mechanically. Reconcile them with the narrative and scoring breakdown. Where a structured fact supplies an important detail that the narrative omits (for example denied representation, absence of consultation, lack of a PIP, prior warnings, selection criteria or a grievance), incorporate that fact into the appropriate Background or Legal Claims reasoning.
+- Use the structured_case_facts as evidence, not as a checklist to reproduce mechanically. Reconcile them with the narrative and scoring breakdown. Where a structured fact supplies an important detail that the narrative omits (for example denied representation, absence of consultation, absence of a structured improvement process, prior warnings, selection criteria or a grievance), incorporate that fact into the appropriate Background or Legal Claims reasoning.
+- In poor-performance matters, a fact such as pip_given=false means there was no formal PIP; it does NOT by itself prove there was no fair opportunity to improve. Assess the whole improvement process, including coaching, guidance, training, time allowed, achievable standards and operational constraints.
 - The reader should be able to follow a clear chain from what happened, to what was defective or unlawful, to why that creates settlement risk for the employer, to the resolution sought.
 - If wp_type is PROCEDURAL_ONLY, treat that as a structural instruction, not merely a tone preference. Do NOT create a standalone substantive-fairness claim or develop a substantive merits argument. Record any denial of misconduct or dispute about the employer's allegation once, briefly, as factual context in the chronology. The legal analysis must then focus on the procedural defects as the primary and dominant basis of the letter. Any substantive issue may be acknowledged in one brief sentence only where necessary for context, and must not read as a co-equal ground of challenge.
 - Any police, criminal-complaint or SAPS-related wording must track the confirmed case facts narrowly. Do not imply that a complaint was made or contemplated unless the case brief says so; use conditional wording only where genuinely necessary.
@@ -292,12 +301,15 @@ Apply the CURRENT LAW OVERRIDE from the drafting instructions when supervising.
 Mandatory current-law checks:
 - The first Code citation must identify the current instrument as "Code of Practice: Dismissal, 2025"; a bare "Code of Practice: Dismissal" that could be confused with the repealed Schedule 8 instrument is a defect.
 - A misconduct/substantive dismissal analysis must anchor fairness in LRA section 188(1) before applying the Code and factual reasoning.
-- A notice-pay clause must treat BCEA section 37 (notice period) and section 38 (payment instead of notice) as complementary. Describing them as alternatives, using "and/or" between them, or suggesting either section independently creates the payment entitlement is a defect.
+- A notice-pay clause must treat BCEA section 37 (notice period) and section 38 (payment instead of notice) as complementary. Both of these formulations are compliant and MUST NOT be penalised: (a) "payment in lieu of the applicable notice period under section 38, with the applicable notice period determined under section 37"; and (b) "payment in lieu of the notice period to which the client is entitled under section 37, such payment to be made under section 38". Only penalise wording that genuinely presents the sections as alternatives, uses "and/or", or materially misstates their relationship.
 - Employee-side non-disparagement must be one-way against the employer and its representatives unless mutuality is expressly authorised in the case brief.
 - If source facts conflict materially, the draft should not resolve the conflict by choosing one value without qualification or review.
 - Any reference to "Schedule 8" in the outward-facing draft is a mandatory defect; the protected skill context is normalised to current-law terminology before drafting.
 - Do not allow the draft to state that a manager laid or initiated a disciplinary charge unless that fact is expressly confirmed in the case brief.
-- For HIGH-merit WP matters, flag a compensation proposal as too generic if it does not connect the requested settlement value/level to the identified procedural and substantive risk, even where no rand amount is stated.
+- Reject any statement that the Code of Practice: Dismissal, 2025 requires a formal PIP, fixed PIP duration or documented milestones. The Code requires a fair and reasonable improvement opportunity and appropriate support, not a prescribed PIP format.
+- Reject claims that the client or VRS possesses documentary evidence unless the case brief expressly confirms that evidence.
+- Check date-to-event attribution: a generic incident_date must not be assigned to a specific event in a multi-event chronology without express support.
+- For HIGH-merit WP matters, the compensation proposal should connect the requested settlement level to the identified procedural and substantive risk. Do NOT require "upper end" or similar language solely because merit_band is HIGH; calibration must remain proportionate to the facts and litigation risk.
 If any of these mandatory checks fails, quality_floor_met must be false and drafting_quality_score must be below ${DRAFT_QUALITY_FLOOR} so the redraft path is triggered.
 
 For every criterion, identify the concrete problem, brief evidence from the draft, the required fix and severity. Use empty strings and severity "none" where there is no problem.
