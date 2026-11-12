@@ -163,6 +163,8 @@ Rules for this API output:
 - Treat incident_date as a generic case date unless the case brief explicitly ties that date to a specific event. In a multi-event narrative, do not assign incident_date to a pregnancy disclosure, grievance, hearing, dismissal, consultation or other event merely because it is the only date available.
 - Do not invent possession of documents, emails, recordings, meeting notes, contracts, HR records or other evidence. Never say that the client or VRS "holds", "has records of", "can produce" or "will rely on" documentary evidence unless the case brief expressly confirms it.
 - If representation was denied, do not expand the type of representative beyond what the case brief confirms. For example, if the narrative confirms only that a colleague was refused, do not add that a trade union representative was also refused merely because the Code permits either form of assistance.
+- Comparator facts must remain exact. A "junior employee in the same team" is NOT automatically a comparator in the same or similar role, with similar duties, performance or tenure. Do not state or imply role similarity, equal circumstances, or that pregnancy/protected status was the "only material difference" unless those facts are expressly confirmed.
+- If the existence of an adverse disciplinary finding is not expressly confirmed, a clean-record/expungement settlement term must be conditional, for example "any adverse disciplinary finding or outcome arising from this matter".
 - If the narrative and structured_case_facts conflict on a material fact, do not silently choose one version. Omit the disputed detail from the outward-facing letter where possible and flag the conflict in the supervisory assessment/forensic questions for human confirmation.
 - Do not state or imply that VRS holds a "written mandate" unless the SERVER CASE BRIEF expressly confirms a written mandate. The safe default is simply that VRS is instructed by the client.
 - Avoid unnecessary credibility assertions such as "we have no reason to doubt" and avoid self-evaluative phrases such as "the strength of our client's position". State the facts and legal significance directly.
@@ -308,7 +310,9 @@ Mandatory current-law checks:
 - Do not allow the draft to state that a manager laid or initiated a disciplinary charge unless that fact is expressly confirmed in the case brief.
 - Reject any statement that the Code of Practice: Dismissal, 2025 requires a formal PIP, fixed PIP duration or documented milestones. The Code requires a fair and reasonable improvement opportunity and appropriate support, not a prescribed PIP format.
 - Reject claims that the client or VRS possesses documentary evidence unless the case brief expressly confirms that evidence.
-- Check date-to-event attribution: a generic incident_date must not be assigned to a specific event in a multi-event chronology without express support.
+- Check date-to-event attribution: a generic incident_date must not be assigned to a specific event in a multi-event chronology without express support. If a multi-event draft assigns the generic date to a pregnancy disclosure, grievance, hearing, consultation or dismissal without express support, treat that as a factual-fidelity defect.
+- Check comparator discipline: "same team" or "junior colleague" does not establish same/similar role, equal circumstances, or that protected status was the only material difference. Treat any such expansion as an unsupported factual assertion.
+- Any sentence saying or implying that the Code of Practice: Dismissal, 2025 repealed or replaced a former Code of Practice: Dismissal, 2025 is a legal-accuracy defect.
 - For HIGH-merit WP matters, the compensation proposal should connect the requested settlement level to the identified procedural and substantive risk. Do NOT require "upper end" or similar language solely because merit_band is HIGH; calibration must remain proportionate to the facts and litigation risk.
 If any of these mandatory checks fails, quality_floor_met must be false and drafting_quality_score must be below ${DRAFT_QUALITY_FLOOR} so the redraft path is triggered.
 
@@ -427,7 +431,7 @@ async function callSupervisor({ model, skillContext, caseBrief, draft, purpose =
 
 function cleanOutwardText(value = '') {
   return String(value || '')
-    .replace(/,?\s*which\s+(?:replaced|repealed)\s+the\s+former\s+(?:Schedule\s+8(?:\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal)?|Code\s+of\s+Practice:\s*Dismissal,?\s*2025)/gi, '')
+    .replace(/,?\s*which\s+(?:has\s+)?(?:replaced|repealed)\s+the\s+former\s+(?:Schedule\s+8(?:\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal)?|Code\s+of\s+Practice:\s*Dismissal,?\s*2025)/gi, '')
     .replace(/\bSchedule\s+8\s+Code\s+of\s+Good\s+Practice\s+on\s+Dismissal\b/gi, 'Code of Practice: Dismissal, 2025')
     .replace(/\bSchedule\s+8\b/gi, 'Code of Practice: Dismissal, 2025')
     .replace(/\b(?:HIGH|MEDIUM|LOW)\s+merit\s+(?:assessment|band)\b/gi, 'assessment')
@@ -540,6 +544,9 @@ function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
   if (allText.includes('code of practice: dismissal') && !allText.includes('code of practice: dismissal, 2025')) {
     defects.push('Identify the current instrument at first use as the Code of Practice: Dismissal, 2025.');
   }
+  if (/code of practice:\s*dismissal,\s*2025[^.]{0,180}(?:repealed|replaced)[^.]{0,180}(?:former\s+)?code of practice:\s*dismissal,\s*2025/i.test(JSON.stringify(structure))) {
+    defects.push('Do not state or imply that the Code of Practice: Dismissal, 2025 repealed or replaced another Code with the same 2025 title.');
+  }
 
   const track = String(caseBrief.track || '').toUpperCase();
   if (['UD-MISCONDUCT','UD-POOR_PERFORMANCE','UD-INCAPACITY'].includes(track)) {
@@ -562,6 +569,16 @@ function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
   }
 
   const outwardText = JSON.stringify(structure);
+  const sourceText = JSON.stringify({
+    incident_description: caseBrief.incident_description,
+    original_client_narrative: caseBrief.original_client_narrative,
+    structured_case_facts: caseBrief.structured_case_facts
+  }).toLowerCase();
+  const limitedComparator = /same team|junior (?:employee|colleague)/i.test(sourceText) && !/same role|similar role|materially similar|only material difference/i.test(sourceText);
+  if (limitedComparator && /same role|similar role|materially similar role|only material (?:point of )?difference/i.test(outwardText)) {
+    defects.push('Keep comparator facts exact: do not infer same/similar roles or an "only material difference" where the case brief confirms only a junior employee/colleague in the same team.');
+  }
+
   const chargeInitiatorConfirmed = Boolean(caseBrief?.structured_case_facts?.charge_initiator);
   if (!chargeInitiatorConfirmed && /(?:laid|initiated|formulated)\s+(?:the\s+)?charge/i.test(outwardText)) {
     defects.push('Do not attribute the disciplinary charge to a specific manager unless the charge initiator is expressly confirmed in the case brief.');
