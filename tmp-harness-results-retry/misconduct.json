@@ -1,0 +1,522 @@
+{
+    "status": "failed",
+    "caseId": "2620d9f2-886a-415f-9889-5e40920eb8c7",
+    "fixture": "misconduct",
+    "stage": "GENERATION_FAILED",
+    "error": "Drafting quality remained below the VRS floor after supervised redraft (7/10): The reference to the client being denied a 'trade union representative' is not supported by the case brief, which mentions only a colleague; this is an unsupported factual addition that must be removed or qualified. | The phrase 'Our client understood this to be characterised as insubordination' blurs whose characterisation this is and should be clarified as the Employer's characterisation, not the client's. | The settlement calibration language, while adequate, could more explicitly tie the specific weight of the three stacked procedural defects plus the safety substantive context to the 'upper to middle' positioning for a HIGH-merit matter. | Remove or qualify the unsupported reference to a 'trade union representative' being denied; confine this to the colleague as confirmed in the brief, or render it conditionally pending confirmation.",
+    "case_brief": {
+        "client_side": "employee",
+        "audience": "counterparty",
+        "sender_variant": "VRS",
+        "client_name": "Thabo Mokoena",
+        "employer_name": "Northstar Logistics (Pty) Ltd",
+        "employer_contact_details": "HR Manager",
+        "addressee_name": null,
+        "addressee_position": null,
+        "incident_date": "2026-10-21",
+        "incident_description": "Thabo worked for the employer for five years. He was accused of insubordination after refusing to drive a delivery vehicle that he said had faulty brakes. He asked for the instruction to be put in writing. He was told at 08:00 that a disciplinary hearing would take place at 10:00 the same day. He was not allowed to bring a colleague. His direct manager, who had issued the instruction, chaired the hearing. Thabo denied being insubordinate and said he was concerned about safety. He was dismissed immediately after the hearing.",
+        "original_client_narrative": "I refused to drive the truck because the brakes were faulty. My manager said I was insubordinate and then chaired my hearing two hours later. I was not allowed anyone with me and I was fired the same day.",
+        "input_language_detected": null,
+        "employment_status": "Dismissed",
+        "dismissal_reason_type": "Misconduct",
+        "track": "UD-MISCONDUCT",
+        "track_label": "Unfair Dismissal \u2014 Misconduct",
+        "secondary_track": null,
+        "override_flags": [],
+        "substantive_score": 7,
+        "procedural_score": 9,
+        "merit_band": "HIGH",
+        "wp_type": "FULL",
+        "legal_basis": [
+            "LRA s188",
+            "2025 Code of Practice: Dismissal paras 7-11",
+            "Occupational Health and Safety Act context"
+        ],
+        "scoring_breakdown": [
+            {
+                "label": "Short notice before hearing",
+                "points": 3,
+                "legalHook": "procedural fairness"
+            },
+            {
+                "label": "Representation denied",
+                "points": 3,
+                "legalHook": "procedural fairness"
+            },
+            {
+                "label": "Chairperson directly involved",
+                "points": 3,
+                "legalHook": "procedural fairness"
+            },
+            {
+                "label": "Safety-related context to alleged insubordination",
+                "points": 2,
+                "legalHook": "substantive fairness"
+            }
+        ],
+        "recommended_next_step": "Without Prejudice settlement letter addressing procedural unfairness and the safety context.",
+        "ccma_deadline_status": {
+            "status": "WITHIN_WINDOW",
+            "daysRemaining": 11
+        },
+        "merit_bonus_trigger": null,
+        "strengths": [
+            "Short notice",
+            "Representation denied",
+            "Biased chair",
+            "Safety context"
+        ],
+        "weaknesses": [
+            "Employer may argue refusal of instruction was misconduct"
+        ],
+        "structured_case_facts": {
+            "employment_status": "Dismissed",
+            "dismissal_reason_type": "Misconduct",
+            "misconduct_category": "insubordination",
+            "conduct_admission": "Dispute",
+            "hearing_held": true,
+            "proc_notice": false,
+            "proc_rep": false,
+            "proc_chair": false,
+            "prior_warnings": "None",
+            "length_of_service": "5 years",
+            "incident_date": "2026-10-21",
+            "employer_name": "Northstar Logistics (Pty) Ltd",
+            "employer_contact_details": "HR Manager"
+        },
+        "client_requested_changes": null,
+        "revision_source_letter": null,
+        "revision_round": 0
+    },
+    "letter": "Background\n\n1. We are instructed by our client, Mr Thabo Mokoena, in connection with the termination of his employment with Northstar Logistics (Pty) Ltd on 21 October 2026. Our client has provided us with his account of the events leading up to and surrounding his dismissal and this letter is written on his instruction. Any further correspondence in this matter should be directed to our offices and not to our client directly.\n\n2. This letter is written on a without prejudice and subject to contract basis in a genuine attempt to resolve this matter without recourse to litigation. Nothing in this letter constitutes an admission of fact or law by our client and all of our client's rights are reserved, including the right to refer this matter to the Commission for Conciliation, Mediation and Arbitration or the relevant bargaining council without further notice, should a satisfactory resolution not be reached.\n\n3. Our client reports that he was employed by Northstar Logistics (Pty) Ltd for a period of five years to the date of his dismissal. To the extent that this is not already confirmed on the Employer's records, we invite the Employer to confirm the commencement date and the terms of our client's employment.\n\n4. On 21 October 2026, our client was instructed to drive a delivery vehicle which he states he believed to have faulty brakes. Our client raised this concern and asked that the instruction be confirmed in writing before he carried it out. Our client understood this to be characterised as insubordination. At approximately 08:00 that same day our client was informed that a disciplinary hearing would be convened at 10:00, being approximately two hours later. Our client attended the hearing without any representative, having been informed that he would not be permitted to bring a colleague or trade union representative with him. The hearing was chaired by the same manager who had issued the original instruction regarding the vehicle. Our client denied that his conduct amounted to insubordination and explained that his concern was a safety concern relating to the condition of the vehicle. Our client was dismissed immediately following the conclusion of the hearing.\n\nLegal Claims\n\n1. Unfair dismissal: substantive fairness under section 188(1) of the LRA: Section 188(1) of the Labour Relations Act 66 of 1995 requires that a dismissal be effected for a fair reason and in accordance with a fair procedure before it can be considered fair. The Code of Practice: Dismissal, 2025 provides the applicable framework at paragraphs 7 to 10 for substantive fairness in misconduct matters. Turning to the substantive fairness of the dismissal, our client disputes that his conduct amounted to insubordination. He states that his refusal was directed at a specific instruction which he understood, reasonably in the circumstances, to present a safety risk, and that he requested written confirmation of the instruction rather than refusing outright to engage with his manager on the issue. This context is directly relevant to whether dismissal was a proportionate sanction for the conduct in question, and to whether the Employer gave due weight to our client's stated safety concern before treating the matter as a dismissible offence.\n\n2. Unfair dismissal: procedural fairness under section 188(1) of the LRA and the Code: The Code of Practice: Dismissal, 2025 sets out, at paragraph 11, the requirements of a fair procedure in misconduct matters. On the procedural fairness of the dismissal, the record as reported to us discloses several material defects. Our client was given approximately two hours' notice of the hearing, which does not, on the facts available, appear to have afforded him a reasonable opportunity to prepare his response or to secure representation. Our client was not permitted to bring a fellow employee or trade union representative to the hearing, which is a significant departure from the right to representation contemplated under the Code. Further, the hearing was chaired by our client's direct manager, being the same individual who issued the instruction said to have been disobeyed. A chairperson who is closely connected to the underlying incident in this way cannot reasonably be expected to bring an independent mind to the proceedings, and this raises a real concern as to the impartiality of the hearing. Taken together, the short notice, the denial of representation and the compromised independence of the chairperson represent cumulative and material departures from a fair process.\n\nWithout Prejudice Settlement Proposal\n\nWithout conceding the correctness of the Employer's position, and in the interests of resolving this matter sensibly and without the need for proceedings before the CCMA, our client proposes the following terms of settlement:\n\n\u2022 Payment to our client of an ex gratia sum reflecting compensation calibrated toward the upper to middle end of the cap-relative range available under section 194(1) of the LRA, having regard to the cumulative procedural defects identified above, namely the inadequate notice of the hearing, the denial of representation and the compromised independence of the chairperson, read together with the safety-related context underlying the alleged misconduct\n\n\u2022 Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked\n\n\u2022 Payment of accrued but untaken leave pay owed to our client under section 40 of the BCEA\n\n\u2022 Confirmation that any pension or provident fund contributions due in respect of our client's employment are paid up to date, and that the accumulated benefit be dealt with in accordance with the rules of the applicable fund\n\n\u2022 Confirmation that UIF contributions have been paid up to date and provision of a completed UI-19 certificate to enable our client to claim unemployment benefits\n\n\u2022 Provision of a certificate of service in terms of section 42 of the BCEA\n\n\u2022 An agreed positive or neutral reference, in terms to be agreed between the parties\n\n\u2022 An undertaking by the Employer and its representatives not to disparage our client in any communication, whether internal or external\n\n\u2022 Confidentiality as to the terms of this settlement, the negotiations and the underlying dispute, as between the parties and their respective advisers\n\n\u2022 Treatment of our client's record as a clean record, with any finding or outcome arising from the disciplinary hearing of 21 October 2026 expunged or treated as withdrawn\n\n\u2022 The terms of settlement to be reduced to a formal written settlement agreement, signed by both parties, with all rights reserved pending such signature\n\nOur client's dismissal, on the facts presently available, exposes the Employer to a claim for unfair dismissal before the CCMA, where compensation of up to 12 months' remuneration is available under section 194(1) of the LRA, in addition to the primary remedy of reinstatement under section 193. The cumulative procedural defects identified above, taken together with the safety-related context of the underlying allegation, represent material litigation risk for the Employer and inform the calibration of the settlement proposed. We trust that the Employer will see the commercial benefit in resolving this matter on the terms proposed rather than proceeding to arbitration.\n\nWe invite a substantive response to this letter within 7 calendar days of the date of this letter, failing which we are instructed to proceed to refer this matter to the CCMA for conciliation and, if necessary, arbitration, without further notice to the Employer. All of our client's rights in this regard are expressly reserved.",
+    "structure": {
+        "legal_claims": [
+            {
+                "text": "Section 188(1) of the Labour Relations Act 66 of 1995 requires that a dismissal be effected for a fair reason and in accordance with a fair procedure before it can be considered fair. The Code of Practice: Dismissal, 2025 provides the applicable framework at paragraphs 7 to 10 for substantive fairness in misconduct matters. Turning to the substantive fairness of the dismissal, our client disputes that his conduct amounted to insubordination. He states that his refusal was directed at a specific instruction which he understood, reasonably in the circumstances, to present a safety risk, and that he requested written confirmation of the instruction rather than refusing outright to engage with his manager on the issue. This context is directly relevant to whether dismissal was a proportionate sanction for the conduct in question, and to whether the Employer gave due weight to our client's stated safety concern before treating the matter as a dismissible offence.",
+                "title": "Unfair dismissal: substantive fairness under section 188(1) of the LRA"
+            },
+            {
+                "text": "The Code of Practice: Dismissal, 2025 sets out, at paragraph 11, the requirements of a fair procedure in misconduct matters. On the procedural fairness of the dismissal, the record as reported to us discloses several material defects. Our client was given approximately two hours' notice of the hearing, which does not, on the facts available, appear to have afforded him a reasonable opportunity to prepare his response or to secure representation. Our client was not permitted to bring a fellow employee or trade union representative to the hearing, which is a significant departure from the right to representation contemplated under the Code. Further, the hearing was chaired by our client's direct manager, being the same individual who issued the instruction said to have been disobeyed. A chairperson who is closely connected to the underlying incident in this way cannot reasonably be expected to bring an independent mind to the proceedings, and this raises a real concern as to the impartiality of the hearing. Taken together, the short notice, the denial of representation and the compromised independence of the chairperson represent cumulative and material departures from a fair process.",
+                "title": "Unfair dismissal: procedural fairness under section 188(1) of the LRA and the Code"
+            }
+        ],
+        "settlement_intro": "Without conceding the correctness of the Employer's position, and in the interests of resolving this matter sensibly and without the need for proceedings before the CCMA, our client proposes the following terms of settlement:",
+        "settlement_terms": [
+            "Payment to our client of an ex gratia sum reflecting compensation calibrated toward the upper to middle end of the cap-relative range available under section 194(1) of the LRA, having regard to the cumulative procedural defects identified above, namely the inadequate notice of the hearing, the denial of representation and the compromised independence of the chairperson, read together with the safety-related context underlying the alleged misconduct",
+            "Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked",
+            "Payment of accrued but untaken leave pay owed to our client under section 40 of the BCEA",
+            "Confirmation that any pension or provident fund contributions due in respect of our client's employment are paid up to date, and that the accumulated benefit be dealt with in accordance with the rules of the applicable fund",
+            "Confirmation that UIF contributions have been paid up to date and provision of a completed UI-19 certificate to enable our client to claim unemployment benefits",
+            "Provision of a certificate of service in terms of section 42 of the BCEA",
+            "An agreed positive or neutral reference, in terms to be agreed between the parties",
+            "An undertaking by the Employer and its representatives not to disparage our client in any communication, whether internal or external",
+            "Confidentiality as to the terms of this settlement, the negotiations and the underlying dispute, as between the parties and their respective advisers",
+            "Treatment of our client's record as a clean record, with any finding or outcome arising from the disciplinary hearing of 21 October 2026 expunged or treated as withdrawn",
+            "The terms of settlement to be reduced to a formal written settlement agreement, signed by both parties, with all rights reserved pending such signature"
+        ],
+        "opening_paragraphs": [
+            "We are instructed by our client, Mr Thabo Mokoena, in connection with the termination of his employment with Northstar Logistics (Pty) Ltd on 21 October 2026. Our client has provided us with his account of the events leading up to and surrounding his dismissal and this letter is written on his instruction. Any further correspondence in this matter should be directed to our offices and not to our client directly.",
+            "This letter is written on a without prejudice and subject to contract basis in a genuine attempt to resolve this matter without recourse to litigation. Nothing in this letter constitutes an admission of fact or law by our client and all of our client's rights are reserved, including the right to refer this matter to the Commission for Conciliation, Mediation and Arbitration or the relevant bargaining council without further notice, should a satisfactory resolution not be reached.",
+            "Our client reports that he was employed by Northstar Logistics (Pty) Ltd for a period of five years to the date of his dismissal. To the extent that this is not already confirmed on the Employer's records, we invite the Employer to confirm the commencement date and the terms of our client's employment.",
+            "On 21 October 2026, our client was instructed to drive a delivery vehicle which he states he believed to have faulty brakes. Our client raised this concern and asked that the instruction be confirmed in writing before he carried it out. Our client understood this to be characterised as insubordination. At approximately 08:00 that same day our client was informed that a disciplinary hearing would be convened at 10:00, being approximately two hours later. Our client attended the hearing without any representative, having been informed that he would not be permitted to bring a colleague or trade union representative with him. The hearing was chaired by the same manager who had issued the original instruction regarding the vehicle. Our client denied that his conduct amounted to insubordination and explained that his concern was a safety concern relating to the condition of the vehicle. Our client was dismissed immediately following the conclusion of the hearing."
+        ],
+        "conclusion_paragraphs": [
+            "Our client's dismissal, on the facts presently available, exposes the Employer to a claim for unfair dismissal before the CCMA, where compensation of up to 12 months' remuneration is available under section 194(1) of the LRA, in addition to the primary remedy of reinstatement under section 193. The cumulative procedural defects identified above, taken together with the safety-related context of the underlying allegation, represent material litigation risk for the Employer and inform the calibration of the settlement proposed. We trust that the Employer will see the commercial benefit in resolving this matter on the terms proposed rather than proceeding to arbitration.",
+            "We invite a substantive response to this letter within 7 calendar days of the date of this letter, failing which we are instructed to proceed to refer this matter to the CCMA for conciliation and, if necessary, arbitration, without further notice to the Employer. All of our client's rights in this regard are expressly reserved."
+        ]
+    },
+    "supervisory_assessment": {
+        "criteria": [
+            {
+                "score": 7,
+                "problem": "One factual overreach: the draft states that the manager was 'the same individual who issued the instruction said to have been disobeyed' and treats this as the chairperson identity, which is confirmed by the brief (proc_chair: false means chair independence failed, and incident_description confirms this). However, the opening narrative states 'Our client understood this to be characterised as insubordination' which is a slight softening/recasting not clearly sourced, and the phrase 'having been informed that he would not be permitted to bring a colleague or trade union representative' asserts a specific prohibition on trade union representation that is not confirmed in the brief (brief only says 'not allowed to bring a colleague'). No union involvement is mentioned in the brief at all.",
+                "severity": "medium",
+                "criterion": "Factual fidelity",
+                "required_fix": "Remove or qualify the unsupported reference to trade union representation; confine the representation denial to the colleague as per the brief, or flag the union question as a forensic question rather than asserting it as fact.",
+                "evidence_from_draft": "\"he would not be permitted to bring a colleague or trade union representative with him\" - trade union representative is not supported by the brief, which only mentions a colleague."
+            },
+            {
+                "score": 7.5,
+                "problem": "The draft generally reflects the HIGH merit band and connects procedural defects (notice, representation, chair bias) and safety context to substantive and procedural fairness arguments, and calibrates settlement toward upper-to-middle cap range. However the settlement term language is somewhat generic in its causal link: it lists the defects but does not explicitly tie the specific combination of substantive score 7 and procedural score 9 to a reasoned proportionality statement beyond 'upper to middle end'. This is borderline compliant with the mandatory HIGH-merit specificity check, but is adequately connected and not entirely generic.",
+                "severity": "low",
+                "criterion": "Legal and strategic alignment",
+                "required_fix": "Strengthen the settlement paragraph to more explicitly state why procedural defects of this severity (three stacked defects plus safety substantive context) justify upper-range calibration, rather than a generic listing.",
+                "evidence_from_draft": "\"compensation calibrated toward the upper to middle end of the cap-relative range available under section 194(1) of the LRA, having regard to the cumulative procedural defects identified above... read together with the safety-related context\""
+            },
+            {
+                "score": 8,
+                "problem": "Tone is professional, measured, and consistent with counterparty-facing register; restrained formulations are used appropriately. No major breaches of tone rules identified.",
+                "severity": "none",
+                "criterion": "VRS tone and house style",
+                "required_fix": "",
+                "evidence_from_draft": "\"A chairperson who is closely connected to the underlying incident in this way cannot reasonably be expected to bring an independent mind to the proceedings\" - measured and not hyperbolic."
+            },
+            {
+                "score": 7.5,
+                "problem": "The structure is largely coherent with distinct claim headings and clear progression. However, the background paragraph conflates the factual account and the insubordination characterisation in a slightly confusing way ('Our client understood this to be characterised as insubordination' sits oddly mid-chronology rather than as a clean recitation of fact), and the two legal claims (substantive and procedural) could be more clearly demarcated from the background before moving to legal analysis. No case-law citations issue. No duplicated template content observed in the structured body supplied.",
+                "severity": "low",
+                "criterion": "Structure and readability",
+                "required_fix": "Clarify that the insubordination characterisation came from the Employer, not from the client's own understanding, to avoid blurring whose characterisation is whose.",
+                "evidence_from_draft": "\"Our client raised this concern and asked that the instruction be confirmed in writing before he carried it out. Our client understood this to be characterised as insubordination.\""
+            },
+            {
+                "score": 8,
+                "problem": "Settlement terms are clear, in the standing 3A.10 order substantially, response window of 7 calendar days correctly stated and does not exceed the cap. No rand figures. Order mostly follows standing structure though withdrawal of charges/disciplinary outcome clause appears before certificate of service deviates slightly from standard order (clean record should appear later per 3A.10 item 12, which it does, but the order of items 7 (reference) and 8 (non-disparagement) before confidentiality (9) is consistent). Minor: the standing order places 'withdrawal of charges and termination of disciplinary process' (item 10) before 'clean record and expungement' (item 12); draft only includes clean record expungement without a separate 'withdrawal of charges/termination of disciplinary process' clause, which is a minor omission given the matter is already concluded (client was dismissed, not pending charges), so this is a reasonable adaptation.",
+                "severity": "none",
+                "criterion": "Settlement clarity and actionability",
+                "required_fix": "",
+                "evidence_from_draft": "\"We invite a substantive response to this letter within 7 calendar days of the date of this letter\""
+            },
+            {
+                "score": 4,
+                "problem": "Mandatory current-law check failure: the Code citation is given as 'Code of Practice: Dismissal, 2025' correctly in the first legal claim paragraph, which is compliant. However, the notice-pay clause fails the mandatory BCEA section 37/38 check: it describes section 37 as creating the entitlement and section 38 as the payment mechanism in a way that is largely correct ('Payment in lieu of the notice period... under section 37 of the BCEA... such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked') - this is actually compliant treatment, not alternative framing. On closer review this passes. However, there is a separate compliance issue: the draft does not explicitly anchor the substantive fairness analysis in LRA section 188(1) before applying the Code in the clearest sequential way - it does cite 188(1) first in the first sentence of the substantive claim, which is compliant. The more serious compliance concern is the unsupported assertion regarding denial of a 'trade union representative' which is not confirmed in the brief, and the subtle recasting of 'Our client understood this to be characterised as insubordination' which risks the draft stating a characterisation as if established. Also of note: no Schedule 8 reference appears, no rand figures appear, no duplicate salutation/closing appears in the Part A body supplied. The most material defect is the unsupported trade union representative assertion, which is a fabricated procedural fact not expressly confirmed in the brief, and under the mandatory check on not resolving conflicting/unconfirmed facts without qualification, this must be treated as a factual fabrication requiring correction before the floor can be met.",
+                "severity": "high",
+                "criterion": "Safety and drafting compliance",
+                "required_fix": "Remove the unsupported 'trade union representative' assertion or convert to conditional wording ('to the extent a union representative would ordinarily have been permitted...') and confirm via forensic question whether union representation was sought or available.",
+                "evidence_from_draft": "\"he would not be permitted to bring a colleague or trade union representative with him\" introduces an unconfirmed fact (trade union representative) as settled fact without conditional language."
+            }
+        ],
+        "score_change": 0.2,
+        "quality_floor": 7.5,
+        "what_is_strong": [
+            "The procedural fairness paragraph is well particularised: it identifies the short notice (two hours), the denial of representation and the chairperson's conflict of interest as three distinct, factually grounded defects rather than asserting unfairness in the abstract.",
+            "The substantive fairness paragraph correctly anchors the analysis in section 188(1) of the LRA before applying the Code of Practice: Dismissal, 2025 and engages with the safety context as relevant to proportionality rather than asserting innocence outright.",
+            "The settlement terms substantially track the standing 3A.10 order (ex gratia, notice, leave pay, pension/provident, UIF, certificate of service, reference, non-disparagement, confidentiality, clean record, agreement to follow) and avoid rand figures throughout.",
+            "The response window is correctly set at 7 calendar days and the reservation of rights is included in the conclusion.",
+            "Conditional wording is correctly used for unconfirmed facts in places, for example inviting the Employer to confirm commencement date and employment terms."
+        ],
+        "what_needs_work": [
+            "The reference to the client being denied a 'trade union representative' is not supported by the case brief, which mentions only a colleague; this is an unsupported factual addition that must be removed or qualified.",
+            "The phrase 'Our client understood this to be characterised as insubordination' blurs whose characterisation this is and should be clarified as the Employer's characterisation, not the client's.",
+            "The settlement calibration language, while adequate, could more explicitly tie the specific weight of the three stacked procedural defects plus the safety substantive context to the 'upper to middle' positioning for a HIGH-merit matter."
+        ],
+        "risks_to_monitor": [
+            "If the Employer's hearing record shows that a union representative was in fact permitted or that none was requested, the unsupported assertion about trade union representation could undermine the credibility of the whole letter if challenged.",
+            "The Employer may argue that refusing a direct instruction, irrespective of the stated safety concern, independently justified disciplinary action, which could be raised as a counter to the settlement positioning.",
+            "The 11-day CCMA window remaining means any delay in sending this letter risks the client needing a protective referral regardless of settlement negotiations."
+        ],
+        "quality_floor_met": false,
+        "redraft_performed": true,
+        "forensic_questions": [
+            "Was the client specifically informed that a trade union representative would not be permitted at the hearing, or was the restriction limited to a fellow employee/colleague as the brief currently records?",
+            "Does the client have any written record (email, text, memo) of the instruction to drive the vehicle or the request to have it confirmed in writing?",
+            "Has a protective CCMA referral already been lodged or diarised given the 11 days remaining in the window?",
+            "What is the client's gross monthly remuneration, for calibration of the settlement proposal against the section 194(1) cap?",
+            "Is there a disciplinary code or policy applicable to Northstar Logistics that prescribes minimum notice periods for hearings, which would further particularise the procedural defect?"
+        ],
+        "initial_assessment": {
+            "criteria": [
+                {
+                    "score": 7,
+                    "problem": "The draft attributes insubordination characterisation and chairing to \"our client's direct manager\" which is supported, but it introduces an unsupported causal framing that the manager \"regarded this as insubordination\" presented as fact rather than account, and the narrative states the manager \"issued the instruction regarding the vehicle\" and also chaired, which is in the brief, but the draft does not flag the brief's internal note that the manager laid/initiated the charge; this is implied (\"the same individual who issued the instruction said to have been disobeyed\") without confirming who brought the actual disciplinary charge. This edges toward stating the manager initiated the charge, which is not expressly confirmed in the brief beyond issuing the instruction and chairing.",
+                    "severity": "low",
+                    "criterion": "Factual fidelity",
+                    "required_fix": "Qualify the attribution: state that the manager who issued the instruction also chaired the hearing (both confirmed), but avoid asserting that this same manager personally brought or laid the disciplinary charge unless the brief confirms it; use conditional/reported language consistently (\"our client understood this to be characterised as insubordination\").",
+                    "evidence_from_draft": "\"the hearing was chaired by our client's direct manager, being the same individual who issued the instruction said to have been disobeyed\" and earlier \"Our client's direct manager regarded this as insubordination.\""
+                },
+                {
+                    "score": 6,
+                    "problem": "The Code citation on first reference is given as \"Code of Practice: Dismissal, 2025\" which satisfies the current-law naming requirement, but section 188(1) is cited together with the Code in the same breath without clearly anchoring fairness in s188(1) before invoking the Code as the mandatory sequencing check requires; the sentence structure leads with s188(1) then the Code, which is acceptable, but the substantive analysis before quantifying exposure is thin given the HIGH merit band (sub 7, proc 9) - the settlement term for ex gratia compensation is generic (\"compensation calibrated to the identified procedural defects and the safety-related context\") without tying the settlement ask explicitly to the strength indicated by the merit band (e.g., short notice, denial of representation, biased chair are each very strong grounds) or indicating where within the 12-month cap this sits, failing the HIGH-merit specificity check.",
+                    "severity": "medium",
+                    "criterion": "Legal and strategic alignment",
+                    "required_fix": "Strengthen the settlement clause to explicitly connect the cumulative procedural failures (short notice, denial of representation, biased chairperson) and the safety-context substantive point to a position calibrated toward the upper/middle of the 12-month cap-relative range, consistent with a HIGH merit band, rather than a generic cap reference.",
+                    "evidence_from_draft": "\"Payment to our client of an ex gratia sum reflecting compensation calibrated to the identified procedural defects and the safety-related context of the alleged misconduct, having regard to the compensation framework of up to 12 months' remuneration under section 194(1) of the LRA\""
+                },
+                {
+                    "score": 8,
+                    "problem": "Tone is largely controlled, professional and proportionate, consistent with counterparty-facing register. Minor stylistic looseness: phrase \"in full and open attempt to resolve this matter\" is awkward and borderline informal/ungrammatical for senior labour litigation register.",
+                    "severity": "low",
+                    "criterion": "VRS tone and house style",
+                    "required_fix": "Rephrase to standard formulation, e.g. \"This letter is written on a without prejudice and subject to contract basis in a genuine attempt to resolve this matter without recourse to litigation.\"",
+                    "evidence_from_draft": "\"This letter is written on a without prejudice and subject to contract basis and in full and open attempt to resolve this matter without recourse to litigation.\""
+                },
+                {
+                    "score": 6.5,
+                    "problem": "The single legal claim paragraph is dense and merges substantive and procedural fairness into one long paragraph via signposts, which is permitted by house style, but combined with the opening narrative paragraph being long and compound, readability suffers. The standing body order per 3A.1 omits several ordinarily-expected standalone elements (comparator - correctly not invented; grievance - not applicable; suspension - not applicable) but the legal analysis paragraph is unusually long and could be split for clarity between substantive and procedural fairness as the house style contemplates signposted sub-sections within reasonable paragraph length. No duplicated template content is present.",
+                    "severity": "low",
+                    "criterion": "Structure and readability",
+                    "required_fix": "Split the single legal claim paragraph into two numbered paragraphs, one for substantive fairness and one for procedural fairness, each with its own plain-text signpost, to improve navigability while retaining prose style.",
+                    "evidence_from_draft": "The entire substantive and procedural analysis is carried in one very long paragraph: \"Turning to the substantive fairness of the dismissal, ... Taken together, the short notice, the denial of representation and the compromised independence of the chairperson represent cumulative and material departures from a fair process.\""
+                },
+                {
+                    "score": 7,
+                    "problem": "The settlement terms follow the standing 3A.10 order substantially (ex gratia, notice, leave pay, pension/provident, UIF, certificate of service, reference, non-disparagement, confidentiality, clean record, agreement to follow) and the response window is 7 calendar days, compliant. However the notice-pay clause conflates sections 37 and 38 in a way that is ambiguous as to whether they are complementary or alternative, which is a mandatory defect under the current-law override.",
+                    "severity": "high",
+                    "criterion": "Settlement clarity and actionability",
+                    "required_fix": "Clarify that section 37 establishes the notice period entitlement and section 38 is the mechanism by which payment in lieu of notice is calculated and paid, expressly describing them as operating together, not as alternative or optional bases.",
+                    "evidence_from_draft": "\"Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked\""
+                },
+                {
+                    "score": 5,
+                    "problem": "Mandatory current-law checks are mostly satisfied (Code cited as \"Code of Practice: Dismissal, 2025\"; s188(1) anchors the analysis; non-disparagement is one-way against the Employer; no Schedule 8 reference; no rand figures; no case law citations; no duplicate salutation/closing since those are template-supplied). However the notice-pay clause fails the mandatory section 37/section 38 complementarity check by presenting them in a construction that reads as sequential/alternative bases (\"entitled to... under section 37... such payment to be made under section 38\") rather than clearly stating they operate together, which is explicitly flagged as a mandatory defect requiring the floor to fail.",
+                    "severity": "high",
+                    "criterion": "Safety and drafting compliance",
+                    "required_fix": "Rewrite the clause to state clearly that section 37 of the BCEA establishes our client's notice entitlement and section 38 of the BCEA entitles our client to payment in lieu of notice calculated by reference to that period, presenting the two sections as a single complementary statutory basis rather than a two-step or alternative construction.",
+                    "evidence_from_draft": "\"Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked\""
+                }
+            ],
+            "what_is_strong": [
+                "The procedural fairness paragraph particularises each defect (two hours' notice, denial of representation, chairperson bias) with precision tied to the brief, satisfying the particularity standard required by the prompt.",
+                "The safety-related substantive context is properly connected to proportionality of sanction rather than asserted as an absolute defence.",
+                "Settlement terms substantially track the standing 3A.10 order (ex gratia, notice, leave, pension/provident, UIF, certificate of service, reference, non-disparagement, confidentiality, clean record, agreement to follow).",
+                "No rand figures, no case-law citations, no Schedule 8 reference; the Code is correctly cited as the 2025 instrument.",
+                "The 7 calendar day response window is compliant with the house-style cap.",
+                "Non-disparagement undertaking is correctly one-way against the Employer, consistent with Employee-side convention."
+            ],
+            "what_needs_work": [
+                "The BCEA section 37/section 38 notice-pay clause must be rewritten to present the two sections as complementary rather than sequential or alternative, per the mandatory current-law check.",
+                "The ex gratia settlement clause should be made more specific to the HIGH merit band, explicitly connecting the cumulative procedural failures and safety context to a calibrated position within the cap, rather than a generic recitation of the cap.",
+                "The single dense legal-claim paragraph should be split into a substantive fairness paragraph and a procedural fairness paragraph for readability, consistent with usual practice under this house style.",
+                "Minor stylistic correction needed to the purpose paragraph (\"in full and open attempt\") for register precision.",
+                "Review the phrase implying the manager's role in characterising/initiating the insubordination finding to ensure it does not overstate confirmed facts about who brought the charge."
+            ],
+            "risks_to_monitor": [
+                "If the section 37/38 ambiguity is read by the Employer's representative as uncertainty about the correct legal basis for notice pay, it could undermine the letter's credibility on a point that should be unassailable.",
+                "The generic compensation framing may under-anchor settlement expectations and invite a lowball counter-offer inconsistent with the HIGH merit band and strong procedural record (proc score 9).",
+                "As the CCMA 30-day window has 11 days remaining, any delay in finalising the redraft narrows the referral runway if settlement is not reached."
+            ],
+            "quality_floor_met": false,
+            "forensic_questions": [
+                "Can the Client confirm or provide documentary evidence (payslip, contract) of the exact commencement date and monthly remuneration to support calibration of notice pay and the settlement ex gratia figure?",
+                "Is there a company disciplinary code or collective agreement that prescribes minimum notice periods for disciplinary hearings, to further particularise the procedural defect on short notice?",
+                "Did the Client raise the brakes concern to anyone else (e.g. a safety officer or OHSA-designated person) before refusing the instruction, which could strengthen the section 187(1)(f)/OHSA s35 framing if later needed?",
+                "Has a CCMA referral already been lodged or is one contemplated within the 11 remaining days, and should the response window be shortened to preserve the limitation margin?"
+            ],
+            "supervisory_summary": "The draft is factually faithful in its core narrative, correctly cites the 2025 Code, anchors fairness in s188(1), uses a one-way non-disparagement clause and observes the 7-day response window and cap-relative settlement language. However it fails a mandatory current-law check: the BCEA section 37/section 38 notice-pay clause presents the two provisions in a sequential/alternative construction rather than clearly complementary terms, which is an explicit mandatory defect requiring the Drafting Quality floor to be treated as not met. The settlement positioning is also under-calibrated for a HIGH merit band matter, and the combined legal-claims paragraph is dense. These issues are correctable without re-assessing the underlying merits score, but the letter is not yet ready to send and should be redrafted on the identified points before finalisation.",
+            "drafting_quality_score": 6.8,
+            "recommended_amendments": [
+                "Rewrite the notice-pay settlement clause so that sections 37 and 38 of the BCEA are described as operating together (entitlement plus payment mechanism), not as alternative or sequential bases.",
+                "Revise the ex gratia compensation clause to explicitly tie the settlement calibration to the specific procedural failures (short notice, denial of representation, biased chair) and the safety-context substantive point, signalling a position toward the higher end of the cap-relative range consistent with the HIGH merit band.",
+                "Split the combined substantive/procedural legal claim paragraph into two numbered paragraphs for readability.",
+                "Correct the awkward phrasing in the purpose paragraph.",
+                "Confirm wording does not overstate who brought the disciplinary charge beyond what the brief confirms (manager issued instruction and chaired hearing)."
+            ]
+        },
+        "supervisory_summary": "The draft is well organised, correctly anchors the substantive claim in section 188(1) before the Code, uses the 2025 Code citation correctly, treats BCEA sections 37 and 38 as complementary rather than alternative, and follows the standing settlement clause order with appropriate cap-relative and non-itemised language. However, it introduces an unsupported fact: a denial of a trade union representative that is not confirmed anywhere in the case brief, which only confirms denial of a colleague. This is a fabricated procedural detail on a HIGH-merit matter and triggers the mandatory check against resolving unconfirmed facts without qualification. Combined with a minor ambiguity over whose characterisation of insubordination is being recorded, and a settlement paragraph that could tie risk factors to calibration more explicitly, the draft falls below the 7.5 floor and must be corrected before approval.",
+        "drafting_quality_score": 7,
+        "recommended_amendments": [
+            "Remove or qualify the unsupported reference to a 'trade union representative' being denied; confine this to the colleague as confirmed in the brief, or render it conditionally pending confirmation.",
+            "Clarify that the insubordination characterisation was the Employer's, not an understanding reached by the client himself, to avoid ambiguity about whose characterisation is being recorded.",
+            "Strengthen the causal link in the settlement intro/terms between the specific combination of procedural defects and substantive safety context and the proposed calibration level, to avoid a generic compensation proposal on a HIGH-merit matter.",
+            "Re-run the Part A draft through the mandatory current-law and unsupported-fact checks before finalising, given the trade union representation fabrication identified."
+        ],
+        "final_drafting_quality_score": 7,
+        "initial_drafting_quality_score": 6.8
+    },
+    "run_summary": {
+        "drafting_quality_score": 7,
+        "quality_floor_met": false,
+        "redraft_performed": true,
+        "initial_drafting_quality_score": 6.8,
+        "final_drafting_quality_score": 7
+    },
+    "skill_hash": "e80ecce904dd02be2159df775af2f15bc4d069f8c84638a819cd1474796580ef",
+    "skill_manifest": {
+        "SKILL_WORKFLOW": {
+            "sha256": "6893d8d6612b25f8f6bfdf327d5db3ad55a4304afb883fdf068135c4d56e9fd3",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "VRS_HOUSE_STYLE": {
+            "sha256": "341fccf7e5adedebc7ac5e3dff406914dbd18365257fee1ec3d3c9fa141e67f5",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "WP_EMPLOYEE_PROMPT": {
+            "sha256": "375f43b124fa0ffa89fb69f63203ca3274ed79d0aeee7efa1c28d800a1cb6d29",
+            "version": "v1.0",
+            "asset_type": "text"
+        },
+        "SKILL_MATTER_ASSESSMENT": {
+            "sha256": "78e271c6943c88681f2b88b10b38371fe557f506395337531740a5fece6b8df1",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "SKILL_WPLETTER_EMPLOYEE": {
+            "sha256": "8c016ab4fcc77d2518fdf9f5636c085480620197123fe777ba12de6f60c96baf",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        }
+    },
+    "llm_call_logs": [
+        {
+            "calls": [
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 52107,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 2374,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "draft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:43:36.794Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:44:02.192Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 51656,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 4520,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "supervision",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:44:02.195Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:44:47.118Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 55919,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 2571,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "redraft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:44:47.120Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:45:05.106Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 51798,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 4279,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "supervision_after_redraft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:45:05.109Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:45:48.668Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                }
+            ],
+            "model": "claude-sonnet-5",
+            "usage": {
+                "speed": "standard",
+                "input_tokens": 52107,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "output_tokens": 2374,
+                "cache_creation": {
+                    "ephemeral_1h_input_tokens": 0,
+                    "ephemeral_5m_input_tokens": 0
+                },
+                "output_tokens_details": {
+                    "thinking_tokens": 0
+                },
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0
+            },
+            "status": "success",
+            "provider": "anthropic",
+            "thinking": "omitted",
+            "max_tokens": 12000,
+            "skill_hash": "e80ecce904dd02be2159df775af2f15bc4d069f8c84638a819cd1474796580ef",
+            "started_at": "2026-11-12T07:43:36.794Z",
+            "stop_reason": "tool_use",
+            "completed_at": "2026-11-12T07:45:48.669Z",
+            "model_source": "pinned_default",
+            "quality_floor": 7.5,
+            "skill_manifest": {
+                "SKILL_WORKFLOW": {
+                    "sha256": "6893d8d6612b25f8f6bfdf327d5db3ad55a4304afb883fdf068135c4d56e9fd3",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "VRS_HOUSE_STYLE": {
+                    "sha256": "341fccf7e5adedebc7ac5e3dff406914dbd18365257fee1ec3d3c9fa141e67f5",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "WP_EMPLOYEE_PROMPT": {
+                    "sha256": "375f43b124fa0ffa89fb69f63203ca3274ed79d0aeee7efa1c28d800a1cb6d29",
+                    "version": "v1.0",
+                    "asset_type": "text"
+                },
+                "SKILL_MATTER_ASSESSMENT": {
+                    "sha256": "78e271c6943c88681f2b88b10b38371fe557f506395337531740a5fece6b8df1",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "SKILL_WPLETTER_EMPLOYEE": {
+                    "sha256": "8c016ab4fcc77d2518fdf9f5636c085480620197123fe777ba12de6f60c96baf",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                }
+            },
+            "anthropic_version": "2023-06-01",
+            "quality_floor_met": false,
+            "redraft_performed": true,
+            "case_brief_summary": {
+                "track": "UD-MISCONDUCT",
+                "wp_type": "FULL",
+                "audience": "counterparty",
+                "merit_band": "HIGH",
+                "client_side": "employee",
+                "override_flags": [],
+                "sender_variant": "VRS"
+            },
+            "drafting_quality_score": 7
+        }
+    ]
+}

@@ -1,0 +1,532 @@
+{
+    "status": "failed",
+    "caseId": "222a9365-0aa1-4ebc-b887-bb0994345cff",
+    "fixture": "performance",
+    "stage": "GENERATION_FAILED",
+    "error": "Drafting quality remained below the VRS floor after supervised redraft (6.5/10): The notice-pay clause blends sections 37 and 38 of the BCEA in a manner that reads as presenting a choice or independent basis rather than a complementary entitlement-and-mechanism relationship, failing the mandatory current-law check. | The two legal-claim paragraphs substantially duplicate the same operational-context facts rather than cleanly separating substantive reasonableness from procedural adequacy, diluting the intended analytical structure. | For a HIGH merit band matter with strong substantive (8) and procedural (8) scores, the compensation settlement clause is comparatively generic and does not explicitly calibrate the requested settlement level toward the upper end of the section 194(1) cap by reference to the combined strength of both defects. | Revise the notice-pay settlement clause so that section 37 of the BCEA is stated as creating the notice-period entitlement and section 38 as the mec",
+    "case_brief": {
+        "client_side": "employee",
+        "audience": "counterparty",
+        "sender_variant": "VRS",
+        "client_name": "Lerato Ndlovu",
+        "employer_name": "Brightline Retail SA (Pty) Ltd",
+        "employer_contact_details": "People & Culture Manager",
+        "addressee_name": null,
+        "addressee_position": null,
+        "incident_date": "2026-10-28",
+        "incident_description": "Lerato was a regional sales coordinator employed for three years. In August she was told that her sales figures were below target. She says the targets had been increased by 35% while two vacancies in her team remained unfilled. She was never placed on a formal performance improvement plan. She had two coaching meetings over three weeks but no written improvement plan, no agreed milestones and no additional resources. She was dismissed for poor performance after the second coaching meeting.",
+        "original_client_narrative": "My targets went up 35 percent while we were two people short. They called two meetings coaching but I never got a PIP or clear plan. Three weeks later they fired me for poor performance.",
+        "input_language_detected": null,
+        "employment_status": "Dismissed",
+        "dismissal_reason_type": "Poor Performance",
+        "track": "UD-POOR_PERFORMANCE",
+        "track_label": "Unfair Dismissal \u2014 Poor Performance",
+        "secondary_track": null,
+        "override_flags": [],
+        "substantive_score": 8,
+        "procedural_score": 8,
+        "merit_band": "HIGH",
+        "wp_type": "FULL",
+        "legal_basis": [
+            "LRA s188",
+            "2025 Code of Practice: Dismissal paras 19-20"
+        ],
+        "scoring_breakdown": [
+            {
+                "label": "No proper opportunity to improve",
+                "points": 3,
+                "legalHook": "poor performance fairness"
+            },
+            {
+                "label": "Targets affected by understaffing",
+                "points": 2,
+                "legalHook": "reasonableness"
+            },
+            {
+                "label": "No formal PIP or milestones",
+                "points": 2,
+                "legalHook": "procedural fairness"
+            }
+        ],
+        "recommended_next_step": "WP letter challenging the adequacy of the performance-management process and the fairness of dismissal.",
+        "ccma_deadline_status": {
+            "status": "WITHIN_WINDOW",
+            "daysRemaining": 18
+        },
+        "merit_bonus_trigger": null,
+        "strengths": [
+            "No proper PIP",
+            "Understaffing affected targets",
+            "Very short improvement period"
+        ],
+        "weaknesses": [
+            "Employer had raised performance concerns before dismissal"
+        ],
+        "structured_case_facts": {
+            "employment_status": "Dismissed",
+            "dismissal_reason_type": "Poor Performance",
+            "length_of_service": "2-5y",
+            "performance_standards_communicated": true,
+            "pip_given": false,
+            "training_provided": false,
+            "performance_control": "External factors",
+            "team_meeting_standards": "No",
+            "prior_performance_warnings": "None",
+            "incident_date": "2026-10-28",
+            "employer_name": "Brightline Retail SA (Pty) Ltd",
+            "employer_contact_details": "People & Culture Manager"
+        },
+        "client_requested_changes": null,
+        "revision_source_letter": null,
+        "revision_round": 0
+    },
+    "letter": "Background\n\n1. We are instructed by our client, Ms Lerato Ndlovu, in relation to the termination of her employment with Brightline Retail SA (Pty) Ltd on or about 28 October 2026. This letter is written without prejudice and subject to contract. Nothing in this letter constitutes an admission of fact or liability on the part of our client, and all of our client's rights are reserved to refer this matter to the Commission for Conciliation, Mediation and Arbitration or any other appropriate forum without further notice should a satisfactory resolution not be reached.\n\n2. Our client was employed as a Regional Sales Coordinator. According to our client's account, she held this role for approximately three years, although we reserve the right to confirm the precise commencement date and the continuity of her service once the employer's records are available.\n\n3. In August 2026 our client was informed that her sales targets had been increased by approximately 35%. At the same time, and according to our client's account, two vacancies within her team remained unfilled, meaning the increased targets were to be met with a reduced complement of staff. This operational context is material to any assessment of whether the performance standard applied to our client was reasonable in the circumstances.\n\n4. Our client attended two coaching meetings over a period of approximately three weeks. No formal Performance Improvement Plan was put in place, no agreed milestones were recorded and no additional resources or support were provided to assist our client in meeting the revised targets. Our client was dismissed for poor performance shortly after the second of these coaching meetings.\n\nLegal Claims\n\n1. Unfair dismissal: poor performance under section 188(1) of the LRA: The fairness of this dismissal falls to be assessed first under section 188(1) of the Labour Relations Act 66 of 1995, which requires both a fair reason for dismissal and a fair process. Where the stated reason is poor performance, the applicable guidance is found at paragraphs 19 and 20 of the Code of Practice: Dismissal, 2025, which require that the performance standard be reasonable, that the employee understand what was expected, that the employee be given a fair and reasonable opportunity to improve, and that dismissal only follow once that opportunity has genuinely been exhausted. On the facts available, the targets applied to our client were increased by approximately 35% while, on our client's account, two positions within her team remained vacant. A standard set without regard to the operational resources available to meet it is not easily characterised as reasonable, and the resulting shortfall cannot fairly be attributed to our client's own performance without regard to that operational context.\n\n2. Procedural fairness: absence of a structured improvement process: As set out above, our client attended two coaching meetings over approximately three weeks before her dismissal. Paragraph 20 of the Code contemplates that an employee facing dismissal for poor performance be afforded guidance, instruction, training or counselling, and a reasonable period to improve, ordinarily structured through a documented Performance Improvement Plan with agreed milestones and a follow-up review. No such plan was put in place, and the compressed three-week period, without any written milestones against which progress could be measured, falls short of the structured opportunity paragraph 20 contemplates. Taken together with the operational context addressed above, the performance-management process does not reflect a fair opportunity to improve before the decision to dismiss was taken.\n\nWithout Prejudice Settlement Proposal\n\nOur client proposes the following terms of settlement, in the interests of resolving this matter efficiently and without the cost and uncertainty of CCMA proceedings:\n\n\u2022 Payment of compensation on a total cost to company basis, calibrated with reference to the compensation available for unfair dismissal of up to twelve months' remuneration under section 194(1) of the LRA. This reflects the compounding effect of both the substantive defect in the performance standard applied, set without regard to the team's operational capacity, and the procedural defect in the improvement process afforded, namely the absence of any documented Performance Improvement Plan within a compressed three-week period, each of which independently and together increases our client's prospects of success and the employer's exposure at arbitration.\n\n\u2022 Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked\n\n\u2022 Payment of any accrued but untaken leave pay owed to our client under section 40 of the BCEA.\n\n\u2022 Written confirmation that any pension or provident fund contributions due in respect of our client are paid up to date, and that the accumulated benefit will be dealt with in accordance with the rules of the applicable fund.\n\n\u2022 Written confirmation that UIF contributions have been paid up to date, together with a completed UI-19 certificate to enable our client to access unemployment benefits.\n\n\u2022 A certificate of service issued in terms of section 42 of the BCEA.\n\n\u2022 An agreed reference, in terms to be agreed between the parties, reflecting a neutral or positive account of our client's service.\n\n\u2022 An undertaking by the employer and its representatives not to disparage our client to any third party, including prospective employers.\n\n\u2022 Confidentiality as between the parties and their respective advisers regarding the terms of settlement, the underlying negotiations and the existence of this dispute.\n\n\u2022 To the extent that any record of the performance concerns raised against our client exists, confirmation that our client's personnel file will be dealt with on a clean-record basis and that no adverse finding will be reflected or relied upon.\n\n\u2022 The terms of settlement to be recorded in a formal written settlement agreement signed by both parties, with all of our client's rights reserved in full until such agreement is concluded.\n\nThe matters set out above expose Brightline Retail SA (Pty) Ltd to a reasonable prospect of an adverse finding at arbitration, together with the attendant cost, management time and reputational exposure of defending such proceedings. Our client holds the relevant records of the coaching meetings and the absence of any documented improvement plan, which will form part of the evidential record should this matter proceed to the CCMA.\n\nWe invite a substantive response to this letter within seven calendar days of receipt. Should a satisfactory response not be received within that period, our client's instructions are to proceed to refer this dispute to the CCMA without further notice. All of our client's rights are expressly reserved.",
+    "structure": {
+        "legal_claims": [
+            {
+                "text": "The fairness of this dismissal falls to be assessed first under section 188(1) of the Labour Relations Act 66 of 1995, which requires both a fair reason for dismissal and a fair process. Where the stated reason is poor performance, the applicable guidance is found at paragraphs 19 and 20 of the Code of Practice: Dismissal, 2025, which require that the performance standard be reasonable, that the employee understand what was expected, that the employee be given a fair and reasonable opportunity to improve, and that dismissal only follow once that opportunity has genuinely been exhausted. On the facts available, the targets applied to our client were increased by approximately 35% while, on our client's account, two positions within her team remained vacant. A standard set without regard to the operational resources available to meet it is not easily characterised as reasonable, and the resulting shortfall cannot fairly be attributed to our client's own performance without regard to that operational context.",
+                "title": "Unfair dismissal: poor performance under section 188(1) of the LRA"
+            },
+            {
+                "text": "As set out above, our client attended two coaching meetings over approximately three weeks before her dismissal. Paragraph 20 of the Code contemplates that an employee facing dismissal for poor performance be afforded guidance, instruction, training or counselling, and a reasonable period to improve, ordinarily structured through a documented Performance Improvement Plan with agreed milestones and a follow-up review. No such plan was put in place, and the compressed three-week period, without any written milestones against which progress could be measured, falls short of the structured opportunity paragraph 20 contemplates. Taken together with the operational context addressed above, the performance-management process does not reflect a fair opportunity to improve before the decision to dismiss was taken.",
+                "title": "Procedural fairness: absence of a structured improvement process"
+            }
+        ],
+        "settlement_intro": "Our client proposes the following terms of settlement, in the interests of resolving this matter efficiently and without the cost and uncertainty of CCMA proceedings:",
+        "settlement_terms": [
+            "Payment of compensation on a total cost to company basis, calibrated with reference to the compensation available for unfair dismissal of up to twelve months' remuneration under section 194(1) of the LRA. This reflects the compounding effect of both the substantive defect in the performance standard applied, set without regard to the team's operational capacity, and the procedural defect in the improvement process afforded, namely the absence of any documented Performance Improvement Plan within a compressed three-week period, each of which independently and together increases our client's prospects of success and the employer's exposure at arbitration.",
+            "Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked",
+            "Payment of any accrued but untaken leave pay owed to our client under section 40 of the BCEA.",
+            "Written confirmation that any pension or provident fund contributions due in respect of our client are paid up to date, and that the accumulated benefit will be dealt with in accordance with the rules of the applicable fund.",
+            "Written confirmation that UIF contributions have been paid up to date, together with a completed UI-19 certificate to enable our client to access unemployment benefits.",
+            "A certificate of service issued in terms of section 42 of the BCEA.",
+            "An agreed reference, in terms to be agreed between the parties, reflecting a neutral or positive account of our client's service.",
+            "An undertaking by the employer and its representatives not to disparage our client to any third party, including prospective employers.",
+            "Confidentiality as between the parties and their respective advisers regarding the terms of settlement, the underlying negotiations and the existence of this dispute.",
+            "To the extent that any record of the performance concerns raised against our client exists, confirmation that our client's personnel file will be dealt with on a clean-record basis and that no adverse finding will be reflected or relied upon.",
+            "The terms of settlement to be recorded in a formal written settlement agreement signed by both parties, with all of our client's rights reserved in full until such agreement is concluded."
+        ],
+        "opening_paragraphs": [
+            "We are instructed by our client, Ms Lerato Ndlovu, in relation to the termination of her employment with Brightline Retail SA (Pty) Ltd on or about 28 October 2026. This letter is written without prejudice and subject to contract. Nothing in this letter constitutes an admission of fact or liability on the part of our client, and all of our client's rights are reserved to refer this matter to the Commission for Conciliation, Mediation and Arbitration or any other appropriate forum without further notice should a satisfactory resolution not be reached.",
+            "Our client was employed as a Regional Sales Coordinator. According to our client's account, she held this role for approximately three years, although we reserve the right to confirm the precise commencement date and the continuity of her service once the employer's records are available.",
+            "In August 2026 our client was informed that her sales targets had been increased by approximately 35%. At the same time, and according to our client's account, two vacancies within her team remained unfilled, meaning the increased targets were to be met with a reduced complement of staff. This operational context is material to any assessment of whether the performance standard applied to our client was reasonable in the circumstances.",
+            "Our client attended two coaching meetings over a period of approximately three weeks. No formal Performance Improvement Plan was put in place, no agreed milestones were recorded and no additional resources or support were provided to assist our client in meeting the revised targets. Our client was dismissed for poor performance shortly after the second of these coaching meetings."
+        ],
+        "conclusion_paragraphs": [
+            "The matters set out above expose Brightline Retail SA (Pty) Ltd to a reasonable prospect of an adverse finding at arbitration, together with the attendant cost, management time and reputational exposure of defending such proceedings. Our client holds the relevant records of the coaching meetings and the absence of any documented improvement plan, which will form part of the evidential record should this matter proceed to the CCMA.",
+            "We invite a substantive response to this letter within seven calendar days of receipt. Should a satisfactory response not be received within that period, our client's instructions are to proceed to refer this dispute to the CCMA without further notice. All of our client's rights are expressly reserved."
+        ]
+    },
+    "supervisory_assessment": {
+        "criteria": [
+            {
+                "score": 7.5,
+                "problem": "Minor hedging introduced around service length not in brief (brief states length_of_service '2-5y' band with narrative 'three years' from client account; draft's caveat about confirming commencement date is reasonable but slightly overcautious). No invented names, dates or figures. Incident description matches brief closely. No salary figures stated, consistent with rule. One soft issue: draft states 'two positions within her team remained vacant' and 'two coaching meetings over approximately three weeks' consistently with brief, so fidelity is largely sound.",
+                "severity": "low",
+                "criterion": "Factual fidelity",
+                "required_fix": "Minor: this is acceptable conditional wording per 3A.11; no substantive fix required, but could be tightened to avoid appearing to doubt the Client's own account unnecessarily.",
+                "evidence_from_draft": "'approximately three years, although we reserve the right to confirm the precise commencement date and the continuity of her service once the employer's records are available.'"
+            },
+            {
+                "score": 6,
+                "problem": "The Code citation in the first legal claim paragraph is given as 'Code of Practice: Dismissal, 2025' only once at first mention which is correct, but the paragraph opens its fairness analysis with reference to paragraphs 19-20 of the Code before properly anchoring in section 188(1) as the primary fairness test; it does cite s188(1) first in the same sentence so this technically passes the anchor requirement. However the settlement term proposing compensation does not sufficiently connect the HIGH merit band and specific scoring breakdown (understaffing +2, no PIP +2, no opportunity +3) into a clearly calibrated settlement position beyond generic cap-relative language; for a HIGH merit matter (8/8, merit band HIGH) the compensation clause reads as fairly generic 'calibrated with reference to...up to twelve months' remuneration' without signalling that the strength of the claims (substantive 8, procedural 8) justifies positioning toward the upper end of the cap. This is a mandatory check failure per the HIGH-merit generic compensation rule.",
+                "severity": "medium",
+                "criterion": "Legal and strategic alignment",
+                "required_fix": "Strengthen the settlement clause to explicitly connect the HIGH merit band (strong substantive and procedural scores) to a settlement position calibrated toward the upper end of the twelve-month cap, for example referencing the combination of both defects as materially increasing exposure and justifying a position at the higher end of the available range, rather than a generic reference to 'up to twelve months'.",
+                "evidence_from_draft": "\"Payment of compensation on a total cost to company basis, calibrated with reference to the compensation available for unfair dismissal of up to twelve months' remuneration under section 194(1) of the LRA. This reflects the compounding effect of both the substantive defect...and the procedural defect...\""
+            },
+            {
+                "score": 8,
+                "problem": "Tone is professional, measured, and consistent with counterparty-facing register. No emotive language, no overstated certainty words like 'clearly' or 'manifestly'. Minor stylistic point: the phrase 'in the interests of resolving this matter efficiently and without the cost and uncertainty of CCMA proceedings' is slightly close to generic filler but acceptable in a settlement preamble context.",
+                "severity": "low",
+                "criterion": "VRS tone and house style",
+                "required_fix": "No material fix required; consider slight variation to avoid formulaic feel in future drafts.",
+                "evidence_from_draft": "\"Our client proposes the following terms of settlement, in the interests of resolving this matter efficiently and without the cost and uncertainty of CCMA proceedings:\""
+            },
+            {
+                "score": 7.5,
+                "problem": "The structure broadly follows the standing order (instruction, purpose, background, chronology, legal analysis, settlement). However the two legal claims largely restate the same operational/procedural facts (understaffing, three-week period, no PIP) in both paragraphs, creating duplication rather than distinct substantive versus procedural development; the second claim heading 'Procedural fairness: absence of a structured improvement process' substantially repeats content already covered in the first claim's substantive analysis, reducing the intended two-part analytical structure to overlapping restatement.",
+                "severity": "medium",
+                "criterion": "Structure and readability",
+                "required_fix": "Tighten the two legal-claim paragraphs so the substantive paragraph focuses purely on reasonableness of the standard and the procedural paragraph focuses purely on the adequacy of the improvement process, cross-referencing rather than re-arguing the same facts in full.",
+                "evidence_from_draft": "Claim 1 references 'a reduced complement of staff' and 'operational context'; Claim 2 again states 'Taken together with the operational context addressed above, the performance-management process does not reflect a fair opportunity to improve' \u2013 duplicative framing across both claims."
+            },
+            {
+                "score": 7,
+                "problem": "The response window of seven calendar days is correctly stated and compliant. The settlement terms are structured clearly in the 3A.10 order (compensation, notice, leave, pension, UIF, certificate of service, reference, non-disparagement, confidentiality, clean record, agreement to follow). However the notice-pay clause wording is ambiguous: it references section 37 (notice period) and section 38 as though offering a choice ('subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA') without clearly stating that section 37 creates the entitlement and section 38 is the payment-in-lieu mechanism operating together, risking the appearance that either section independently creates the entitlement.",
+                "severity": "high",
+                "criterion": "Settlement clarity and actionability",
+                "required_fix": "Revise to make explicit that section 37 establishes the notice period and section 38 is the mechanism by which payment is made in lieu of notice worked, e.g. 'Payment in lieu of notice, calculated by reference to the notice period established under section 37 of the BCEA (or any more favourable contractual notice period), paid in accordance with section 38 of the BCEA.' This removes any suggestion the sections operate as alternatives.",
+                "evidence_from_draft": "\"Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked\""
+            },
+            {
+                "score": 6.5,
+                "problem": "No case-law citations, no rand figures, no Schedule 8 reference, no duplicate salutation/signature (correctly out of scope per Part A body). No manager alleged to have laid a disciplinary charge not in brief (none present, consistent). However the notice-pay clause fails the mandatory section 37/38 complementary treatment check (see settlement clarity finding), which is itself a mandatory current-law compliance defect requiring the floor to be unmet. No other mandatory-check failures identified (Code citation correctly dated 2025; non-disparagement is one-way against employer; no conflicting facts resolved without qualification).",
+                "severity": "high",
+                "criterion": "Safety and drafting compliance",
+                "required_fix": "Correct the notice-pay clause per the fix specified under Settlement clarity and actionability to treat sections 37 and 38 as complementary, not alternative or independently sufficient.",
+                "evidence_from_draft": "\"such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked\" immediately following \"entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement\""
+            }
+        ],
+        "score_change": 0.5,
+        "quality_floor": 7.5,
+        "what_is_strong": [
+            "Background paragraph correctly ties the 35% target increase and two unfilled vacancies to the reasonableness analysis required under Code of Practice: Dismissal, 2025 paragraphs 19-20, directly reflecting the case brief's scoring rationale.",
+            "The settlement clause order fully tracks the 3A.10 standing structure (compensation, notice, leave, pension, UIF, certificate of service, reference, non-disparagement, confidentiality, clean record, agreement to follow) with no omissions.",
+            "Conditional wording is correctly used for the unconfirmed personnel-file record ('To the extent that any record of the performance concerns raised against our client exists...').",
+            "No case-law citations, no rand figures and no Schedule 8 references appear anywhere in the draft; the Code is correctly dated 2025 throughout.",
+            "The non-disparagement clause is correctly drafted as one-way against the employer, consistent with the employee-side mandatory rule."
+        ],
+        "what_needs_work": [
+            "The notice-pay clause blends sections 37 and 38 of the BCEA in a manner that reads as presenting a choice or independent basis rather than a complementary entitlement-and-mechanism relationship, failing the mandatory current-law check.",
+            "The two legal-claim paragraphs substantially duplicate the same operational-context facts rather than cleanly separating substantive reasonableness from procedural adequacy, diluting the intended analytical structure.",
+            "For a HIGH merit band matter with strong substantive (8) and procedural (8) scores, the compensation settlement clause is comparatively generic and does not explicitly calibrate the requested settlement level toward the upper end of the section 194(1) cap by reference to the combined strength of both defects."
+        ],
+        "risks_to_monitor": [
+            "If the notice-pay clause is read literally by the employer's representative, it may create confusion over whether notice pay is owed under section 37 or section 38 independently, inviting a technical dispute over quantum calculation.",
+            "The duplicated operational-context framing across both legal claims may read as padding to a sophisticated opposing representative, slightly undercutting the letter's persuasive force.",
+            "Given the matter is within the 30-day CCMA window with 18 days remaining, any delay in finalising the notice-pay correction should not be allowed to compress the referral timeline unduly."
+        ],
+        "quality_floor_met": false,
+        "redraft_performed": true,
+        "forensic_questions": [
+            "Can the Client confirm her exact commencement date and any documentary evidence of continuous, unblemished service over the three-year period?",
+            "Does the Client have copies of any written communication (email, memo) formally notifying her of the 35% target increase and the timeline over which it applied?",
+            "Were the two unfilled vacancies within her team confirmed in any internal document, org chart, or management communication, and for how long had they been vacant?",
+            "Did the Client receive any written record, minutes or notes from either of the two coaching meetings, and were any verbal commitments made regarding additional resources or support?",
+            "Is there a copy of the dismissal letter confirming the stated reason for dismissal and the date it was communicated to the Client?",
+            "Has the Client retained her employment contract or any applicable collective agreement specifying a contractual notice period that may exceed the BCEA section 37 minimum?",
+            "Does the Client's personnel file currently contain any documented prior performance warnings, notwithstanding the brief's indication of 'None'?"
+        ],
+        "initial_assessment": {
+            "criteria": [
+                {
+                    "score": 7.5,
+                    "problem": "Minor hedging on service length and reliance on 'our client's account' is appropriate given the brief does not confirm continuity of service, but the draft introduces an unconfirmed 'Schedule 8 repealed and replaced' historical claim not in the brief, and the settlement term on personnel-record/clean-record framing implies a poor-performance finding was actually recorded, which is not confirmed in the brief.",
+                    "severity": "medium",
+                    "criterion": "Factual fidelity",
+                    "required_fix": "Remove the unnecessary historical legislative detail about Schedule 8 being repealed (not needed and risks drawing attention to the old instrument by name); qualify the clean-record clause conditionally ('to the extent any record of the performance concerns exists') rather than asserting a specific adverse finding exists.",
+                    "evidence_from_draft": "legal_claims text: 'which repealed and replaced the former Schedule 8 Code of Good Practice on Dismissal'; settlement_terms: 'Confirmation that our client's personnel record will reflect no adverse finding of poor performance'"
+                },
+                {
+                    "score": 7,
+                    "problem": "The claims are correctly tied to the facts (understaffing, no PIP, compressed timeframe) and the HIGH merit band is reflected, but the settlement intro undercuts the firm's strong procedural/substantive position by opening with 'Without conceding the strength of our client's claims', which is an unnecessary self-weakening concession given an 8/8 HIGH merit matter. The compensation clause gestures at 'identified substantive and procedural defects' but does not calibrate the proposal upward to reflect the HIGH band and strong leverage (8/10 substantive, 8/10 procedural) as required for HIGH-merit matters.",
+                    "severity": "medium",
+                    "criterion": "Legal and strategic alignment",
+                    "required_fix": "Remove or soften the self-undermining concessional opening in the settlement intro (standard WP non-admission language already covers this in the purpose paragraph); strengthen the compensation clause to expressly connect the settlement level to the strength of the identified defects and the HIGH merit posture, for example referencing the compounding effect of both substantive and procedural weaknesses on exposure.",
+                    "evidence_from_draft": "settlement_intro: 'Without conceding the strength of our client's claims in any formal forum'; settlement_terms[0]: 'calibrated with reference to the compensation available ... reflecting the identified substantive and procedural defects'"
+                },
+                {
+                    "score": 8,
+                    "problem": "Tone is largely professional, controlled and proportionate, consistent with counterparty-facing style. However there are a few stock/hedging phrases bordering on filler ('on our client's account and as reflected in the information available to us') that are slightly repetitive and clutter the sentence; 'does not on its face reflect' is acceptable qualified language but appears alongside other hedges in close proximity, creating some uniformity of hedge-phrasing across paragraphs.",
+                    "severity": "low",
+                    "criterion": "VRS tone and house style",
+                    "required_fix": "Vary the hedging constructions and tighten repeated qualifier phrases across the two legal claim paragraphs so the register does not read formulaic.",
+                    "evidence_from_draft": "'On our client's account and as reflected in the information available to us, no such plan was put in place.'"
+                },
+                {
+                    "score": 8,
+                    "problem": "Structure is clear: background paragraphs, two well-labelled legal claims, settlement intro, numbered settlement terms, exposure/response window conclusion. No duplicated template content. Minor issue: the second legal claim (procedural fairness) substantially restates facts already given in the first claim paragraph (coaching meetings, no PIP) and in the background paragraphs, creating some repetition across three separate places.",
+                    "severity": "low",
+                    "criterion": "Structure and readability",
+                    "required_fix": "Compress the procedural fairness paragraph so it builds on the established facts rather than restating them verbatim; reference the established facts by cross-reference ('As set out above,') rather than repeating the factual recitation.",
+                    "evidence_from_draft": "Background para 4 and legal_claims[1] both describe 'two coaching meetings over a period of approximately three weeks' and absence of PIP/milestones/resources in near-identical terms."
+                },
+                {
+                    "score": 7,
+                    "problem": "The settlement terms are comprehensive and follow the standing clause order substantially, response window is correctly capped at seven calendar days. However the notice pay clause conflates/sequences BCEA sections 37 and 38 in a way that is ambiguous as to complementarity (see mandatory check below), which affects actionability and legal precision of that specific term.",
+                    "severity": "medium",
+                    "criterion": "Settlement clarity and actionability",
+                    "required_fix": "Reframe as a single integrated clause: 'Payment instead of notice under section 38 of the BCEA, calculated by reference to the notice period applicable under section 37 of the BCEA or the employment contract, whichever is more favourable.'",
+                    "evidence_from_draft": "settlement_terms[1]: 'Payment in lieu of the applicable notice period under section 38 of the BCEA, with the applicable notice period determined under section 37 of the BCEA, subject to any more favourable contractual notice entitlement.'"
+                },
+                {
+                    "score": 5,
+                    "problem": "Mandatory current-law check failure: the Code is correctly cited as 'Code of Practice: Dismissal, 2025' on first reference, which is compliant, but the draft explicitly names 'the former Schedule 8 Code of Good Practice on Dismissal' in the outward-facing letter text, which is a mandatory defect (any reference to 'Schedule 8' in the outward-facing draft is prohibited). Additionally, the notice-pay clause treats BCEA ss37/38 ambiguously rather than as clearly complementary, which is a second mandatory-check failure. No case-law citations, no rand figures, no duplicate salutation/closing present (correctly left to template), and non-disparagement is correctly one-way against the employer. These two mandatory failures require the floor to be set to not met.",
+                    "severity": "high",
+                    "criterion": "Safety and drafting compliance",
+                    "required_fix": "Delete all reference to 'Schedule 8' from the letter body entirely (the Code of Practice: Dismissal, 2025 citation alone suffices and needs no historical gloss in a counterparty-facing letter). Correct the notice-pay clause to present sections 37 and 38 as complementary (section 37 sets the period, section 38 creates the obligation to pay instead of notice), not as alternative or independently operative provisions.",
+                    "evidence_from_draft": "'which repealed and replaced the former Schedule 8 Code of Good Practice on Dismissal'; 'Payment in lieu of the applicable notice period under section 38 of the BCEA, with the applicable notice period determined under section 37 of the BCEA'"
+                }
+            ],
+            "what_is_strong": [
+                "The factual background correctly and precisely ties the 35% target increase and the two unfilled vacancies to the reasonableness of the performance standard, exactly as the case brief frames the strength of the matter.",
+                "The procedural fairness claim correctly identifies the absence of a documented PIP, agreed milestones and the compressed three-week timeframe as the core procedural defect, matching the brief's scoring_breakdown points.",
+                "The Code of Practice: Dismissal, 2025 is correctly cited by its current name on first reference and section 188(1) is correctly anchored before the Code analysis.",
+                "Settlement terms substantially follow the standing 3A.10 clause order (compensation, notice, leave, pension, UIF, certificate of service, reference, non-disparagement, confidentiality, clean record, agreement to follow) with no rand figures and no itemisation.",
+                "The seven calendar day response window and reservation of rights are correctly stated and comply with the format rule."
+            ],
+            "what_needs_work": [
+                "Remove the 'former Schedule 8' reference entirely; it is a mandatory-defect under the current-law override regardless of context.",
+                "Fix the notice pay clause so sections 37 and 38 of the BCEA are presented as complementary, not sequential/alternative provisions.",
+                "Remove or soften the 'Without conceding the strength of our client's claims' concessional opening in the settlement intro, which undersells an 8/8 HIGH-merit matter.",
+                "Connect the compensation proposal more explicitly to the HIGH merit band and the compounding substantive/procedural weaknesses, rather than a generic cap-relative reference.",
+                "Tighten the clean-record settlement clause so it does not assert that an adverse finding was actually made, which is not confirmed in the brief.",
+                "Reduce repetition between the background paragraph and the procedural fairness claim describing the same coaching-meeting facts.",
+                "Remove the repealed Schedule 8 citation and use the current Code of Practice: Dismissal, 2025.",
+                "Anchor substantive dismissal fairness expressly in LRA section 188(1) before applying the Code."
+            ],
+            "risks_to_monitor": [
+                "If the Schedule 8 reference is not removed before dispatch, a sophisticated employer representative may seize on the historical citation error to question the letter's legal currency and credibility.",
+                "The ambiguous BCEA ss37/38 notice clause could be read by the employer as offering a choice of basis for calculating notice pay, creating a quantum dispute during negotiation.",
+                "The concessional settlement intro phrase may weaken the client's negotiating position if read literally by the employer's representative as an admission of claim weakness.",
+                "The employer may dispute the understaffing causation point if it can show the two vacancies were unrelated to Ms Ndlovu's specific sales territory or responsibilities; this should be tested before the letter is finalised.",
+                "The 18-day CCMA referral window remaining is tight; ensure dispatch and the seven-day response window are managed so there is still time to refer if settlement fails."
+            ],
+            "quality_floor_met": false,
+            "forensic_questions": [
+                "Liability: Can the client confirm which specific two positions in her team were vacant and for how long, to substantiate the causal link between understaffing and the target shortfall?",
+                "Liability: Who set the revised 35% target and was any rationale or data provided to the client for the increase at the time?",
+                "Liability: Were any other team members subject to the same revised target, and if so, did they also fail to meet it, to support a comparator or systemic-standard argument?",
+                "Chronology: What were the exact dates of the two coaching meetings and the date of the dismissal meeting or letter, to confirm the three-week timeframe precisely?",
+                "Chronology: Is the three-year length of service confirmed by a written contract or payslip record, or only the client's recollection?",
+                "Documents: Does the client hold any written record, email or notes from the two coaching meetings that could evidence the absence of a formal PIP or milestones?",
+                "Documents: Is there a copy of the dismissal letter or outcome communication stating the reason for dismissal and any procedural steps followed?",
+                "Documents: Was a written employment contract or collective agreement in place that specifies a notice period longer than the BCEA section 37 minimum?"
+            ],
+            "supervisory_summary": "The draft is substantively well-aligned to the HIGH-merit facts (understaffing-driven target increase, absent PIP, compressed improvement window) and follows the standing WP body order and settlement clause structure competently, with correct section 188(1) anchoring and correct current Code of Practice: Dismissal, 2025 citation. However it fails two mandatory current-law checks: it names the repealed 'Schedule 8' instrument in the outward-facing text, and it presents BCEA sections 37 and 38 ambiguously rather than as complementary notice-pay provisions. These are drafting defects that must be corrected regardless of otherwise competent structure and tone. The settlement intro also unnecessarily undersells an 8/8 HIGH-merit matter with a concessional opening phrase, and the compensation clause does not explicitly connect the proposed settlement level to the strength of the identified defects as required for HIGH-merit matters. Given the two mandatory-check failures, the Drafting Quality Score is set below the 7.5 floor and the draft must be corrected and reassessed before it is finalised.",
+            "drafting_quality_score": 6,
+            "recommended_amendments": [
+                "Delete the Schedule 8 historical reference from the legal claims text before this draft is finalised; this is a mandatory correction.",
+                "Rewrite the notice pay settlement term to present BCEA sections 37 and 38 as complementary provisions, not alternatives.",
+                "Remove or materially soften the concessional opening clause in the settlement intro paragraph.",
+                "Expand the compensation settlement term to explicitly connect the proposed settlement level to the HIGH merit band and the identified compounding substantive and procedural defects.",
+                "Qualify the clean-record settlement clause so it does not assert a specific adverse finding was made unless confirmed in the brief.",
+                "Trim the procedural fairness claim paragraph to avoid verbatim repetition of facts already stated in the background section.",
+                "Reconfirm service length, exact meeting dates and dismissal date with the client before dispatch given the hedged language currently used.",
+                "Remove the repealed Schedule 8 citation and use the current Code of Practice: Dismissal, 2025.",
+                "Anchor substantive dismissal fairness expressly in LRA section 188(1) before applying the Code."
+            ],
+            "mandatory_drafting_defects": [
+                "Remove the repealed Schedule 8 citation and use the current Code of Practice: Dismissal, 2025.",
+                "Anchor substantive dismissal fairness expressly in LRA section 188(1) before applying the Code."
+            ]
+        },
+        "supervisory_summary": "The draft is competently structured and faithful to the case brief, correctly sequenced per the 3A.1 body order and the 3A.10 settlement clause order, with no invented facts, no case-law citations and no Schedule 8 reference. However it fails a mandatory current-law check: the notice-pay clause treats BCEA sections 37 and 38 as alternative rather than complementary provisions, which triggers the mandatory redraft requirement. Combined with duplicated reasoning across the two legal-claim paragraphs and a settlement compensation clause that under-calibrates to the HIGH merit band, the Drafting Quality Score is set at 6.5, below the 7.5 floor. The letter should be corrected on these three points and re-reviewed before it is approved for dispatch.",
+        "drafting_quality_score": 6.5,
+        "recommended_amendments": [
+            "Revise the notice-pay settlement clause so that section 37 of the BCEA is stated as creating the notice-period entitlement and section 38 as the mechanism for payment in lieu, removing any 'and/or' or alternative framing.",
+            "Differentiate the two legal-claim paragraphs more clearly: confine the first to the reasonableness of the performance standard itself, and confine the second strictly to the adequacy of the improvement process, cross-referencing rather than re-arguing the operational facts.",
+            "Strengthen the compensation settlement clause to explicitly state that the combination of the HIGH substantive and procedural scores materially increases exposure and justifies a settlement position toward the upper end of the twelve-month section 194(1) range, rather than a generic cap-relative reference.",
+            "Re-run the internal QC checklist after the above corrections and confirm the Drafting Quality Score meets or exceeds 7.5 before finalising for client review."
+        ],
+        "final_drafting_quality_score": 6.5,
+        "initial_drafting_quality_score": 6
+    },
+    "run_summary": {
+        "drafting_quality_score": 6.5,
+        "quality_floor_met": false,
+        "redraft_performed": true,
+        "initial_drafting_quality_score": 6,
+        "final_drafting_quality_score": 6.5
+    },
+    "skill_hash": "e80ecce904dd02be2159df775af2f15bc4d069f8c84638a819cd1474796580ef",
+    "skill_manifest": {
+        "SKILL_WORKFLOW": {
+            "sha256": "6893d8d6612b25f8f6bfdf327d5db3ad55a4304afb883fdf068135c4d56e9fd3",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "VRS_HOUSE_STYLE": {
+            "sha256": "341fccf7e5adedebc7ac5e3dff406914dbd18365257fee1ec3d3c9fa141e67f5",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "WP_EMPLOYEE_PROMPT": {
+            "sha256": "375f43b124fa0ffa89fb69f63203ca3274ed79d0aeee7efa1c28d800a1cb6d29",
+            "version": "v1.0",
+            "asset_type": "text"
+        },
+        "SKILL_MATTER_ASSESSMENT": {
+            "sha256": "78e271c6943c88681f2b88b10b38371fe557f506395337531740a5fece6b8df1",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "SKILL_WPLETTER_EMPLOYEE": {
+            "sha256": "8c016ab4fcc77d2518fdf9f5636c085480620197123fe777ba12de6f60c96baf",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        }
+    },
+    "llm_call_logs": [
+        {
+            "calls": [
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 52014,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 2228,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "draft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:45:56.499Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:46:20.088Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 51442,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 4651,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "supervision",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:46:20.092Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:47:06.344Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 55931,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 2179,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "redraft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:47:06.344Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:47:22.786Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 51410,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 4573,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "supervision_after_redraft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:47:22.790Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:48:08.130Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                }
+            ],
+            "model": "claude-sonnet-5",
+            "usage": {
+                "speed": "standard",
+                "input_tokens": 52014,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "output_tokens": 2228,
+                "cache_creation": {
+                    "ephemeral_1h_input_tokens": 0,
+                    "ephemeral_5m_input_tokens": 0
+                },
+                "output_tokens_details": {
+                    "thinking_tokens": 0
+                },
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0
+            },
+            "status": "success",
+            "provider": "anthropic",
+            "thinking": "omitted",
+            "max_tokens": 12000,
+            "skill_hash": "e80ecce904dd02be2159df775af2f15bc4d069f8c84638a819cd1474796580ef",
+            "started_at": "2026-11-12T07:45:56.499Z",
+            "stop_reason": "tool_use",
+            "completed_at": "2026-11-12T07:48:08.131Z",
+            "model_source": "pinned_default",
+            "quality_floor": 7.5,
+            "skill_manifest": {
+                "SKILL_WORKFLOW": {
+                    "sha256": "6893d8d6612b25f8f6bfdf327d5db3ad55a4304afb883fdf068135c4d56e9fd3",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "VRS_HOUSE_STYLE": {
+                    "sha256": "341fccf7e5adedebc7ac5e3dff406914dbd18365257fee1ec3d3c9fa141e67f5",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "WP_EMPLOYEE_PROMPT": {
+                    "sha256": "375f43b124fa0ffa89fb69f63203ca3274ed79d0aeee7efa1c28d800a1cb6d29",
+                    "version": "v1.0",
+                    "asset_type": "text"
+                },
+                "SKILL_MATTER_ASSESSMENT": {
+                    "sha256": "78e271c6943c88681f2b88b10b38371fe557f506395337531740a5fece6b8df1",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "SKILL_WPLETTER_EMPLOYEE": {
+                    "sha256": "8c016ab4fcc77d2518fdf9f5636c085480620197123fe777ba12de6f60c96baf",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                }
+            },
+            "anthropic_version": "2023-06-01",
+            "quality_floor_met": false,
+            "redraft_performed": true,
+            "case_brief_summary": {
+                "track": "UD-POOR_PERFORMANCE",
+                "wp_type": "FULL",
+                "audience": "counterparty",
+                "merit_band": "HIGH",
+                "client_side": "employee",
+                "override_flags": [],
+                "sender_variant": "VRS"
+            },
+            "drafting_quality_score": 6.5
+        }
+    ]
+}

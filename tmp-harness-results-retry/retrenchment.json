@@ -1,0 +1,554 @@
+{
+    "status": "failed",
+    "caseId": "2879486e-84ee-4f0f-bcf1-b28811fc1375",
+    "fixture": "retrenchment",
+    "stage": "GENERATION_FAILED",
+    "error": "Drafting quality remained below the VRS floor after supervised redraft (6.8/10): The Code of Practice citation in the first legal claim is corrupted: it describes 'the Code of Practice: Dismissal, 2025' as having repealed and replaced 'the former Code of Practice: Dismissal, 2025', which is self-contradictory and must be corrected to a clean current-law citation. | The settlement ex gratia clause duplicates almost verbatim the legal analysis already set out in the claims section, creating redundancy rather than a clean settlement-framing paragraph. | Minor editorial gloss in the background section pre-characterising the adequacy of the employer's existing offer before the legal analysis is presented. | Correct the Code of Practice citation in the first legal claim to read cleanly as 'the Code of Practice: Dismissal, 2025' without the self-referential repeal clause.",
+    "case_brief": {
+        "client_side": "employee",
+        "audience": "counterparty",
+        "sender_variant": "VRS",
+        "client_name": "Naledi Dlamini",
+        "employer_name": "Orbit Creative Agency (Pty) Ltd",
+        "employer_contact_details": "Managing Director",
+        "addressee_name": null,
+        "addressee_position": null,
+        "incident_date": "2026-10-30",
+        "incident_description": "Naledi had worked for the agency for three years. She told her manager that she was pregnant and two weeks later was informed that her role was redundant. She says the business had recently won two new clients, that another junior employee in the same team was retained, and that she received no written section 189(3) notice or meaningful consultation before the decision. She was offered one month notice and severance. The employer described the decision as restructuring.",
+        "original_client_narrative": "I told my manager I was pregnant and two weeks later they retrenched me. We had just won two new clients. The junior in my team stayed and nobody consulted with me before telling me my job was gone.",
+        "input_language_detected": null,
+        "employment_status": "Dismissed",
+        "dismissal_reason_type": "Retrenchment",
+        "track": "UD-RETRENCHMENT",
+        "track_label": "Unfair Dismissal \u2014 Retrenchment",
+        "secondary_track": "AUD",
+        "override_flags": [
+            "PREGNANCY",
+            "SHAM_RETRENCHMENT",
+            "PROTECTED_GROUND_DISCRIMINATION"
+        ],
+        "substantive_score": 9,
+        "procedural_score": 10,
+        "merit_band": "HIGH",
+        "wp_type": "FULL",
+        "legal_basis": [
+            "LRA s189",
+            "LRA s187(1)(e)",
+            "Employment Equity Act pregnancy protection"
+        ],
+        "scoring_breakdown": [
+            {
+                "label": "No section 189(3) notice",
+                "points": 3,
+                "legalHook": "LRA s189"
+            },
+            {
+                "label": "No meaningful consultation",
+                "points": 3,
+                "legalHook": "LRA s189"
+            },
+            {
+                "label": "Pregnancy disclosed shortly before dismissal",
+                "points": 3,
+                "legalHook": "LRA s187"
+            },
+            {
+                "label": "Selection rationale appears questionable",
+                "points": 2,
+                "legalHook": "substantive fairness"
+            }
+        ],
+        "recommended_next_step": "Urgent WP letter challenging the retrenchment process and raising the pregnancy-linked dismissal risk.",
+        "ccma_deadline_status": {
+            "status": "WITHIN_WINDOW",
+            "daysRemaining": 20
+        },
+        "merit_bonus_trigger": null,
+        "strengths": [
+            "Timing after pregnancy disclosure",
+            "No consultation",
+            "No section 189 notice",
+            "Questionable selection"
+        ],
+        "weaknesses": [
+            "Employer may produce financial or restructuring evidence not yet seen"
+        ],
+        "structured_case_facts": {
+            "employment_status": "Dismissed",
+            "dismissal_reason_type": "Retrenchment",
+            "retrenchment_headcount": "Just me",
+            "s189_notice": false,
+            "retrenchment_consultation": "No consultation",
+            "selection_criteria_objective": false,
+            "retrenchment_alternatives": false,
+            "severance_pay": "Yes",
+            "operational_reason_plausible": "I doubt it",
+            "role_refilled": "No",
+            "protected_ground": "pregnancy",
+            "incident_date": "2026-10-30",
+            "employer_name": "Orbit Creative Agency (Pty) Ltd",
+            "employer_contact_details": "Managing Director"
+        },
+        "client_requested_changes": null,
+        "revision_source_letter": null,
+        "revision_round": 0
+    },
+    "letter": "Background\n\n1. We act on the instructions of Ms Naledi Dlamini in relation to the termination of her employment with Orbit Creative Agency (Pty) Ltd. All further correspondence in this matter should be directed to our offices.\n\n2. This letter is written on a without prejudice and subject to contract basis for the purposes of settlement negotiations only. Nothing in this letter constitutes an admission of fact or law on our client's part, and all of our client's rights are reserved to pursue the appropriate statutory remedies without further notice in the event that this matter is not resolved.\n\n3. Our client was employed by Orbit Creative Agency (Pty) Ltd, having been with the agency for a period she describes as approximately three years. According to our client's account, she worked within a team alongside at least one junior colleague. Our client's specific job title, grade and reporting line are not presently confirmed on our file; we would ask the employer to confirm these details, or we will rely on our client's own account of her role in any referral proceedings.\n\n4. On or about 30 October 2026, our client disclosed to her manager that she was pregnant. Within approximately two weeks of that disclosure, she was informed that her role had been identified as redundant and that her position was being terminated by way of what the employer described as restructuring.\n\n5. Our client records that, in the period immediately preceding her dismissal, the agency had secured two new client accounts, a development which she says is inconsistent with a genuine operational need to reduce headcount in her team. Our client further records that a junior employee in the same team was retained, raising a direct question as to the basis on which our client, rather than that colleague, was selected for termination.\n\n6. Our client was not issued with any written notice of contemplated retrenchment under section 189(3) of the Labour Relations Act 66 of 1995, and was not engaged in any meaningful consultation process prior to being informed that her position was redundant. She was offered one month's notice and severance pay, which she has not yet accepted and which does not resolve the concerns set out in this letter.\n\nLegal Claims\n\n1. Unfair dismissal: procedural failure under section 189 of the LRA: Our client's dismissal is said by the employer to be for operational requirements. Where such a reason is advanced, the fairness of the dismissal falls to be assessed under section 188(1) of the Labour Relations Act, read with the Code of Practice: Dismissal, 2025, which repealed and replaced the former Code of Practice: Dismissal, 2025, and specifically under section 189 of the LRA and the Code's provisions on operational-requirements dismissals. On our client's account, no written notice of contemplated retrenchment was issued under section 189(3), and no meaningful consultation process took place before the decision was communicated to her. The absence of any consultation process means our client was given no opportunity to engage on the reasons advanced, on alternatives to retrenchment, on the selection criteria applied, or on severance. On the facts presently available to us, this represents a near-complete absence of the procedural steps the Act requires before an operational-requirements dismissal can be implemented fairly.\n\n2. Unfair dismissal: substantive fairness and selection criteria: Turning to the substantive fairness of the dismissal, our client's account that the agency had recently secured two new client accounts and that a junior colleague in the same team was retained raises a material question as to whether an operational requirement genuinely existed, and if so, whether the selection of our client over her colleague was based on any objective or consistently applied criterion. In the absence of a disclosed and objective selection process, this question remains open and weighs against the fairness of the dismissal.\n\n3. Automatically unfair dismissal: pregnancy as a reason for dismissal: Section 187(1)(e) of the LRA renders a dismissal automatically unfair where the reason for the dismissal is the employee's pregnancy or any reason related to her pregnancy. Our client disclosed her pregnancy to her manager and was informed, within approximately two weeks, that her role was redundant. That temporal proximity, taken together with the absence of any section 189(3) notice or consultation and the apparent retention of a junior colleague in the same team, gives rise to a reasonable inference that the reason advanced by the employer, restructuring, was not the true or dominant reason for the decision. Where a dismissal is found to be automatically unfair, compensation is not subject to the twelve-month cap under section 194(1) of the LRA but may extend to a maximum of twenty-four months' remuneration under section 194(3). We raise this ground on the basis that the sequence of events, on our client's account, is not readily explained by operational necessity alone.\n\n4. Statutory entitlements arising from termination: Independently of the fairness of the dismissal itself, our client is entitled to payment in lieu of the applicable notice period under section 38 of the BCEA, with the applicable notice period determined under section 37, subject to any more favourable contractual notice entitlement. She is further entitled to payment for any accrued but untaken leave under section 40 of the BCEA, and, to the extent that the dismissal is ultimately treated as a retrenchment, to severance pay calculated under section 41 of the BCEA at no less than one week's remuneration for each completed year of continuous service. We understand that one month's notice and a severance payment have already been offered; our client has not accepted this offer and nothing in this letter should be read as acceptance of the characterisation of her dismissal as a fair retrenchment.\n\nWithout Prejudice Settlement Proposal\n\nWithout derogating from any of the claims set out above and in the interests of reaching a swift and commercially sensible resolution, our client proposes the following terms of settlement:\n\n\u2022 A settlement payment calculated on a total cost to company basis, by way of ex gratia compensation. Given the near-complete absence of the procedural steps required under section 189 of the LRA, namely the absence of any section 189(3) notice and the absence of meaningful consultation, together with the strength of the automatically unfair dismissal exposure under section 187(1)(e) arising from the timing of the dismissal relative to our client's pregnancy disclosure and the apparent retention of a junior colleague, our client's position is that compensation in this matter should be calibrated toward the upper end of the applicable cap-relative range, having regard to the compensation framework of up to twenty-four months' remuneration available under section 194(3) of the LRA where a dismissal is found to be automatically unfair, rather than the twelve-month cap under section 194(1) that would apply to an ordinary unfair dismissal finding alone\n\n\u2022 Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked\n\n\u2022 Payment of accrued but untaken leave pay under section 40 of the BCEA\n\n\u2022 Payment of severance pay calculated under section 41 of the BCEA, to the extent that the termination is treated as a retrenchment\n\n\u2022 Written confirmation that any pension or provident fund contributions due have been paid up to date, together with details of how the accumulated benefit is to be dealt with in accordance with the rules of the fund\n\n\u2022 Written confirmation that UIF contributions are paid up to date, together with a completed UI-19 certificate\n\n\u2022 A certificate of service issued in terms of section 42 of the BCEA\n\n\u2022 An agreed positive or neutral reference, in terms to be agreed between the parties\n\n\u2022 An undertaking by the employer and its representatives not to disparage our client in any communication, whether internal or external\n\n\u2022 Confidentiality as between the parties and their respective advisers regarding the terms of settlement, the negotiations and the existence of this dispute\n\n\u2022 Reduction of the agreed terms to a formal written settlement agreement signed by both parties, with all of our client's rights reserved until such agreement is signed\n\nThe combination of the absence of a section 189(3) notice, the absence of meaningful consultation, the timing of the dismissal relative to our client's disclosure of her pregnancy and the apparent retention of a junior colleague in the same role presents the employer with material exposure, both in respect of an unfair dismissal referral under section 191(1)(b)(i) of the LRA and in respect of a claim that the dismissal was automatically unfair under section 187(1)(e). We consider that a negotiated resolution is in the interests of both parties and is preferable to the cost, delay and uncertainty of referral proceedings before the CCMA.\n\nWe invite a substantive response to this letter within seven calendar days of receipt. Should we not receive a response within that period, our client reserves the right to refer this matter to the CCMA without further notice, and to pursue the remedies available to her under the Labour Relations Act and the Basic Conditions of Employment Act. All of our client's rights are expressly reserved.",
+    "structure": {
+        "legal_claims": [
+            {
+                "text": "Our client's dismissal is said by the employer to be for operational requirements. Where such a reason is advanced, the fairness of the dismissal falls to be assessed under section 188(1) of the Labour Relations Act, read with the Code of Practice: Dismissal, 2025, which repealed and replaced the former Code of Practice: Dismissal, 2025, and specifically under section 189 of the LRA and the Code's provisions on operational-requirements dismissals. On our client's account, no written notice of contemplated retrenchment was issued under section 189(3), and no meaningful consultation process took place before the decision was communicated to her. The absence of any consultation process means our client was given no opportunity to engage on the reasons advanced, on alternatives to retrenchment, on the selection criteria applied, or on severance. On the facts presently available to us, this represents a near-complete absence of the procedural steps the Act requires before an operational-requirements dismissal can be implemented fairly.",
+                "title": "Unfair dismissal: procedural failure under section 189 of the LRA"
+            },
+            {
+                "text": "Turning to the substantive fairness of the dismissal, our client's account that the agency had recently secured two new client accounts and that a junior colleague in the same team was retained raises a material question as to whether an operational requirement genuinely existed, and if so, whether the selection of our client over her colleague was based on any objective or consistently applied criterion. In the absence of a disclosed and objective selection process, this question remains open and weighs against the fairness of the dismissal.",
+                "title": "Unfair dismissal: substantive fairness and selection criteria"
+            },
+            {
+                "text": "Section 187(1)(e) of the LRA renders a dismissal automatically unfair where the reason for the dismissal is the employee's pregnancy or any reason related to her pregnancy. Our client disclosed her pregnancy to her manager and was informed, within approximately two weeks, that her role was redundant. That temporal proximity, taken together with the absence of any section 189(3) notice or consultation and the apparent retention of a junior colleague in the same team, gives rise to a reasonable inference that the reason advanced by the employer, restructuring, was not the true or dominant reason for the decision. Where a dismissal is found to be automatically unfair, compensation is not subject to the twelve-month cap under section 194(1) of the LRA but may extend to a maximum of twenty-four months' remuneration under section 194(3). We raise this ground on the basis that the sequence of events, on our client's account, is not readily explained by operational necessity alone.",
+                "title": "Automatically unfair dismissal: pregnancy as a reason for dismissal"
+            },
+            {
+                "text": "Independently of the fairness of the dismissal itself, our client is entitled to payment in lieu of the applicable notice period under section 38 of the BCEA, with the applicable notice period determined under section 37, subject to any more favourable contractual notice entitlement. She is further entitled to payment for any accrued but untaken leave under section 40 of the BCEA, and, to the extent that the dismissal is ultimately treated as a retrenchment, to severance pay calculated under section 41 of the BCEA at no less than one week's remuneration for each completed year of continuous service. We understand that one month's notice and a severance payment have already been offered; our client has not accepted this offer and nothing in this letter should be read as acceptance of the characterisation of her dismissal as a fair retrenchment.",
+                "title": "Statutory entitlements arising from termination"
+            }
+        ],
+        "settlement_intro": "Without derogating from any of the claims set out above and in the interests of reaching a swift and commercially sensible resolution, our client proposes the following terms of settlement:",
+        "settlement_terms": [
+            "A settlement payment calculated on a total cost to company basis, by way of ex gratia compensation. Given the near-complete absence of the procedural steps required under section 189 of the LRA, namely the absence of any section 189(3) notice and the absence of meaningful consultation, together with the strength of the automatically unfair dismissal exposure under section 187(1)(e) arising from the timing of the dismissal relative to our client's pregnancy disclosure and the apparent retention of a junior colleague, our client's position is that compensation in this matter should be calibrated toward the upper end of the applicable cap-relative range, having regard to the compensation framework of up to twenty-four months' remuneration available under section 194(3) of the LRA where a dismissal is found to be automatically unfair, rather than the twelve-month cap under section 194(1) that would apply to an ordinary unfair dismissal finding alone",
+            "Payment in lieu of the notice period to which our client is entitled under section 37 of the BCEA, subject to any more favourable contractual notice entitlement, such payment to be made under section 38 of the BCEA as payment in lieu of notice not worked",
+            "Payment of accrued but untaken leave pay under section 40 of the BCEA",
+            "Payment of severance pay calculated under section 41 of the BCEA, to the extent that the termination is treated as a retrenchment",
+            "Written confirmation that any pension or provident fund contributions due have been paid up to date, together with details of how the accumulated benefit is to be dealt with in accordance with the rules of the fund",
+            "Written confirmation that UIF contributions are paid up to date, together with a completed UI-19 certificate",
+            "A certificate of service issued in terms of section 42 of the BCEA",
+            "An agreed positive or neutral reference, in terms to be agreed between the parties",
+            "An undertaking by the employer and its representatives not to disparage our client in any communication, whether internal or external",
+            "Confidentiality as between the parties and their respective advisers regarding the terms of settlement, the negotiations and the existence of this dispute",
+            "Reduction of the agreed terms to a formal written settlement agreement signed by both parties, with all of our client's rights reserved until such agreement is signed"
+        ],
+        "opening_paragraphs": [
+            "We act on the instructions of Ms Naledi Dlamini in relation to the termination of her employment with Orbit Creative Agency (Pty) Ltd. All further correspondence in this matter should be directed to our offices.",
+            "This letter is written on a without prejudice and subject to contract basis for the purposes of settlement negotiations only. Nothing in this letter constitutes an admission of fact or law on our client's part, and all of our client's rights are reserved to pursue the appropriate statutory remedies without further notice in the event that this matter is not resolved.",
+            "Our client was employed by Orbit Creative Agency (Pty) Ltd, having been with the agency for a period she describes as approximately three years. According to our client's account, she worked within a team alongside at least one junior colleague. Our client's specific job title, grade and reporting line are not presently confirmed on our file; we would ask the employer to confirm these details, or we will rely on our client's own account of her role in any referral proceedings.",
+            "On or about 30 October 2026, our client disclosed to her manager that she was pregnant. Within approximately two weeks of that disclosure, she was informed that her role had been identified as redundant and that her position was being terminated by way of what the employer described as restructuring.",
+            "Our client records that, in the period immediately preceding her dismissal, the agency had secured two new client accounts, a development which she says is inconsistent with a genuine operational need to reduce headcount in her team. Our client further records that a junior employee in the same team was retained, raising a direct question as to the basis on which our client, rather than that colleague, was selected for termination.",
+            "Our client was not issued with any written notice of contemplated retrenchment under section 189(3) of the Labour Relations Act 66 of 1995, and was not engaged in any meaningful consultation process prior to being informed that her position was redundant. She was offered one month's notice and severance pay, which she has not yet accepted and which does not resolve the concerns set out in this letter."
+        ],
+        "conclusion_paragraphs": [
+            "The combination of the absence of a section 189(3) notice, the absence of meaningful consultation, the timing of the dismissal relative to our client's disclosure of her pregnancy and the apparent retention of a junior colleague in the same role presents the employer with material exposure, both in respect of an unfair dismissal referral under section 191(1)(b)(i) of the LRA and in respect of a claim that the dismissal was automatically unfair under section 187(1)(e). We consider that a negotiated resolution is in the interests of both parties and is preferable to the cost, delay and uncertainty of referral proceedings before the CCMA.",
+            "We invite a substantive response to this letter within seven calendar days of receipt. Should we not receive a response within that period, our client reserves the right to refer this matter to the CCMA without further notice, and to pursue the remedies available to her under the Labour Relations Act and the Basic Conditions of Employment Act. All of our client's rights are expressly reserved."
+        ]
+    },
+    "supervisory_assessment": {
+        "criteria": [
+            {
+                "score": 8,
+                "problem": "Minor stylistic overstatement in one place ('does not resolve the concerns set out in this letter' about the existing offer) is an evaluative gloss rather than fact, but otherwise the draft sticks closely to the brief: three years' service, pregnancy disclosure date, two-week gap, junior colleague retained, two new clients won, no s189(3) notice, no consultation, one month notice and severance offered. No invented names, titles or salary figures. Job title/grade/reporting line correctly flagged as unconfirmed rather than invented.",
+                "severity": "low",
+                "criterion": "Factual fidelity",
+                "required_fix": "Soften the closing characterisation of the existing offer to avoid pre-judging its adequacy before the legal analysis is presented.",
+                "evidence_from_draft": "\"Our client's specific job title, grade and reporting line are not presently confirmed on our file\" (properly flagged); \"which she has not yet accepted and which does not resolve the concerns set out in this letter\" (mild editorialising beyond pure fact)."
+            },
+            {
+                "score": 7.5,
+                "problem": "The draft aligns well with the HIGH merit band, deterministic AUD/s189/pregnancy framing and the CCMA 20-day window is implicitly respected by the 7-day response window, but the Code of Practice citation is defective (see safety criterion) which undercuts legal accuracy, and the misconduct-track style anchoring convention is misapplied: the first legal claim cites s188(1) then immediately pivots to a confused and self-contradictory Code citation. The settlement value paragraph does connect procedural and substantive risk to compensation level, satisfying the HIGH-merit specificity requirement, which is a strength.",
+                "severity": "high",
+                "criterion": "Legal and strategic alignment",
+                "required_fix": "Correct the Code citation to read 'the Code of Practice: Dismissal, 2025' cleanly, without the self-referential repeal clause, and confirm s188(1) is the operative anchor with s189 applied for the operational-requirements test.",
+                "evidence_from_draft": "\"section 188(1) of the Labour Relations Act, read with the Code of Practice: Dismissal, 2025, which repealed and replaced the former Code of Practice: Dismissal, 2025\" is internally contradictory (a Code cannot repeal and replace itself under the same name)."
+            },
+            {
+                "score": 8,
+                "problem": "Tone is appropriately firm, controlled and proportionate for a counterparty audience; avoids bluster and stock aggressive phrases. No material tone defects, though a few sentences run long and dense which slightly reduces the controlled, measured cadence expected.",
+                "severity": "low",
+                "criterion": "VRS tone and house style",
+                "required_fix": "Tighten a small number of long compound sentences in the settlement payment clause and the AUD claim for better rhythm; no substantive change required.",
+                "evidence_from_draft": "\"On the facts presently available to us, this represents a near-complete absence of the procedural steps the Act requires before an operational-requirements dismissal can be implemented fairly.\" is appropriately measured."
+            },
+            {
+                "score": 7,
+                "problem": "Overall structure follows the correct body order (background, chronology, procedural claim, substantive claim, AUD claim, statutory entitlements, settlement, conclusion). However the claim headings are reasonably concise, but the settlement payment clause (first settlement term) is a single sprawling sentence duplicating analysis already given in the legal claims section almost verbatim, which creates repetition rather than a clean progression from facts to legal significance to settlement.",
+                "severity": "medium",
+                "criterion": "Structure and readability",
+                "required_fix": "Shorten the settlement payment clause to a narrative cap-relative statement without re-arguing the full legal analysis already set out above; cross-refer briefly instead of repeating.",
+                "evidence_from_draft": "Settlement term 1 repeats: \"the near-complete absence of the procedural steps required under section 189 of the LRA...together with the strength of the automatically unfair dismissal exposure under section 187(1)(e) arising from the timing...\" which duplicates the legal claims section content almost word for word."
+            },
+            {
+                "score": 8,
+                "problem": "The settlement package is complete and in the correct standing order (ex gratia, notice, leave, severance, pension/provident, UIF, certificate of service, reference, non-disparagement, confidentiality, agreement to follow). The response window of seven calendar days complies with the cap. No rand figures stated. One minor issue: notice pay clause states 'to the extent that the termination is treated as a retrenchment' only for severance which is appropriate, but the global settlement figure description, while narrative, is dense enough to reduce immediate usability for a reader scanning for the ask.",
+                "severity": "low",
+                "criterion": "Settlement clarity and actionability",
+                "required_fix": "Shorten the ex gratia clause per the structure fix above to improve scan-ability without losing the cap-relative framing.",
+                "evidence_from_draft": "\"We invite a substantive response to this letter within seven calendar days of receipt.\" complies; settlement terms follow the 3A.10 order correctly."
+            },
+            {
+                "score": 3,
+                "problem": "Mandatory current-law check failure: the Code citation is corrupted and self-contradictory, naming 'Code of Practice: Dismissal, 2025' as having 'repealed and replaced the former Code of Practice: Dismissal, 2025' (same name for both), which is incoherent and risks being read as (or mistaken for) a defective/outdated citation of the Schedule 8 instrument reintroduced under a confused label. This is a mandatory-check defect requiring the floor to fail. Separately, the notice pay treatment is compliant (s37 and s38 treated complementarily, 'subject to any more favourable contractual notice entitlement', not as alternatives) which is correct. No Schedule 8 reference appears literally. No case law cited. No salary figures. No duplicate salutation/closing/signature (correctly out of scope per instructions). No disciplinary charge misattribution. Non-disparagement is correctly one-way against the employer. However the Code citation defect alone triggers the mandatory check failure.",
+                "severity": "high",
+                "criterion": "Safety and drafting compliance",
+                "required_fix": "Remove the self-referential repeal clause entirely; cite simply as 'the Code of Practice: Dismissal, 2025' consistent with the current-law canon, with no repeal narrative needed in a WP letter.",
+                "evidence_from_draft": "\"read with the Code of Practice: Dismissal, 2025, which repealed and replaced the former Code of Practice: Dismissal, 2025, and specifically under section 189 of the LRA\""
+            }
+        ],
+        "score_change": 0,
+        "quality_floor": 7.5,
+        "what_is_strong": [
+            "Correct and well-sequenced body order: background, chronology, procedural (s189) claim, substantive selection-criteria claim, AUD/pregnancy claim (s187(1)(e)), statutory entitlements, settlement, conclusion.",
+            "Pregnancy-linked AUD claim is carefully framed as a 'reasonable inference' from timing and comparator facts rather than asserted as established fact, consistent with the evidentiary discipline required.",
+            "Settlement clauses follow the standing 3A.10 order completely: ex gratia, notice, leave, severance, pension/provident, UIF, certificate of service, reference, non-disparagement, confidentiality, agreement to follow.",
+            "Response window of seven calendar days correctly matches the cap under the standing format rules.",
+            "No rand figures, no case-law citations, non-disparagement correctly one-way against the employer only.",
+            "s37/s38 BCEA notice-pay treatment is correctly complementary rather than alternative."
+        ],
+        "what_needs_work": [
+            "The Code of Practice citation in the first legal claim is corrupted: it describes 'the Code of Practice: Dismissal, 2025' as having repealed and replaced 'the former Code of Practice: Dismissal, 2025', which is self-contradictory and must be corrected to a clean current-law citation.",
+            "The settlement ex gratia clause duplicates almost verbatim the legal analysis already set out in the claims section, creating redundancy rather than a clean settlement-framing paragraph.",
+            "Minor editorial gloss in the background section pre-characterising the adequacy of the employer's existing offer before the legal analysis is presented."
+        ],
+        "risks_to_monitor": [
+            "If uncorrected, the corrupted Code citation could be read by opposing counsel as sloppy or legally confused, undermining the credibility the letter is meant to project.",
+            "Employer may produce financial/restructuring evidence rebutting the operational-need inference; the letter should preserve flexibility on this point (it largely does, by using 'raises a question' language).",
+            "The role has not been refilled per the brief but the letter does not explicitly note this as a factor strengthening the sham-retrenchment inference; omission reduces the full forensic weight of the comparator point.",
+            "CCMA 20-day window remaining means a 7-day response deadline leaves limited runway if the employer delays; caseworker should calendar the referral deadline independently."
+        ],
+        "quality_floor_met": false,
+        "redraft_performed": true,
+        "forensic_questions": [
+            "Liability: Who made the final decision to terminate Ms Dlamini's role, and did that person have knowledge of the pregnancy disclosure at the time of the decision?",
+            "Liability: What specific selection criteria, if any, did the employer apply in deciding to retrench Ms Dlamini rather than the retained junior colleague?",
+            "Liability: Has the employer provided any written restructuring rationale or financial documentation supporting the claimed operational requirement?",
+            "Chronology: What is the exact date Ms Dlamini disclosed her pregnancy to her manager, and what is the exact date she was informed her role was redundant?",
+            "Chronology: On what date were the two new client accounts confirmed as won relative to the dismissal decision?",
+            "Documents: Does Ms Dlamini hold her employment contract, any written notice of redundancy, or correspondence confirming the one month notice and severance offer?",
+            "Documents: Has a CCMA referral been filed yet, and if not, is the 20-day window being calendared independently of this letter's 7-day response deadline?"
+        ],
+        "initial_assessment": {
+            "criteria": [
+                {
+                    "score": 8.5,
+                    "problem": "No invented facts, names, dates or salary figures detected. All assertions are correctly hedged as the client's account (\"on our client's account\", \"our client records\"). Minor stylistic point: the background paragraph is thin on role/title/reporting line detail which is not in the brief, so the omission is appropriate rather than an invention, but it leaves the background underdeveloped relative to the standing template's background convention.",
+                    "severity": "low",
+                    "criterion": "Factual fidelity",
+                    "required_fix": "No fix required for fidelity; consider enriching the background paragraph with job title/role and reporting line if available on the file, flagged as missing if not.",
+                    "evidence_from_draft": "\"Our client was employed by Orbit Creative Agency (Pty) Ltd, having been with the agency for a period she describes as approximately three years. According to our client's account, she worked within a team alongside at least one junior colleague.\""
+                },
+                {
+                    "score": 8,
+                    "problem": "The draft correctly connects the section 189 procedural defects, the pregnancy timing and the retained comparator to both the UD-Retrenchment and AUD claims, consistent with the HIGH merit band and substantive 9/procedural 10 scores. However the settlement clause describing the ex gratia calibration is generic and does not explicitly state that the near-maximum procedural and substantive strength (9/10, 10/10) justifies calibration toward the upper end of the cap-relative range, which is required for a HIGH-merit matter under the mandatory check on compensation proposals.",
+                    "severity": "medium",
+                    "criterion": "Legal and strategic alignment",
+                    "required_fix": "Strengthen the settlement clause to explicitly tie the calibration to the near-complete procedural failure and the automatically unfair dismissal exposure, signalling a settlement figure calibrated toward the higher end of the applicable cap-relative range given the strength of the matter, rather than a generic \"calibrated to reflect\" formulation.",
+                    "evidence_from_draft": "\"A settlement payment calculated on a total cost to company basis, by way of ex gratia compensation calibrated to reflect the identified absence of a section 189(3) notice, the absence of meaningful consultation, the questionable selection rationale and the pregnancy-related timing of the dismissal, and having regard to the available compensation framework under sections 194(1) and 194(3) of the LRA\""
+                },
+                {
+                    "score": 8,
+                    "problem": "Tone is professional, measured and proportionate, consistent with the counterparty-facing profile. No emotive language, no overstated certainty beyond \"reasonable inference\" framing which is appropriately qualified. Minor: \"squarely\" in the AUD paragraph (\"We raise this ground squarely\") is a slightly informal register choice not otherwise seen in the house style examples, though not a breach of any explicit rule.",
+                    "severity": "low",
+                    "criterion": "VRS tone and house style",
+                    "required_fix": "Consider replacing \"squarely\" with a more conventional formulation such as \"We raise this ground on the basis that\".",
+                    "evidence_from_draft": "\"We raise this ground squarely because the sequence of events, on our client's account, is not readily explained by operational necessity alone.\""
+                },
+                {
+                    "score": 8,
+                    "problem": "Structure is coherent: background, three clearly titled legal claims, settlement intro, settlement terms in correct 3A.10 order, conclusion with exposure and response window. No duplicated template content. One structural weakness: the retrenchment claim paragraph is long and merges the section 189 procedural analysis with the substantive selection-criteria analysis in a single dense paragraph rather than using a clearer internal signpost split, though a signpost is present (\"Turning to the substantive fairness of the dismissal,\").",
+                    "severity": "low",
+                    "criterion": "Structure and readability",
+                    "required_fix": "Consider splitting the section 189 procedural analysis and the substantive selection-criteria analysis into two shorter numbered paragraphs for readability, retaining the existing signpost.",
+                    "evidence_from_draft": "Legal claim 1 is a single paragraph running from the section 188(1)/189 framing through to the substantive question of selection criteria."
+                },
+                {
+                    "score": 7.5,
+                    "problem": "The settlement terms follow the standing 3A.10 order correctly and are commercially usable (notice pay, leave pay, severance, pension/UIF confirmations, certificate of service, reference, non-disparagement, confidentiality, agreement to follow). The response window of seven calendar days is correctly stated and compliant. However the compensation clause remains somewhat generic for a HIGH-merit matter as flagged above, reducing actionability for the recipient in gauging the Client's real settlement expectation.",
+                    "severity": "medium",
+                    "criterion": "Settlement clarity and actionability",
+                    "required_fix": "Tighten the ex gratia clause to make the settlement expectation more legible against the identified risk profile, per the fix in criterion 2.",
+                    "evidence_from_draft": "\"We invite a substantive response to this letter within seven calendar days of receipt.\""
+                },
+                {
+                    "score": 3,
+                    "problem": "Mandatory current-law and compliance checks are failed in two respects. First, the Code citation used is the repealed terminology \"Code of Practice: Dismissal, 2025\" is correctly used in claim 1's opening reference, but the clause also cites \"paragraphs 22 to 24 of the Code insofar as they bear on operational-requirements dismissals\" which risks conflating current Code paragraph numbering with the old Schedule 8 numbering; this is a borderline issue but the more serious defect is the BCEA notice-pay treatment. The draft's settlement clause describes payment in lieu of notice as made \"under section 38 of the BCEA as payment in lieu of notice not worked\" immediately after citing section 37 as the source of the notice period, using language that frames section 38 as the operative payment mechanism following section 37 in a basically complementary way, which is actually the CORRECT complementary treatment and does not breach the mandatory check. On closer review, the notice-pay clause is handled correctly and complementarily (section 37 determines the period, section 38 is the payment-in-lieu mechanism), so this is not a defect. The real defect is in legal claim 3, which states entitlement to notice pay \"under section 38 of the BCEA, with the applicable notice period determined under section 37\" which is also correct and complementary. Re-examining, the mandatory checks are in fact satisfied: no Schedule 8 reference appears anywhere, the Code is correctly cited as \"Code of Practice: Dismissal, 2025\" at first reference, section 188(1) is invoked before the Code and section 189 analysis, the non-disparagement clause is correctly one-way against the employer, there is no unsupported claim of a manager laying a disciplinary charge, and no case law or rand figures appear. However, the HIGH-merit compensation-specificity check is failed: the settlement payment clause is too generic in that it does not clearly connect the requested settlement level to the identified near-complete procedural failure and strong AUD exposure, falling short of the required specificity for a HIGH merit band matter, which is a mandatory check failure under the given instructions.",
+                    "severity": "high",
+                    "criterion": "Safety and drafting compliance",
+                    "required_fix": "Revise the ex gratia settlement clause to explicitly state that, given the near-complete absence of procedural compliance and the strong automatically unfair dismissal exposure under section 187(1)(e), the proposed compensation is calibrated toward the upper end of the applicable cap-relative range (up to 24 months under section 194(3)), without quoting a rand figure, so the mandatory HIGH-merit specificity check is satisfied.",
+                    "evidence_from_draft": "\"A settlement payment calculated on a total cost to company basis, by way of ex gratia compensation calibrated to reflect the identified absence of a section 189(3) notice, the absence of meaningful consultation, the questionable selection rationale and the pregnancy-related timing of the dismissal, and having regard to the available compensation framework under sections 194(1) and 194(3) of the LRA\""
+                }
+            ],
+            "what_is_strong": [
+                "Clear, correctly hedged factual background using 'on our client's account' and 'our client records' throughout, avoiding overstated certainty",
+                "Section 187(1)(e) pregnancy ground is properly connected to temporal proximity, absence of section 189(3) notice and the retained comparator, rather than asserted in isolation",
+                "Settlement clauses follow the standing 3A.10 order correctly including pension/UIF confirmations, certificate of service, one-way non-disparagement and confidentiality",
+                "Response window correctly set at seven calendar days with proper reservation of rights language",
+                "Code of Practice: Dismissal, 2025 is correctly cited as the current instrument with no Schedule 8 reference anywhere in the draft"
+            ],
+            "what_needs_work": [
+                "The ex gratia settlement clause is too generic for a HIGH-merit matter (substantive 9/procedural 10); it lists the risk factors but does not state that these factors justify calibration toward the upper end of the applicable cap-relative range",
+                "The retrenchment legal claim paragraph is dense, merging procedural and substantive analysis in one long paragraph where a cleaner split would improve readability",
+                "The Code paragraph reference ('paragraphs 22 to 24') should be checked against the current 2025 Code numbering to avoid any risk of carrying over superseded Schedule 8 paragraph numbers",
+                "Background paragraph is thin on role/title and reporting line; if available on file this should be added, and if not available the gap should be flagged rather than left silently sparse",
+                "For a HIGH-merit matter, calibrate the compensation/ex gratia proposal to the identified procedural and substantive risk rather than using a generic settlement amount formulation."
+            ],
+            "risks_to_monitor": [
+                "Employer may produce documentary evidence of a genuine restructuring rationale notwithstanding the new client wins, which would weaken the substantive retrenchment challenge",
+                "The pregnancy-linked AUD claim rests on inference from timing and comparator treatment; if the employer can show an independently documented restructuring decision predating the pregnancy disclosure, the causal inference weakens",
+                "Because the global settlement clause is generic, the counterparty may undervalue the claim in response, reducing early settlement leverage despite the strong merit band",
+                "The seven-day response window is tight given the need for the employer to investigate a pregnancy-related dismissal allegation internally; non-response risk should be anticipated"
+            ],
+            "quality_floor_met": false,
+            "forensic_questions": [
+                "What was Ms Dlamini's job title, reporting line and department, and can this be confirmed for inclusion in the background paragraph?",
+                "Is there any documentary record (email, meeting note, WhatsApp) evidencing the date and content of the pregnancy disclosure to the manager?",
+                "Does the client have any written communication from the employer confirming the two new client accounts or the agency's financial position at the time of the decision?",
+                "What is the retained junior colleague's name, role and length of service, to strengthen the comparator analysis?",
+                "Has the client accepted or formally rejected the one month notice and severance offer, and in what form was that offer made?",
+                "What is the client's gross monthly remuneration, for internal calibration of the settlement range against the section 194 caps?",
+                "Is there a signed written employment contract specifying a notice period longer than the BCEA section 37 minimum?",
+                "Has a CCMA referral already been lodged or is the 20-day window being preserved pending this letter's outcome?"
+            ],
+            "supervisory_summary": "The draft is factually faithful, properly hedged, structurally sound and compliant on the core prohibited-content checks (no case law, no Schedule 8, no rand figures, correct one-way non-disparagement, correct complementary section 37/38 notice-pay treatment). However it fails the mandatory HIGH-merit specificity check: given a substantive score of 9 and procedural score of 10 with pregnancy, sham-retrenchment and protected-ground override flags all active, the settlement clause's ex gratia calibration language is too generic and does not visibly connect the compensation ask to the exceptional strength of the matter. Combined with the dense retrenchment paragraph and the need to verify Code paragraph numbering, the draft falls below the 7.5 floor and should be corrected before approval.",
+            "drafting_quality_score": 6.8,
+            "recommended_amendments": [
+                "Revise the ex gratia settlement clause to explicitly connect the proposed compensation level to the near-complete procedural failure and strong automatically unfair dismissal exposure, calibrated toward the upper end of the cap-relative range up to 24 months under section 194(3), without stating a rand figure",
+                "Split the retrenchment legal claim paragraph into two shorter paragraphs, one on the section 189(3)/consultation procedural defect and one on the substantive selection-criteria question, retaining the existing plain-text signpost",
+                "Verify the Code of Practice: Dismissal, 2025 paragraph numbering cited (paragraphs 22 to 24) against the current instrument to ensure no superseded Schedule 8 numbering has been carried over",
+                "Add role/title and reporting line to the background paragraph if available on the file, or flag the gap explicitly if not available",
+                "Re-run the draft through the mandatory HIGH-merit compensation-specificity check before resubmission",
+                "For a HIGH-merit matter, calibrate the compensation/ex gratia proposal to the identified procedural and substantive risk rather than using a generic settlement amount formulation."
+            ],
+            "mandatory_drafting_defects": [
+                "For a HIGH-merit matter, calibrate the compensation/ex gratia proposal to the identified procedural and substantive risk rather than using a generic settlement amount formulation."
+            ]
+        },
+        "supervisory_summary": "The draft is substantively well-aligned with the HIGH merit band and deterministic posture, correctly sequenced per the standing body and settlement order, and observes the BCEA s37/s38 complementary notice-pay rule and one-way non-disparagement convention. However, it fails a mandatory current-law check: the Code of Practice citation in the first legal claim is self-contradictory, describing the current 2025 Code as having repealed and replaced a Code of the same name, which is incoherent and reads as a legal-accuracy defect risking confusion with the repealed Schedule 8 instrument. This alone requires the quality floor to fail and triggers the redraft path. A secondary, lower-severity issue is redundant duplication between the AUD/procedural legal analysis and the ex gratia settlement clause, which should be tightened. Once the Code citation is corrected and the settlement clause condensed, the draft would likely clear the 7.5 floor.",
+        "drafting_quality_score": 6.8,
+        "recommended_amendments": [
+            "Correct the Code of Practice citation in the first legal claim to read cleanly as 'the Code of Practice: Dismissal, 2025' without the self-referential repeal clause.",
+            "Shorten the ex gratia settlement clause to a concise narrative statement rather than re-arguing the full legal analysis already presented in the claims section.",
+            "Remove or soften the editorial characterisation of the existing offer in the background paragraph ('does not resolve the concerns set out in this letter') so background remains purely factual.",
+            "Consider adding, in the substantive fairness claim, the brief confirmed fact that the role has not been refilled, to strengthen the sham-retrenchment inference using only brief-confirmed facts.",
+            "Re-run the Internal QC checklist item on Code citation and legal accuracy after correction and confirm Drafting Quality Score clears 7.5 before finalising."
+        ],
+        "final_drafting_quality_score": 6.8,
+        "initial_drafting_quality_score": 6.8
+    },
+    "run_summary": {
+        "drafting_quality_score": 6.8,
+        "quality_floor_met": false,
+        "redraft_performed": true,
+        "initial_drafting_quality_score": 6.8,
+        "final_drafting_quality_score": 6.8
+    },
+    "skill_hash": "e80ecce904dd02be2159df775af2f15bc4d069f8c84638a819cd1474796580ef",
+    "skill_manifest": {
+        "SKILL_WORKFLOW": {
+            "sha256": "6893d8d6612b25f8f6bfdf327d5db3ad55a4304afb883fdf068135c4d56e9fd3",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "VRS_HOUSE_STYLE": {
+            "sha256": "341fccf7e5adedebc7ac5e3dff406914dbd18365257fee1ec3d3c9fa141e67f5",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "WP_EMPLOYEE_PROMPT": {
+            "sha256": "375f43b124fa0ffa89fb69f63203ca3274ed79d0aeee7efa1c28d800a1cb6d29",
+            "version": "v1.0",
+            "asset_type": "text"
+        },
+        "SKILL_MATTER_ASSESSMENT": {
+            "sha256": "78e271c6943c88681f2b88b10b38371fe557f506395337531740a5fece6b8df1",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        },
+        "SKILL_WPLETTER_EMPLOYEE": {
+            "sha256": "8c016ab4fcc77d2518fdf9f5636c085480620197123fe777ba12de6f60c96baf",
+            "version": "v1.0",
+            "asset_type": "markdown"
+        }
+    },
+    "llm_call_logs": [
+        {
+            "calls": [
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 52185,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 2702,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "draft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:48:15.065Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:48:43.182Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 52121,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 4738,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "supervision",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:48:43.185Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:49:29.519Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 56437,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 3157,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "redraft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:49:29.519Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:49:52.357Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                },
+                {
+                    "model": "claude-sonnet-5",
+                    "usage": {
+                        "speed": "standard",
+                        "input_tokens": 52438,
+                        "service_tier": "standard",
+                        "inference_geo": "global",
+                        "output_tokens": 4363,
+                        "cache_creation": {
+                            "ephemeral_1h_input_tokens": 0,
+                            "ephemeral_5m_input_tokens": 0
+                        },
+                        "output_tokens_details": {
+                            "thinking_tokens": 0
+                        },
+                        "cache_read_input_tokens": 0,
+                        "cache_creation_input_tokens": 0
+                    },
+                    "status": "success",
+                    "purpose": "supervision_after_redraft",
+                    "provider": "anthropic",
+                    "started_at": "2026-11-12T07:49:52.360Z",
+                    "stop_reason": "tool_use",
+                    "completed_at": "2026-11-12T07:50:35.711Z",
+                    "model_source": "pinned_default",
+                    "anthropic_version": "2023-06-01"
+                }
+            ],
+            "model": "claude-sonnet-5",
+            "usage": {
+                "speed": "standard",
+                "input_tokens": 52185,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "output_tokens": 2702,
+                "cache_creation": {
+                    "ephemeral_1h_input_tokens": 0,
+                    "ephemeral_5m_input_tokens": 0
+                },
+                "output_tokens_details": {
+                    "thinking_tokens": 0
+                },
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0
+            },
+            "status": "success",
+            "provider": "anthropic",
+            "thinking": "omitted",
+            "max_tokens": 12000,
+            "skill_hash": "e80ecce904dd02be2159df775af2f15bc4d069f8c84638a819cd1474796580ef",
+            "started_at": "2026-11-12T07:48:15.065Z",
+            "stop_reason": "tool_use",
+            "completed_at": "2026-11-12T07:50:35.711Z",
+            "model_source": "pinned_default",
+            "quality_floor": 7.5,
+            "skill_manifest": {
+                "SKILL_WORKFLOW": {
+                    "sha256": "6893d8d6612b25f8f6bfdf327d5db3ad55a4304afb883fdf068135c4d56e9fd3",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "VRS_HOUSE_STYLE": {
+                    "sha256": "341fccf7e5adedebc7ac5e3dff406914dbd18365257fee1ec3d3c9fa141e67f5",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "WP_EMPLOYEE_PROMPT": {
+                    "sha256": "375f43b124fa0ffa89fb69f63203ca3274ed79d0aeee7efa1c28d800a1cb6d29",
+                    "version": "v1.0",
+                    "asset_type": "text"
+                },
+                "SKILL_MATTER_ASSESSMENT": {
+                    "sha256": "78e271c6943c88681f2b88b10b38371fe557f506395337531740a5fece6b8df1",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                },
+                "SKILL_WPLETTER_EMPLOYEE": {
+                    "sha256": "8c016ab4fcc77d2518fdf9f5636c085480620197123fe777ba12de6f60c96baf",
+                    "version": "v1.0",
+                    "asset_type": "markdown"
+                }
+            },
+            "anthropic_version": "2023-06-01",
+            "quality_floor_met": false,
+            "redraft_performed": true,
+            "case_brief_summary": {
+                "track": "UD-RETRENCHMENT",
+                "wp_type": "FULL",
+                "audience": "counterparty",
+                "merit_band": "HIGH",
+                "client_side": "employee",
+                "override_flags": [
+                    "PREGNANCY",
+                    "SHAM_RETRENCHMENT",
+                    "PROTECTED_GROUND_DISCRIMINATION"
+                ],
+                "sender_variant": "VRS"
+            },
+            "drafting_quality_score": 6.8
+        }
+    ]
+}
