@@ -1,5 +1,5 @@
 name: Temporary background drafting retry
-# rerun after drafting QC patch ae7801d
+# final retrenchment verification after comparator/citation hardening
 on:
   push:
     branches: [main]
@@ -19,7 +19,7 @@ jobs:
           mkdir -p tmp-harness-results-retry
           base="https://labourlawassist.netlify.app/.netlify/functions/tmp_background_harness_retry_2d5f7a"
           sleep 25
-          for fixture in misconduct performance retrenchment; do
+          for fixture in retrenchment; do
             echo "START $fixture"
             start=""
             for i in {1..20}; do
