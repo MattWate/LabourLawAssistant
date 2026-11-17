@@ -64,7 +64,7 @@ function inferTrack(facts = {}) {
 }
 
 function ccmaStatus(facts = {}) {
-  return deadlineStatus(facts);
+  return deadlineStatus({ ...facts, track: facts.track || inferTrack(facts) });
 }
 
 function hardDisqualifier(facts = {}, track) {
