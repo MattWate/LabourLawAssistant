@@ -1,0 +1,60 @@
+name: Intake Live Smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'client-consent.html'
+      - 'netlify/functions/ask.js'
+      - 'netlify/functions/client_case_consent.js'
+      - 'netlify/functions/lib/intakeSafety.js'
+      - '.github/workflows/intake-live-smoke.yml'
+  workflow_dispatch:
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify deployed intake safety endpoints
+        run: |
+          node - <<'NODE'
+          const base='https://labourlawassist.netlify.app';
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          async function post(body){
+            const r=await fetch(base+'/.netlify/functions/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+            const text=await r.text();
+            let data={}; try{data=JSON.parse(text)}catch{}
+            return {r,data,text};
+          }
+          let ready=false;
+          for(let i=0;i<12;i++){
+            try{
+              const {r,data}=await post({action:'intake_safety_version'});
+              if(r.ok && data.version==='2026-11-17-v2'){ready=true;break;}
+            }catch{}
+            await sleep(10000);
+          }
+          if(!ready) throw new Error('Latest intake safety build did not become visible on Netlify');
+
+          const d=await post({
+            action:'deadline_check',
+            now:'2026-11-16T12:00:00Z',
+            facts:{employment_status:'dismissed',dismissal_reason_type:'Poor Performance',incident_date:'2026-10-13'}
+          });
+          if(!d.r.ok) throw new Error('deadline_check failed: '+d.text);
+          if(d.data.status?.status!=='LAPSED-CONDONATION' || d.data.status?.daysOverdue!==4) throw new Error('Card 04 live deadline replay failed: '+JSON.stringify(d.data));
+          if(!/condonation/i.test(d.data.message||'')) throw new Error('Card 04 live warning missing');
+
+          const m=await post({action:'deadline_check',facts:{track:'CD',employment_status:'resigned'}});
+          if(!m.r.ok || m.data.status?.status!=='UNKNOWN') throw new Error('Missing-date live check failed: '+JSON.stringify(m.data));
+
+          const page=await fetch(base+'/client-consent.html',{cache:'no-store'});
+          if(!page.ok || !(await page.text()).includes('VRS Client Consent')) throw new Error('Client consent page not deployed');
+
+          const unauth=await fetch(base+'/.netlify/functions/uat_log_review',{cache:'no-store'});
+          if(unauth.status!==401) throw new Error('UAT review endpoint should remain authenticated; got '+unauth.status);
+
+          console.log('PASS deployed intake safety smoke tests');
+          NODE
