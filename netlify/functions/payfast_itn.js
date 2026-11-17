@@ -44,7 +44,8 @@ async function recordItn(existingPayment, data, checks) {
   // allowed to replace those issued values before we validate the completion.
   const patch = {
     pf_payment_id: data.pf_payment_id || existingPayment.pf_payment_id || null,
-    status: normaliseStatus(data.payment_status),
+    status: existingPayment.status === 'manual_confirmed' && normaliseStatus(data.payment_status) !== 'paid'
+      ? 'manual_disputed' : normaliseStatus(data.payment_status),
     raw_itn: data,
     signature_valid: checks.signatureValid,
     merchant_valid: checks.merchantValid,
@@ -152,8 +153,11 @@ async function unlockCaseIfPaid(existingPayment, recordedPayment, data, checks) 
     .maybeSingle();
   if (error || !caseData) throw error || new Error('Case not found for paid transaction');
 
-  if (caseData.payment_status === 'paid' && caseData.status === 'paid_ready_for_drafting') {
-    return { unlocked: true, reason: 'already_unlocked', verificationMode };
+  // A late/retried ITN must never roll back drafting, overwrite the manual
+  // override audit, or send another customer confirmation.
+  if (caseData.payment_status === 'paid') {
+    if (normaliseStatus(data.payment_status) !== 'paid') console.warn('PayFast status conflicts with paid case', {caseId:caseData.id, m_payment_id:existingPayment.m_payment_id});
+    return { unlocked: true, reason: 'already_paid_no_change', verificationMode };
   }
 
   const paidAt = caseData.paid_at || new Date().toISOString();
@@ -172,7 +176,7 @@ async function unlockCaseIfPaid(existingPayment, recordedPayment, data, checks) 
     payfast_case_match: caseValid
   };
 
-  const { error: updateError } = await supabase.from('cases').update({
+  const { data: updatedRows, error: updateError } = await supabase.from('cases').update({
     payment_status: 'paid',
     paid_at: paidAt,
     wp_generation_unlocked: true,
@@ -180,8 +184,9 @@ async function unlockCaseIfPaid(existingPayment, recordedPayment, data, checks) 
     letter_status: caseData.letter_status === 'sent' ? 'sent' : (caseData.letter_status || 'not_started'),
     case_facts: { ...facts, ...paymentFacts },
     updated_at: new Date().toISOString()
-  }).eq('id', existingPayment.case_id);
+  }).eq('id', existingPayment.case_id).eq('payment_status', 'pending').select('id');
   if (updateError) throw updateError;
+  if (!updatedRows?.length) return { unlocked: true, reason: 'concurrent_confirmation_no_change', verificationMode };
 
   const notification = await notifyPaymentConfirmed(caseData);
   const notificationAt = notification.sent ? new Date().toISOString() : null;
