@@ -808,7 +808,7 @@ async function processIncomingMessage(message) {
     facts = mergeIntakeInferences(facts, turn);
     next = resolveNextUnanswered(next, facts);
 
-    if (facts._pending_confirmation?.items?.length && promptCount(facts) < WHATSAPP_PROMPT_LIMIT) {
+    if (facts._pending_confirmation?.items?.length && !['CLIENT_NAME','CLIENT_EMAIL'].includes(next) && promptCount(facts) < WHATSAPP_PROMPT_LIMIT) {
       facts = withPromptRecorded(facts, `confirm:${facts._pending_confirmation.items.map(x => x.field).join(',')}`);
       await updateConversation(conversation.id, { current_step: next, collected_facts: facts, classification,
         processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
@@ -828,6 +828,7 @@ async function processIncomingMessage(message) {
   if (step.type === 'evaluate') return completeEvaluation(conversation, message, facts);
 
   let next;
+  let deadlineWarning = null;
   if (step.type === 'buttons') {
     const selected = matchChoice(input, step);
     if (!selected) return `I did not understand that answer. Reply with the number or wording shown.\n\n${renderPrompt(stepName)}`;
@@ -861,7 +862,6 @@ async function processIncomingMessage(message) {
     if (step.minWords && wordCount(input) < step.minWords) return `Please add a little more detail, ideally at least ${step.minWords} words.\n\n${step.prompt}`;
     facts[step.saveAs] = valueToSave;
     facts = markDirectAnswer(facts, step.saveAs);
-    let deadlineWarning = null;
     if (['incident_date', 'dismissal_date', 'resignation_date'].includes(step.saveAs)) {
       const deadline = await invokeAsk('deadline_check', { facts });
       facts.ccma_deadline_status = deadline.status;
@@ -911,7 +911,7 @@ async function processIncomingMessage(message) {
   facts = withPromptRecorded(facts, `step:${next}`);
   await updateConversation(conversation.id, { current_step: next, collected_facts: facts,
     processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
-  return [turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
+  return [deadlineWarning, turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
 }
 
-module.exports = { processIncomingMessage, STEPS, renderPrompt };
+module.exports = { processIncomingMessage, STEPS, renderPrompt, mergeNarrativeFacts, mergeDirectExtractions, mergeIntakeInferences, withPromptRecorded, requiredLetterFieldsMissing };
