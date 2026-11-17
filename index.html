@@ -363,11 +363,14 @@
     const AI_SKIP_CONFIDENCE = 0.8;
     const AI_CAPTURE_CONFIDENCE = 0.65;
     const WEB_PROMPT_LIMIT = 15;
+    const RESERVED_CONTACT_STATES = new Set(["CLIENT_NAME", "CLIENT_EMAIL", "CLIENT_PHONE"]);
 
     function webPromptCount() { return Number(collectedFacts._intake_prompt_count || 0); }
     function recordWebPrompt(key) {
         const history = Array.isArray(collectedFacts._intake_prompt_history) ? collectedFacts._intake_prompt_history : [];
         if (!key || history.includes(key)) return true;
+        const stateKey = String(key).replace(/^step:/, "");
+        if (RESERVED_CONTACT_STATES.has(stateKey)) return true;
         if (history.length >= WEB_PROMPT_LIMIT) return false;
         collectedFacts._intake_prompt_history = [...history, key];
         collectedFacts._intake_prompt_count = history.length + 1;
@@ -502,26 +505,18 @@
             return { enabled: false };
         }
     }
-    async function handleWebPromptLimit(reason = "prompt_limit_incomplete") {
-        if (collectedFacts._handoff_started) return;
-        collectedFacts._handoff_started = true;
-        textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
-        showLoading();
-        try {
-            const missing = requiredLetterFieldsMissing();
-            const res = await fetch('/.netlify/functions/ask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: "intake_handoff", reason, missing, facts: collectedFacts })
-            });
-            const data = await res.json(); hideLoading();
-            appendMessage(data.message || "Thanks. I have saved your information and sent it to VRS for follow-up.", "bot");
-            if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}.`, "bot");
-        } catch (error) {
-            hideLoading();
-            appendMessage("Thanks. I have reached the end of the automated questions. Please contact VRS so a person can continue with you.", "bot");
-            console.error(error);
-        }
+    async function handleWebPromptLimit(reason = "prompt_limit_reached") {
+        if (collectedFacts._contact_capture_started) return;
+        collectedFacts._contact_capture_started = true;
+        collectedFacts._prompt_limit_reason = reason;
+        appendMessage("I have enough information for a first assessment. Before I finish, I need your contact details so VRS can reach you if a consultant needs to follow up.", "bot");
+
+        if (!hasKnownValue(collectedFacts.client_name)) currentState = "CLIENT_NAME";
+        else if (!hasKnownValue(collectedFacts.client_email)) currentState = "CLIENT_EMAIL";
+        else if (!hasKnownValue(collectedFacts.whatsapp_number)) currentState = "CLIENT_PHONE";
+        else currentState = "HANDOFF";
+
+        renderState();
     }
     function renderPendingConfirmation() {
         const text = pendingConfirmationText();
@@ -604,12 +599,18 @@
             if (!hasKnownValue(value) || hasKnownValue(collectedFacts[key])) return;
             const confidence = Number(confidenceByField[key] ?? overallConfidence ?? 0);
             if (confidence < AI_CAPTURE_CONFIDENCE) return;
+
+            const isLegalDate = ["incident_date", "dismissal_date", "resignation_date"].includes(key);
+            const narrative = String(collectedFacts.original_client_narrative || collectedFacts.initial_query || "");
+            const hasExplicitYear = /\b(?:19|20)\d{2}\b/.test(narrative);
+            if (isLegalDate && !hasExplicitYear) return;
+
             collectedFacts[key] = value;
             metadata[key] = {
                 source: "initial_narrative_ai",
                 confidence,
-                confirmed: confidence >= AI_SKIP_CONFIDENCE,
-                trust_basis: confidence >= AI_SKIP_CONFIDENCE ? "high_confidence_initial_narrative" : "requires_client_confirmation",
+                confirmed: isLegalDate ? false : confidence >= AI_SKIP_CONFIDENCE,
+                trust_basis: isLegalDate ? "date_requires_client_confirmation" : (confidence >= AI_SKIP_CONFIDENCE ? "high_confidence_initial_narrative" : "requires_client_confirmation"),
                 captured_at: new Date().toISOString()
             };
         });
