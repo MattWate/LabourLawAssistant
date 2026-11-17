@@ -415,6 +415,14 @@ exports.handler = async (event) => {
     }
 
 
+    if (action === 'intake_safety_version') {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: '2026-11-17-v2', checkpointing: true, candidate_dates: true, immediate_deadlines: true, priority_budget: true })
+      };
+    }
+
     if (action === 'deadline_check') {
       const deadlineFacts = body.facts || {};
       const status = deadlineStatus({ ...deadlineFacts, track: deadlineFacts.track || inferTrack(deadlineFacts) }, body.now ? new Date(body.now) : new Date());
