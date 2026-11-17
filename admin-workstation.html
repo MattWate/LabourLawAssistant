@@ -139,7 +139,8 @@
       <div class="modal-head"><div><h2>Create New Case</h2><p>Capture a manual matter without the chatbot.</p></div><button class="btn ghost" onclick="closeModal('new-case-modal')">Close</button></div>
       <div class="section"><h3>Client Details</h3><div class="edit-grid">
         <div class="block"><label>Client Name</label><input class="field" id="new-client-name"/></div>
-        <div class="block"><label>Contact Info</label><input class="field" id="new-contact-info"/></div>
+        <div class="block"><label>Client Email</label><input class="field" id="new-client-email"/></div>
+        <div class="block"><label>WhatsApp Number</label><input class="field" id="new-whatsapp-number" placeholder="+27 82 123 4567"/></div>
         <div class="block"><label>Source</label><select class="select" id="new-source"><option>manual</option><option>phone</option><option>email</option><option>referral</option><option>walk-in</option><option>whatsapp</option></select></div>
         <div class="block"><label>Urgency</label><select class="select" id="new-urgency"><option>normal</option><option>urgent</option><option>deadline risk</option></select></div>
       </div></div>
@@ -153,7 +154,7 @@
         <div class="block wide"><label>Incident Description</label><textarea class="textarea" id="new-incident-description"></textarea></div>
       </div></div>
       <div class="section"><h3>Initial Admin Assessment</h3><div class="edit-grid">
-        <div class="block"><label>Track</label><select class="select" id="new-track"><option value="MANUAL_REVIEW">Manual Review</option><option value="UD-CONDUCT">Unfair Dismissal - Conduct</option><option value="UD-RETRENCHMENT">Unfair Dismissal - Retrenchment</option><option value="AUD">Automatically Unfair Dismissal</option><option value="CD">Constructive Dismissal</option><option value="JURISDICTION_TRIAGE">Jurisdiction Triage</option></select></div>
+        <div class="block"><label>Track</label><select class="select" id="new-track"><option value="MANUAL_REVIEW">Manual Review</option><option value="UD-MISCONDUCT">Unfair Dismissal - Misconduct</option><option value="UD-POOR_PERFORMANCE">Unfair Dismissal - Poor Performance</option><option value="UD-INCAPACITY">Unfair Dismissal - Incapacity</option><option value="UD-RETRENCHMENT">Unfair Dismissal - Retrenchment</option><option value="AUD">Automatically Unfair Dismissal</option><option value="CD">Constructive Dismissal</option><option value="JURISDICTION_TRIAGE">Jurisdiction Triage</option></select></div>
         <div class="block"><label>Merit Band</label><select class="select" id="new-merit"><option>REQUIRES REVIEW</option><option>HIGH</option><option>MEDIUM-HIGH</option><option>MEDIUM</option><option>LOW</option><option>NO MERIT</option></select></div>
         <div class="block"><label>WP Eligible?</label><select class="select" id="new-wp"><option value="false">No</option><option value="true">Yes</option></select></div>
         <div class="block"><label>Attorney Review?</label><select class="select" id="new-attorney-review"><option value="true">Yes</option><option value="false">No</option></select></div>
@@ -167,7 +168,7 @@
     <div class="modal-card glass">
       <div class="modal-head"><div><h2>Override Justine Decision</h2><p>Preserve the original assessment while setting the effective firm decision.</p></div><button class="btn ghost" onclick="closeModal('override-modal')">Close</button></div>
       <div class="section"><h3>Admin Override</h3><div class="edit-grid">
-        <div class="block"><label>Track</label><select class="select" id="ov-track"><option value="AUD">AUD</option><option value="CD">CD</option><option value="UD-CONDUCT">UD-CONDUCT</option><option value="UD-RETRENCHMENT">UD-RETRENCHMENT</option><option value="JURISDICTION_TRIAGE">JURISDICTION_TRIAGE</option><option value="MANUAL_REVIEW">MANUAL_REVIEW</option></select></div>
+        <div class="block"><label>Track</label><select class="select" id="ov-track"><option value="AUD">AUD</option><option value="CD">CD</option><option value="UD-MISCONDUCT">UD-MISCONDUCT</option><option value="UD-POOR_PERFORMANCE">UD-POOR_PERFORMANCE</option><option value="UD-INCAPACITY">UD-INCAPACITY</option><option value="UD-RETRENCHMENT">UD-RETRENCHMENT</option><option value="JURISDICTION_TRIAGE">JURISDICTION_TRIAGE</option><option value="MANUAL_REVIEW">MANUAL_REVIEW</option></select></div>
         <div class="block"><label>Merit Band</label><select class="select" id="ov-merit"><option>HIGH</option><option>MEDIUM-HIGH</option><option>MEDIUM</option><option>LOW</option><option>NO MERIT</option><option>REQUIRES REVIEW</option></select></div>
         <div class="block"><label>WP Eligible?</label><select class="select" id="ov-wp"><option value="true">Yes</option><option value="false">No</option></select></div>
         <div class="block"><label>WP Type</label><select class="select" id="ov-wp-type"><option value="FULL">FULL</option><option value="LIMITED">LIMITED</option><option value="N/A">N/A</option></select></div>
@@ -628,13 +629,13 @@
 
     function editableFacts(c) {
       const f = facts(c);
-      const keys = ['client_name','contact_info','employer_name','addressee_name','addressee_position','employer_contact_details','incident_date','employment_status','dismissal_reason_type','contract_type','sector','hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter','incident_description'];
+      const keys = ['client_name','client_email','whatsapp_number','contact_info','employer_name','addressee_name','addressee_position','employer_contact_details','incident_date','employment_status','dismissal_reason_type','contract_type','sector','hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter','incident_description'];
       return '<div class="edit-grid">' + keys.map(k => editField(k, f[k])).join('') + '</div>';
     }
 
     function editField(k, v) {
       const labels = {
-        client_name:'Client Name',contact_info:'Client Contact',employer_name:'Employer Registered Name',addressee_name:'Addressee Name',addressee_position:'Addressee Position',employer_contact_details:'Employer Contact',incident_date:'Incident Date',employment_status:'Employment Status',dismissal_reason_type:'Dismissal Reason',contract_type:'Contract Type',sector:'Sector',
+        client_name:'Client Name',client_email:'Client Email',whatsapp_number:'WhatsApp Number',contact_info:'Legacy Contact',employer_name:'Employer Registered Name',addressee_name:'Addressee Name',addressee_position:'Addressee Position',employer_contact_details:'Employer Contact',incident_date:'Incident Date',employment_status:'Employment Status',dismissal_reason_type:'Dismissal Reason',contract_type:'Contract Type',sector:'Sector',
         hearing_held:'Hearing Held?',proc_notice:'48h Notice Given?',proc_rep:'Representation Allowed?',proc_chair:'Independent Chair?',proc_consultation:'Consultation Held?',paid_suspension:'Paid Suspension?',constructive_dismissal:'Constructive Dismissal?',wants_letter:'Wants Letter?',incident_description:'Incident Description'
       };
       const bools = ['hearing_held','proc_notice','proc_rep','proc_chair','proc_consultation','paid_suspension','constructive_dismissal','wants_letter'];
@@ -804,7 +805,7 @@
         else v = v.trim() === '' ? null : v;
         f[k] = v;
       });
-      await updateCase({ id, case_facts: f, client_name: f.client_name, issue_summary: f.incident_description });
+      await updateCase({ id, case_facts: f, client_name: f.client_name, contact_info: f.whatsapp_number || f.client_email || f.contact_info || null, issue_summary: f.incident_description });
       if (refresh) {
         toast('Case facts saved.');
         await fetchCases();
@@ -919,7 +920,9 @@
         const review = $('new-attorney-review').value === 'true';
         const f = {
           client_name: $('new-client-name').value || 'New Manual Client',
-          contact_info: $('new-contact-info').value || '',
+          client_email: $('new-client-email').value || '',
+          whatsapp_number: $('new-whatsapp-number').value || '',
+          contact_info: $('new-whatsapp-number').value || $('new-client-email').value || '',
           source: $('new-source').value,
           urgency: $('new-urgency').value,
           employer_name: $('new-employer-name').value || '',
