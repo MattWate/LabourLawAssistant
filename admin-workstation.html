@@ -607,7 +607,7 @@
       const f = facts(c);
       const ed = effective(c);
       return '<div class="card"><div class="case-head"><div><h2>' + esc(f.client_name || c.client_name || 'Anonymous Client') + '</h2><div class="case-id"><strong>Reference: ' + esc(f.case_reference || c.case_reference || '—') + '</strong> · Internal ID: ' + esc(c.id) + ' · Updated ' + esc(date(c.updated_at)) + '</div></div><div class="mini-actions">' + paymentAction(c) + '<button class="btn warn" onclick="openOverrideModal()">Override Decision</button><button class="btn primary" onclick="openRequestInfoModal()">Request Info</button><button class="btn ghost" onclick="saveCaseFacts(\'' + c.id + '\')">Save Facts</button></div></div><div class="fact-grid">' +
-        fact('Employer', f.employer_name) + fact('Contact', f.contact_info || c.contact_info) + fact('Incident Date', f.incident_date) + fact('Employment Status', f.employment_status) + fact('Incident Description', f.incident_description || c.issue_summary, true) +
+        fact('Employer', f.employer_name) + fact('Client Email', f.client_email) + fact('WhatsApp', f.whatsapp_number || f.contact_info || c.contact_info) + fact('Incident Date', f.incident_date) + fact('Employment Status', f.employment_status) + fact('Incident Description', f.incident_description || c.issue_summary, true) +
         '</div></div>' + determinationCard(f) + '<div class="card"><h3>Case Facts - Editable</h3>' + editableFacts(c) + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px"><button class="btn danger" onclick="archiveCase(\'' + c.id + '\')">Archive</button><button class="btn primary" onclick="saveCaseFacts(\'' + c.id + '\')">Save Case Details</button></div></div><div class="card"><h3>Decision Control</h3><div class="decision-grid"><div class="decision"><h4>Justine / Original</h4>' + decisionSummary(f.justine_decision || f) + '</div><div class="decision"><h4>Effective Firm Decision</h4>' + decisionSummary(ed) + (f.admin_override?.reason ? '<div class="timeline-item" style="margin-top:12px"><strong>Override reason</strong>' + esc(f.admin_override.reason) + '</div>' : '') + '</div></div></div>' + letterCard(c);
     }
 
@@ -769,6 +769,11 @@
         let result = {};
         try { result = await res.json(); } catch (e) {}
         if (!res.ok) throw new Error(result.error || 'Could not approve case for payment.');
+        if (result.mandate_required) {
+          toast(result.message || 'The VRS mandate has been sent to the client. Ask them to reply YES, then request payment again.');
+          await fetchCases();
+          return;
+        }
         if (result.consent_required) {
           toast(result.message || 'Pre-payment consent has been requested from the client. Ask them to reply YES, then request payment again.');
           await fetchCases();
