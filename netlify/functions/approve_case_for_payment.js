@@ -104,6 +104,67 @@ async function sendPaymentRequest({ conversation, caseData, payment }) {
   return { sent: true, mode: templateName ? 'session_text_after_template_failure' : 'session_text' };
 }
 
+
+function normaliseWhatsAppNumber(value = '') {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('0') && digits.length === 10) digits = '27' + digits.slice(1);
+  return digits.length >= 10 && digits.length <= 15 ? digits : null;
+}
+
+async function ensureMandateConversation(caseId, caseData, facts) {
+  const { data: existing, error: readError } = await supabase
+    .from('whatsapp_conversations')
+    .select('id,from_number,phone_number_id')
+    .eq('case_id', caseId)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (existing?.from_number) return existing;
+
+  const number = normaliseWhatsAppNumber(facts.whatsapp_number || facts.contact_info || caseData.contact_info);
+  if (!number) return null;
+
+  const now = new Date().toISOString();
+  const payload = {
+    from_number: number,
+    contact_name: facts.client_name || caseData.client_name || null,
+    phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
+    current_step: 'COMPLETE',
+    status: 'completed',
+    collected_facts: { ...facts, contact_info: number, whatsapp_number: number },
+    case_id: caseId,
+    handoff_reason: null,
+    error_message: null,
+    last_inbound_at: null,
+    updated_at: now
+  };
+
+  const { data: byNumber } = await supabase
+    .from('whatsapp_conversations')
+    .select('id')
+    .eq('from_number', number)
+    .maybeSingle();
+
+  if (byNumber?.id) {
+    const { data, error } = await supabase
+      .from('whatsapp_conversations')
+      .update(payload)
+      .eq('id', byNumber.id)
+      .select('id,from_number,phone_number_id')
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('whatsapp_conversations')
+    .insert({ ...payload, processed_message_ids: [], created_at: now })
+    .select('id,from_number,phone_number_id')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true });
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
@@ -133,11 +194,7 @@ exports.handler = async (event) => {
     }
 
     if (facts.mandate_acceptance?.accepted !== true) {
-      const { data: mandateConversation } = await supabase
-        .from('whatsapp_conversations')
-        .select('id,from_number,phone_number_id')
-        .eq('case_id', caseId)
-        .maybeSingle();
+      const mandateConversation = await ensureMandateConversation(caseId, caseData, facts);
 
       if (!mandateConversation?.from_number) {
         return json(409, {
@@ -178,11 +235,7 @@ exports.handler = async (event) => {
     }
 
     if (facts.payment_start_consent?.accepted !== true) {
-      const { data: consentConversation } = await supabase
-        .from('whatsapp_conversations')
-        .select('id,from_number,phone_number_id')
-        .eq('case_id', caseId)
-        .maybeSingle();
+      const consentConversation = await ensureMandateConversation(caseId, caseData, facts);
 
       if (!consentConversation?.from_number) {
         return json(409, {
