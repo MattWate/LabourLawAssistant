@@ -175,6 +175,22 @@ exports.handler = async (event) => {
     }
     const byCase = new Map(conversations.map(x => [x.case_id, x]));
 
+    let payments = [];
+    if (ids.length) {
+      const { data, error: paymentError } = await service
+        .from('payments')
+        .select('*')
+        .in('case_id', ids)
+        .order('created_at', { ascending:false });
+      if (paymentError) throw paymentError;
+      payments = data || [];
+    }
+    const paymentsByCase = new Map();
+    for (const payment of payments) {
+      if (!paymentsByCase.has(payment.case_id)) paymentsByCase.set(payment.case_id, []);
+      paymentsByCase.get(payment.case_id).push(payment);
+    }
+
     let items = (cases || []).map(raw => {
       const row = withCaseReference(raw);
       const f = row.case_facts || {};
@@ -193,7 +209,13 @@ exports.handler = async (event) => {
         payment_status: row.payment_status,
         track: diagnostics.decision.effective_track,
         flags: diagnostics.flags,
-        ...(caseId ? { raw_case: row, review: diagnostics } : {})
+        ...(caseId ? {
+          raw_case: row,
+          review: {
+            ...diagnostics,
+            payments: paymentsByCase.get(row.id) || []
+          }
+        } : {})
       };
     });
 
