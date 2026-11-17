@@ -614,7 +614,7 @@
     function paymentAction(c) {
       const f = facts(c);
       const ed = effective(c);
-      if (c.payment_status === 'paid') return '<span class="badge green">Payment received ' + esc(date(c.paid_at)) + '</span>';
+      if (c.payment_status === 'paid') return '<span class="badge green">' + (f.payment_verification_source === 'admin_override' ? 'Payment manually confirmed ' : 'Payment received ') + esc(date(c.paid_at)) + '</span>';
       if (c.status === 'awaiting_mandate_acceptance') return '<button class="btn ghost" disabled>Awaiting Mandate</button>';
       if (c.status === 'awaiting_payment_consent') return '<button class="btn ghost" disabled>Awaiting Client Consent</button>';
       if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button><button id="btn-manual-payment-' + c.id + '" class="btn warn" onclick="manualConfirmPayment(\'' + c.id + '\')">Confirm Payment Manually</button>';
