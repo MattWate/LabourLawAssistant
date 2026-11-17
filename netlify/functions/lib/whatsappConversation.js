@@ -3,6 +3,7 @@ const { validateAndNormaliseDate } = require('./dateValidation');
 const { CONSENT_CONFIG, consentSnapshot, mandateAcceptanceSnapshot, paymentConsentSnapshot, whatsappConsentText } = require('./consentConfig');
 const { compareClientEmployerEmail } = require('./emailPrivacy');
 const { retentionMetadata } = require('./privacyGovernance');
+const { promptBudgetDecision } = require('./intakeSafety');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -226,9 +227,9 @@ const STEPS = {
   COMPANY_NAME: text('What is the employer\'s full registered name?', 'employer_name', 'ADDRESSEE_NAME'),
   ADDRESSEE_NAME: text('Who should any letter be addressed to? Please give their full name, or type UNKNOWN if you do not know it.', 'addressee_name', 'ADDRESSEE_POSITION'),
   ADDRESSEE_POSITION: text('What is that person\'s job title or position? Type UNKNOWN if you do not know it.', 'addressee_position', 'COMPANY_CONTACT'),
-  COMPANY_CONTACT: text('Could you share a contact email or number for the employer\'s HR department or the addressee? Type UNKNOWN if you do not have it.', 'employer_contact_details', 'CLIENT_NAME'),
-  CLIENT_NAME: text('Almost done. What is your full name?', 'client_name', 'CLIENT_EMAIL'),
-  CLIENT_EMAIL: text('What personal email address should VRS use for confidential correspondence? Please do not use an employer-controlled work email address.', 'client_email', 'HANDOFF'),
+  COMPANY_CONTACT: text('Could you share a contact email or number for the employer\'s HR department or the addressee? Type UNKNOWN if you do not have it.', 'employer_contact_details', 'HANDOFF'),
+  CLIENT_NAME: text('Before we go into the detail, what is your full name?', 'client_name', 'CLIENT_EMAIL'),
+  CLIENT_EMAIL: text('What personal email address should VRS use for confidential correspondence? Please do not use an employer-controlled work email address.', 'client_email', null),
   HANDOFF: { type: 'evaluate' }
 };
 
@@ -328,7 +329,20 @@ const AI_SKIP_CONFIDENCE = Number(process.env.WHATSAPP_AI_SKIP_CONFIDENCE || 0.8
 const AI_CAPTURE_CONFIDENCE = Number(process.env.WHATSAPP_AI_CAPTURE_CONFIDENCE || 0.65);
 const { markClientConfirmedFact } = require('./factProvenance');
 
-const WHATSAPP_PROMPT_LIMIT = 18;
+const WHATSAPP_PROMPT_LIMIT = 15;
+
+function appendIntakeEvent(facts = {}, type, payload = {}) {
+  const event = {
+    id: payload.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type,
+    at: new Date().toISOString(),
+    state: payload.state || null,
+    field: payload.field || null,
+    value: payload.value ?? null,
+    meta: payload.meta || null
+  };
+  return { ...facts, _intake_events: [...(Array.isArray(facts._intake_events) ? facts._intake_events : []), event].slice(-500) };
+}
 
 function promptCount(facts = {}) {
   return Number(facts._intake_prompt_count || 0);
@@ -337,6 +351,10 @@ function promptCount(facts = {}) {
 function withPromptRecorded(facts = {}, promptKey = '') {
   const history = Array.isArray(facts._intake_prompt_history) ? facts._intake_prompt_history : [];
   if (!promptKey || history.includes(promptKey)) return facts;
+  const state = String(promptKey).replace(/^step:/, '');
+  const decision = promptBudgetDecision({ state, count: history.length, limit: WHATSAPP_PROMPT_LIMIT });
+  if (!decision.allow) return { ...facts, _prompt_budget_stop: decision.reason || 'prompt_budget_reached' };
+  if (!decision.countAgainstBudget) return facts;
   return {
     ...facts,
     _intake_prompt_count: history.length + 1,
@@ -380,6 +398,18 @@ function mergeDirectExtractions(facts = {}, turn = {}) {
     const existingMeta = metadata[item.field];
     if (hasValue(merged[item.field]) && existingMeta?.confirmed === true) return;
 
+    if (['incident_date', 'dismissal_date', 'resignation_date'].includes(item.field)) {
+      merged._candidate_legal_date = {
+        field: item.field,
+        value: item.value,
+        confidence: 1,
+        source: 'client_explicit_extraction',
+        evidence: item.evidence || null,
+        confirmed: false,
+        captured_at: new Date().toISOString()
+      };
+      return;
+    }
     merged[item.field] = item.value;
     metadata[item.field] = {
       source: 'client_explicit_extraction',
@@ -406,6 +436,17 @@ function mergeIntakeInferences(facts = {}, turn = {}) {
 
   turn.inferences.forEach(item => {
     if (!item?.field || hasValue(merged[item.field])) return;
+    if (['incident_date', 'dismissal_date', 'resignation_date'].includes(item.field)) {
+      merged._candidate_legal_date = {
+        field: item.field,
+        value: item.value,
+        confidence: Number(item.confidence || 0),
+        source: 'claude_inference',
+        confirmed: false,
+        captured_at: new Date().toISOString()
+      };
+      return;
+    }
     merged[item.field] = item.value;
     metadata[item.field] = {
       source: 'claude_inference',
@@ -521,13 +562,18 @@ function mergeNarrativeFacts(facts = {}, classification = {}) {
     if (confidence < AI_CAPTURE_CONFIDENCE) return;
 
     if (['incident_date', 'dismissal_date', 'resignation_date', 'relevant_event_date', 'hearing_date'].includes(key)) {
-      const dateResult = validateAndNormaliseDate(String(value), { allowFuture: key === 'hearing_date' });
-      if (!dateResult.ok) return;
-      merged[key] = dateResult.iso;
-    } else {
-      merged[key] = value;
+      merged._candidate_legal_date = {
+        field: key,
+        value,
+        confidence,
+        source: 'initial_narrative_ai',
+        confirmed: false,
+        captured_at: new Date().toISOString()
+      };
+      return;
     }
 
+    merged[key] = value;
     metadata[key] = {
       source: 'initial_narrative_ai',
       confidence,
@@ -557,7 +603,7 @@ function routeClassification(classification = {}) {
   return 'START_FALLBACK';
 }
 async function completeEvaluation(conversation, message, facts) {
-  const finalFacts = { ...facts, contact_info: conversation.from_number, source: 'whatsapp' };
+  const finalFacts = appendIntakeEvent({ ...facts, contact_info: conversation.from_number, whatsapp_number: conversation.from_number, source: 'whatsapp' }, 'evaluation_started', { state: 'HANDOFF' });
   const evaluation = await invokeAsk('evaluate', { facts: finalFacts });
   await updateConversation(conversation.id, { status: 'completed', current_step: 'COMPLETE', collected_facts: finalFacts, case_id: evaluation.caseId,
     processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
@@ -754,7 +800,9 @@ async function processIncomingMessage(message) {
     if (!hasValue(facts.employment_status)) facts.employment_status = classification.category || 'Ambiguous';
     if (!hasValue(facts.dismissal_reason_type) && classification.dismissal_reason_type) facts.dismissal_reason_type = classification.dismissal_reason_type;
     if (!hasValue(facts.advisory_topic) && classification.advisory_topic) facts.advisory_topic = classification.advisory_topic;
-    let next = resolveNextUnanswered(routeClassification(classification), facts);
+    facts._post_contact_state = resolveNextUnanswered(routeClassification(classification), facts);
+    let next = hasValue(facts.client_name) ? 'CLIENT_EMAIL' : 'CLIENT_NAME';
+    facts = appendIntakeEvent(facts, 'classification_completed', { state: stepName, value: classification.category || null, meta: { post_contact_state: facts._post_contact_state } });
     const turn = await runConversationalTurn({ facts, stepName, step, answer: input, nextStep: next });
     facts = mergeDirectExtractions(facts, turn);
     facts = mergeIntakeInferences(facts, turn);
@@ -775,7 +823,7 @@ async function processIncomingMessage(message) {
     facts = withPromptRecorded(facts, `step:${next}`);
     await updateConversation(conversation.id, { current_step: next, collected_facts: facts, classification,
       processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
-    return [turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
+    return [deadlineWarning, turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
   }
   if (step.type === 'evaluate') return completeEvaluation(conversation, message, facts);
 
@@ -809,15 +857,29 @@ async function processIncomingMessage(message) {
       if (!dateResult.ok) return `${dateResult.message}\n\n${step.prompt}`;
       valueToSave = dateResult.iso;
     }
+    facts = appendIntakeEvent(facts, 'answer_received', { state: stepName, field: step.saveAs, value: valueToSave });
     if (step.minWords && wordCount(input) < step.minWords) return `Please add a little more detail, ideally at least ${step.minWords} words.\n\n${step.prompt}`;
     facts[step.saveAs] = valueToSave;
     facts = markDirectAnswer(facts, step.saveAs);
+    let deadlineWarning = null;
+    if (['incident_date', 'dismissal_date', 'resignation_date'].includes(step.saveAs)) {
+      const deadline = await invokeAsk('deadline_check', { facts });
+      facts.ccma_deadline_status = deadline.status;
+      facts = appendIntakeEvent(facts, 'deadline_calculated', { state: stepName, field: step.saveAs, value: valueToSave, meta: deadline.status });
+      deadlineWarning = deadline.message || null;
+    }
     if (step.saveAs === 'employer_name') {
       facts.employer_registered_name = valueToSave;
       facts = markDirectAnswer(facts, 'employer_registered_name');
     }
-    if (step.saveAs === 'client_email') facts.contact_email = valueToSave;
-    next = resolveNextUnanswered(step.next, facts);
+    if (step.saveAs === 'client_email') {
+      facts.contact_email = valueToSave;
+      facts = appendIntakeEvent(facts, 'contact_captured', { state: stepName, field: 'client_email', value: valueToSave });
+      next = resolveNextUnanswered(facts._post_contact_state || 'START_FALLBACK', facts);
+      delete facts._post_contact_state;
+    } else {
+      next = resolveNextUnanswered(step.next, facts);
+    }
   }
 
   if (DEFLECTIONS[next]) return markHandoff(conversation, message, next, facts);
@@ -835,13 +897,15 @@ async function processIncomingMessage(message) {
   }
 
   if (next === 'HANDOFF') {
-    const missing = requiredLetterFieldsMissing(facts);
-    if (!missing.length) return completeEvaluation(conversation, message, facts);
-    return markHandoff(conversation, message, 'INCOMPLETE_LETTER_FACTS', facts);
+    facts.intake_missing_fields = requiredLetterFieldsMissing(facts);
+    facts = appendIntakeEvent(facts, 'evaluation_started', { state: next, meta: { missing_fields: facts.intake_missing_fields } });
+    return completeEvaluation(conversation, message, facts);
   }
 
-  if (promptCount(facts) >= WHATSAPP_PROMPT_LIMIT) {
-    return markHandoff(conversation, message, 'PROMPT_LIMIT_INCOMPLETE', facts);
+  if (facts._prompt_budget_stop || promptCount(facts) >= WHATSAPP_PROMPT_LIMIT) {
+    facts._prompt_limit_reason = facts._prompt_budget_stop || 'prompt_budget_reached';
+    facts = appendIntakeEvent(facts, 'prompt_cap_reached', { state: next, meta: { prompt_count: promptCount(facts), reason: facts._prompt_limit_reason } });
+    return completeEvaluation(conversation, message, facts);
   }
 
   facts = withPromptRecorded(facts, `step:${next}`);
