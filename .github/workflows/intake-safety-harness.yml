@@ -12,6 +12,10 @@ on:
       - 'netlify/functions/lib/intakeConversation.js'
       - 'netlify/functions/lib/whatsappConversation.js'
       - 'netlify/functions/lib/whatsappProductionConversation.js'
+      - 'netlify/functions/approve_case_for_payment.js'
+      - 'netlify/functions/client_case_consent.js'
+      - 'netlify/functions/uat_log_review.js'
+      - 'client-consent.html'
       - 'scripts/intake-safety-harness.js'
       - '.github/workflows/intake-safety-harness.yml'
 jobs:
