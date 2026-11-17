@@ -156,6 +156,7 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     client_name: facts.client_name || null,
     contact_info: facts.contact_info || null,
     client_email: facts.client_email || null,
+    whatsapp_number: facts.whatsapp_number || null,
     consent: facts.consent || null,
     employer_name: facts.employer_name || null,
     employer_registered_name: facts.employer_registered_name || facts.employer_name || null,
@@ -245,6 +246,12 @@ function clientOutcomeFor(facts = {}, scorecard = facts) {
   const track = String(scorecard.track || facts.track || '').toUpperCase();
   const employmentStatus = String(facts.employment_status || '').toLowerCase();
   const advisoryMatter = ['ANC', 'PDA', 'ULP'].includes(track) || employmentStatus.includes('advisory') || employmentStatus.includes('still employed');
+  const deadline = scorecard.ccma_deadline_status || facts.ccma_deadline_status || {};
+  const deadlinePrefix = deadline.status === 'LAPSED-CONDONATION'
+    ? `Important: based on the date you gave us, the ordinary 30-day CCMA referral period appears to have passed by ${deadline.daysOverdue ?? 'an unknown number of'} days. Condonation may be required, so this needs urgent review. `
+    : deadline.status === 'WITHIN_WINDOW' && Number(deadline.daysRemaining) <= 7
+      ? `Important: based on the date you gave us, there are only ${deadline.daysRemaining} days left in the ordinary 30-day CCMA referral period. Do not wait for settlement discussions before protecting the deadline. `
+      : '';
 
   if (wpEligible) {
     const dismissalMatter = employmentStatus.includes('dismiss') ||
@@ -256,14 +263,14 @@ function clientOutcomeFor(facts = {}, scorecard = facts) {
       ? 'you may have a strong case for a possible unfair dismissal claim'
       : 'your matter may have sufficient merit to take further';
 
-    return `Thank you for sharing your information with us. Based on what you have told us, it looks like ${meritDescription}. Your information has been forwarded to VRS Labour Law Consultants, who will be in touch to finalise your Without Prejudice letter.`;
+    return deadlinePrefix + `Thank you for sharing your information with us. Based on what you have told us, it looks like ${meritDescription}. Your information has been forwarded to VRS Labour Law Consultants, who will be in touch to finalise your Without Prejudice letter.`;
   }
 
   if (advisoryMatter) {
-    return 'Thank you for your submission. This looks like something we can help guide you on, though it is not a matter that calls for a Without Prejudice letter at this stage. One of our consultants will be in touch with practical next steps.';
+    return deadlinePrefix + 'Thank you for your submission. This looks like something we can help guide you on, though it is not a matter that calls for a Without Prejudice letter at this stage. One of our consultants will be in touch with practical next steps.';
   }
 
-  return 'Thank you for taking the time to share your information with us. Having carefully considered what you have told us, this is not something we are able to take further. Based on the details provided, it appears your employer followed a fair process and had a valid reason for their decision. We are sorry we cannot assist on this occasion and we wish you all the very best.';
+  return deadlinePrefix + 'Thank you for taking the time to share your information with us. Having carefully considered what you have told us, this is not something we are able to take further. Based on the details provided, it appears your employer followed a fair process and had a valid reason for their decision. We are sorry we cannot assist on this occasion and we wish you all the very best.';
 }
 
 function dedupeStory(text = '') {
