@@ -7,6 +7,8 @@ on:
       - 'netlify/functions/approve_case_for_payment.js'
       - 'netlify/functions/create_payfast_payment.js'
       - 'netlify/functions/payfast_itn.js'
+      - 'netlify/functions/manual_confirm_payment.js'
+      - 'admin-workstation.html'
       - 'netlify/functions/generate_letter.js'
       - 'netlify/functions/generate_letter-background.js'
       - 'netlify/functions/manage_letter_release.js'
@@ -26,3 +28,7 @@ jobs:
           node-version: '20'
       - run: npm install --ignore-scripts
       - run: node scripts/commercial-flow-harness.js
+      - run: node --check netlify/functions/manual_confirm_payment.js
+      - run: node --check netlify/functions/payfast_itn.js
+      - run: node -e "const fs=require('fs');const s=fs.readFileSync('admin-workstation.html','utf8');const m=[...s.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)];fs.writeFileSync('/tmp/justine-admin.js',m.map(x=>x[1]).join('\\n'));"
+      - run: node --check /tmp/justine-admin.js
