@@ -256,6 +256,7 @@ Important rules:
 - "suspended without pay" or "suspension without pay" must set override_flags to include SUSPENSION_WITHOUT_PAY and hydrated_facts.paid_suspension to false.
 - If the narrative says there was no hearing, set hydrated_facts.hearing_held to false.
 - If a fact is not clear at confidence >= 0.7, set it to null or omit it.
+- DATE SAFETY: Never infer or guess a year. Only populate incident_date when the user's own narrative contains an explicit day/month/year or an unambiguous ISO/full date including the year. If the user says only "19 October", "last Friday", "in October" or similar, incident_date must be null/omitted so the client is asked to confirm the exact date.
 - Adjacent statutes such as OHS Act protected-role analysis may be flagged in reasoning but must not become a special track.
 - Preserve the user's narrative once. Do not duplicate it.
 
