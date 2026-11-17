@@ -341,10 +341,13 @@
         COMPANY_NAME: { msg: "What is the employer's full registered name?", type: "text", next: "ADDRESSEE_NAME", saveAs: "employer_name" },
         ADDRESSEE_NAME: { msg: "Who should any letter be addressed to? Please give their full name, or type UNKNOWN if you do not know it.", type: "text", next: "ADDRESSEE_POSITION", saveAs: "addressee_name" },
         ADDRESSEE_POSITION: { msg: "What is that person's job title or position? Type UNKNOWN if you do not know it.", type: "text", next: "COMPANY_CONTACT", saveAs: "addressee_position" },
-        COMPANY_CONTACT: { msg: "Could you share a contact email or number for the employer's HR department or the addressee? Type UNKNOWN if you do not have it.", type: "text", next: "CLIENT_NAME", saveAs: "employer_contact_details" },
-        CLIENT_NAME: { msg: "Almost done! What is your full name?", type: "text", next: "CLIENT_EMAIL", saveAs: "client_name" },
+        COMPANY_CONTACT: { msg: "Could you share a contact email or number for the employer's HR department or the addressee? Type UNKNOWN if you do not have it.", type: "text", next: "HANDOFF", saveAs: "employer_contact_details" },
+        CONTACT_NAME: { msg: "Before we go into the detail, what is your full name?", type: "text", next: "CONTACT_EMAIL", saveAs: "client_name" },
+        CONTACT_EMAIL: { msg: "What personal email address should VRS use for confidential correspondence? Please do not use an employer-controlled work email address.", type: "text", next: "CONTACT_PHONE", saveAs: "client_email" },
+        CONTACT_PHONE: { msg: "What WhatsApp cell phone number should VRS use to contact you if we need to follow up? Please include the country code, for example +27 82 123 4567.", type: "text", next: null, saveAs: "whatsapp_number" },
+        CLIENT_NAME: { msg: "What is your full name?", type: "text", next: "CLIENT_EMAIL", saveAs: "client_name" },
         CLIENT_EMAIL: { msg: "What personal email address should VRS use for confidential correspondence? Please do not use an employer-controlled work email address.", type: "text", next: "CLIENT_PHONE", saveAs: "client_email" },
-        CLIENT_PHONE: { msg: "And finally, what WhatsApp cell phone number should VRS use to contact you? Please include the country code, for example +27 82 123 4567.", type: "text", next: "HANDOFF", saveAs: "whatsapp_number" },
+        CLIENT_PHONE: { msg: "What WhatsApp cell phone number should VRS use to contact you? Please include the country code, for example +27 82 123 4567.", type: "text", next: "HANDOFF", saveAs: "whatsapp_number" },
         HANDOFF: { action: "evaluate" }
     };
 
@@ -363,18 +366,81 @@
     const AI_SKIP_CONFIDENCE = 0.8;
     const AI_CAPTURE_CONFIDENCE = 0.65;
     const WEB_PROMPT_LIMIT = 15;
-    const RESERVED_CONTACT_STATES = new Set(["CLIENT_NAME", "CLIENT_EMAIL", "CLIENT_PHONE"]);
+    const RESERVED_CONTACT_STATES = new Set(["CONTACT_NAME", "CONTACT_EMAIL", "CONTACT_PHONE", "CLIENT_NAME", "CLIENT_EMAIL", "CLIENT_PHONE"]);
+    const CRITICAL_UNCAPPED_STATES = new Set(["FIRED_DATE", "RESIGN_DATE", "DISC_STATUS"]);
+    const OPTIONAL_BUDGET_STATES = new Set(["ADDRESSEE_NAME", "ADDRESSEE_POSITION", "COMPANY_CONTACT"]);
 
     function webPromptCount() { return Number(collectedFacts._intake_prompt_count || 0); }
+    function intakeEvent(type, payload = {}) {
+        const event = { id: (crypto?.randomUUID?.() || (Date.now() + "-" + Math.random())), type, at: new Date().toISOString(), state: currentState, ...payload };
+        collectedFacts._intake_events_buffer = [...(collectedFacts._intake_events_buffer || []), event].slice(-200);
+        return event;
+    }
     function recordWebPrompt(key) {
         const history = Array.isArray(collectedFacts._intake_prompt_history) ? collectedFacts._intake_prompt_history : [];
         if (!key || history.includes(key)) return true;
         const stateKey = String(key).replace(/^step:/, "");
-        if (RESERVED_CONTACT_STATES.has(stateKey)) return true;
+        if (RESERVED_CONTACT_STATES.has(stateKey) || CRITICAL_UNCAPPED_STATES.has(stateKey)) return true;
+        if (OPTIONAL_BUDGET_STATES.has(stateKey) && history.length >= WEB_PROMPT_LIMIT - 3) return false;
         if (history.length >= WEB_PROMPT_LIMIT) return false;
         collectedFacts._intake_prompt_history = [...history, key];
         collectedFacts._intake_prompt_count = history.length + 1;
         return true;
+    }
+    async function flushIntakeCheckpoint(forceCreate = false) {
+        const canCreate = hasKnownValue(collectedFacts.client_name) && hasKnownValue(collectedFacts.client_email) && hasKnownValue(collectedFacts.whatsapp_number);
+        if (!collectedFacts._checkpoint_case_id && !forceCreate && !canCreate) return null;
+        if (!collectedFacts._checkpoint_case_id && !canCreate) return null;
+        const events = Array.isArray(collectedFacts._intake_events_buffer) ? collectedFacts._intake_events_buffer : [];
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "intake_checkpoint",
+                    caseId: collectedFacts._checkpoint_case_id || null,
+                    checkpointToken: collectedFacts._checkpoint_token || null,
+                    facts: collectedFacts,
+                    events
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || "checkpoint failed");
+            collectedFacts._checkpoint_case_id = data.caseId;
+            collectedFacts._checkpoint_token = data.checkpointToken;
+            activeCaseId = data.caseId;
+            collectedFacts._intake_events_buffer = [];
+            return data;
+        } catch (error) {
+            console.error("Intake checkpoint failed:", error);
+            intakeEvent("error", { meta: { stage: "checkpoint", message: error.message } });
+            return null;
+        }
+    }
+    async function checkDeadlineNow() {
+        if (!hasKnownValue(collectedFacts.incident_date)) return null;
+        try {
+            const res = await fetch('/.netlify/functions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: "deadline_check", facts: collectedFacts })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || "deadline check failed");
+            collectedFacts.ccma_deadline_status = data.status;
+            intakeEvent("deadline_calculated", { field: "incident_date", value: collectedFacts.incident_date, meta: data.status });
+            if (data.message && collectedFacts._deadline_warning_shown_for !== collectedFacts.incident_date) {
+                appendMessage(data.message, "bot");
+                collectedFacts._deadline_warning_shown_for = collectedFacts.incident_date;
+                intakeEvent("deadline_warning_shown", { field: "incident_date", value: collectedFacts.incident_date, meta: data.status });
+            }
+            await flushIntakeCheckpoint();
+            return data.status;
+        } catch (error) {
+            console.error("Deadline check failed:", error);
+            intakeEvent("error", { meta: { stage: "deadline_check", message: error.message } });
+            return null;
+        }
     }
     function requiredLetterFieldsMissing() {
         return ["employer_name", "addressee_name", "addressee_position", "client_name", "client_email", "incident_description"]
@@ -505,17 +571,17 @@
             return { enabled: false };
         }
     }
-    async function handleWebPromptLimit(reason = "prompt_limit_reached") {
-        if (collectedFacts._contact_capture_started) return;
-        collectedFacts._contact_capture_started = true;
+    async function handleWebPromptLimit(reason = "prompt_budget_reached") {
         collectedFacts._prompt_limit_reason = reason;
-        appendMessage("I have enough information for a first assessment. Before I finish, I need your contact details so VRS can reach you if a consultant needs to follow up.", "bot");
-
-        if (!hasKnownValue(collectedFacts.client_name)) currentState = "CLIENT_NAME";
-        else if (!hasKnownValue(collectedFacts.client_email)) currentState = "CLIENT_EMAIL";
-        else if (!hasKnownValue(collectedFacts.whatsapp_number)) currentState = "CLIENT_PHONE";
-        else currentState = "HANDOFF";
-
+        intakeEvent("prompt_cap_reached", { meta: { reason, prompt_count: webPromptCount() } });
+        if (!hasKnownValue(collectedFacts.client_name)) currentState = "CONTACT_NAME";
+        else if (!hasKnownValue(collectedFacts.client_email)) currentState = "CONTACT_EMAIL";
+        else if (!hasKnownValue(collectedFacts.whatsapp_number)) currentState = "CONTACT_PHONE";
+        else {
+            appendMessage("I have enough information for a first assessment, so I am going to stop the detailed questions here and prepare this for VRS review.", "bot");
+            currentState = "HANDOFF";
+            await flushIntakeCheckpoint();
+        }
         renderState();
     }
     function renderPendingConfirmation() {
@@ -601,18 +667,28 @@
             if (confidence < AI_CAPTURE_CONFIDENCE) return;
 
             const isLegalDate = ["incident_date", "dismissal_date", "resignation_date"].includes(key);
-            const narrative = String(collectedFacts.original_client_narrative || collectedFacts.initial_query || "");
-            const hasExplicitYear = /\b(?:19|20)\d{2}\b/.test(narrative);
-            if (isLegalDate && !hasExplicitYear) return;
+            if (isLegalDate) {
+                collectedFacts._candidate_legal_date = {
+                    field: key,
+                    value,
+                    confidence,
+                    source: "initial_narrative_ai",
+                    confirmed: false,
+                    captured_at: new Date().toISOString()
+                };
+                intakeEvent("ai_fact_proposed", { field: key, value, meta: { confidence, legal_date_candidate: true } });
+                return;
+            }
 
             collectedFacts[key] = value;
             metadata[key] = {
                 source: "initial_narrative_ai",
                 confidence,
-                confirmed: isLegalDate ? false : confidence >= AI_SKIP_CONFIDENCE,
-                trust_basis: isLegalDate ? "date_requires_client_confirmation" : (confidence >= AI_SKIP_CONFIDENCE ? "high_confidence_initial_narrative" : "requires_client_confirmation"),
+                confirmed: confidence >= AI_SKIP_CONFIDENCE,
+                trust_basis: confidence >= AI_SKIP_CONFIDENCE ? "high_confidence_initial_narrative" : "requires_client_confirmation",
                 captured_at: new Date().toISOString()
             };
+            intakeEvent("ai_fact_proposed", { field: key, value, meta: { confidence, confirmed: confidence >= AI_SKIP_CONFIDENCE } });
         });
         collectedFacts._fact_metadata = metadata;
         collectedFacts.ai_extracted_fields = Object.keys(metadata).filter(key => metadata[key]?.source === "initial_narrative_ai");
@@ -626,7 +702,7 @@
     }
 
     function renderState() {
-        if (renderPendingConfirmation()) return;
+        if (!RESERVED_CONTACT_STATES.has(currentState) && renderPendingConfirmation()) return;
 
         if (currentState === "CONSENT") {
             textContainer.style.display = 'none';
@@ -672,6 +748,7 @@
                     };
                     buttonContainer.style.display = 'none';
                     appendMessage("I accept and consent.", "user");
+                    intakeEvent("consent_accepted", { field: "consent_accepted", value: true });
                     currentState = "JUR_EMPLOYEE";
                     renderState();
                 };
@@ -689,9 +766,11 @@
         }
         textContainer.style.display = 'none'; buttonContainer.style.display = 'none';
         if (step.action === "evaluate") {
-            const missing = requiredLetterFieldsMissing();
-            if (missing.length) { handleWebPromptLimit("incomplete_letter_facts"); return; }
-            appendMessage("Thank you. Give me a moment to prepare this for VRS review.", "bot"); triggerAIEvaluation(); return;
+            collectedFacts.intake_missing_fields = requiredLetterFieldsMissing();
+            appendMessage("Thank you. Give me a moment to prepare this for VRS review.", "bot");
+            intakeEvent("evaluation_started", { meta: { missing_fields: collectedFacts.intake_missing_fields } });
+            triggerAIEvaluation();
+            return;
         }
         if (step.type === "end") {
             setTimeout(async () => {
@@ -707,6 +786,7 @@
             const promptText = override?.state === currentState ? override.text : step.msg;
             if (override?.state === currentState) delete collectedFacts._next_question_override;
             appendMessage(promptText, "bot");
+            intakeEvent("question_asked", { field: step.saveAs || null, meta: { prompt_key: promptKey, prompt: promptText } });
             if (step.type === "buttons") {
                 buttonContainer.innerHTML = '';
                 step.options.forEach(opt => { const btn = document.createElement('button'); btn.className = 'action-btn'; btn.innerText = opt.label; btn.onclick = () => handleUserInput(opt.val, opt.label, step.saveAs, opt.next); buttonContainer.appendChild(btn); });
@@ -749,9 +829,10 @@
                     if (!hasKnownValue(collectedFacts["dismissal_reason_type"]) && data.dismissal_reason_type) collectedFacts["dismissal_reason_type"] = data.dismissal_reason_type;
                     if (!hasKnownValue(collectedFacts["advisory_topic"]) && data.advisory_topic) collectedFacts["advisory_topic"] = data.advisory_topic;
                     const routeMap = { "Dismissed": "FIRED_DATE", "Resigned": "RESIGN_DATE", "Discrimination": "DISC_STATUS", "Advisory": "ADV_ISSUE", "UIF": "UIF_DESC" };
-                    currentState = routeMap[finalCategory] || "START_FALLBACK";
-                    const turn = await processWebTurn(step, val, currentState);
-                    if (turn?.resolved_next_state) currentState = turn.resolved_next_state;
+                    collectedFacts._post_contact_state = routeMap[finalCategory] || "START_FALLBACK";
+                    intakeEvent("classification_completed", { value: finalCategory, meta: { post_contact_state: collectedFacts._post_contact_state } });
+                    currentState = "CONTACT_NAME";
+                    await processWebTurn(step, val, collectedFacts._post_contact_state);
                 }
                 renderState();
             } catch(error) { hideLoading(); console.error("Classification error:", error); currentState = "START_FALLBACK"; renderState(); }
@@ -794,12 +875,17 @@
                 return;
             }
         }
-        if (saveKey) { collectedFacts[saveKey] = actualValue; collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), [saveKey]: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } }; }
+        if (saveKey) {
+            collectedFacts[saveKey] = actualValue;
+            collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), [saveKey]: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } };
+            intakeEvent("answer_received", { field: saveKey, value: actualValue });
+        }
         if (saveKey === "client_email") collectedFacts.contact_email = actualValue;
         if (saveKey === "whatsapp_number") {
             const normalised = normaliseWhatsAppNumber(actualValue);
-            if (!normalised) { appendMessage("Please enter a valid WhatsApp number, including the country code where possible.", "bot"); currentState = "CLIENT_PHONE"; renderState(); return; }
+            if (!normalised) { appendMessage("Please enter a valid WhatsApp number, including the country code where possible.", "bot"); currentState = RESERVED_CONTACT_STATES.has(currentState) ? currentState : "CLIENT_PHONE"; renderState(); return; }
             collectedFacts.whatsapp_number = normalised; collectedFacts.contact_info = normalised; collectedFacts.contact_channel = "whatsapp";
+            intakeEvent("contact_captured", { field: "whatsapp_number", value: normalised });
         }
         if (saveKey === "worker_status") collectedFacts["contract_type"] = actualValue === "Contractor" ? "Contractor" : actualValue;
         if (saveKey === "length_of_service") collectedFacts["tenure"] = actualValue;
@@ -826,6 +912,17 @@
         if (saveKey === "advisory_topic") { collectedFacts["ancillary_topic"] = actualValue; if (actualValue !== "Hearing Prep") { collectedFacts["employment_status"] = "Advisory"; collectedFacts["wp_eligible"] = false; collectedFacts["wp_type"] = null; } }
         if (saveKey === "relevant_event_date") collectedFacts["incident_date"] = actualValue;
         if (saveKey === "raised_internally") collectedFacts["internal_escalation"] = actualValue;
+        if (saveKey === "incident_date" || saveKey === "relevant_event_date") await checkDeadlineNow();
+
+        if (currentState === "CONTACT_PHONE") {
+            await flushIntakeCheckpoint(true);
+            currentState = collectedFacts._post_contact_state || "START_FALLBACK";
+            delete collectedFacts._post_contact_state;
+            renderState();
+            return;
+        }
+
+        await flushIntakeCheckpoint();
         const currentStep = scriptFlow[currentState];
         const turn = await processWebTurn(currentStep, String(displayValue ?? actualValue), nextStateKey);
         currentState = turn?.resolved_next_state || nextStateKey;
@@ -845,10 +942,12 @@
     async function triggerAIEvaluation() {
         showLoading();
         try {
+            await flushIntakeCheckpoint();
             const res = await fetch('/.netlify/functions/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: "evaluate", facts: collectedFacts }) });
             const data = await res.json(); hideLoading();
             if (data.error) { appendMessage("An error occurred: " + data.error, "bot"); return; }
             activeCaseId = data.caseId;
+            intakeEvent("evaluation_completed", { meta: { case_id: data.caseId, case_reference: data.caseReference, has_merit: data.hasMerit } });
             appendMessage(data.clientOutcome || data.pitch, "bot");
             if (data.caseReference) appendMessage(`Your VRS case reference is ${data.caseReference}. Please keep this and quote it if you contact VRS through another channel.`, "bot");
             buttonContainer.innerHTML = '';
