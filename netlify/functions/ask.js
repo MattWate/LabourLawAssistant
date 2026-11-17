@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
@@ -12,6 +13,7 @@ const { CONSENT_CONFIG, consentSnapshot } = require('./lib/consentConfig');
 const { compareClientEmployerEmail, cleanEmail } = require('./lib/emailPrivacy');
 const { retentionMetadata } = require('./lib/privacyGovernance');
 const { determineProductRoute } = require('./lib/productRouting');
+const { deadlineStatus, deadlineMessage } = require('./lib/intakeSafety');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -59,6 +61,108 @@ async function linkWebCaseToWhatsApp({ caseId, facts = {}, caseFacts = {} }) {
   }
 
   return { linked: true, number };
+}
+
+
+function checkpointHash(token = '') {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+function cleanCheckpointFacts(facts = {}) {
+  const copy = { ...(facts || {}) };
+  delete copy._checkpoint_token;
+  delete copy._intake_events_buffer;
+  return copy;
+}
+
+function normaliseIntakeEvents(events = []) {
+  if (!Array.isArray(events)) return [];
+  return events.slice(-200).map(event => ({
+    id: event.id || crypto.randomUUID(),
+    type: String(event.type || 'event'),
+    at: event.at || new Date().toISOString(),
+    state: event.state || null,
+    field: event.field || null,
+    value: event.value ?? null,
+    meta: event.meta || null
+  }));
+}
+
+async function readCheckpoint(caseId, token) {
+  if (!caseId || !token) return null;
+  const { data, error } = await supabase
+    .from('cases')
+    .select('*')
+    .eq('id', caseId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const expected = data.case_facts?._intake_checkpoint_token_hash;
+  if (!expected || expected !== checkpointHash(token)) return null;
+  return data;
+}
+
+async function saveIntakeCheckpoint({ caseId, token, facts = {}, events = [] }) {
+  const now = new Date().toISOString();
+  const incoming = normaliseIntakeEvents(events);
+
+  if (!caseId) {
+    const newToken = crypto.randomBytes(24).toString('hex');
+    const cleanFacts = cleanCheckpointFacts(facts);
+    const caseFacts = {
+      ...cleanFacts,
+      _intake_checkpoint: true,
+      _intake_checkpoint_token_hash: checkpointHash(newToken),
+      _intake_events: incoming,
+      _intake_checkpoint_updated_at: now,
+      attorney_review_flag: true
+    };
+    const { data, error } = await supabase.from('cases').insert({
+      client_name: cleanFacts.client_name || 'Intake in progress',
+      contact_info: cleanFacts.whatsapp_number || cleanFacts.contact_info || cleanFacts.client_email || null,
+      issue_summary: cleanFacts.initial_query || cleanFacts.incident_description || 'Intake in progress.',
+      case_facts: caseFacts,
+      status: 'intake_in_progress',
+      letter_status: 'not_drafted'
+    }).select().single();
+    if (error) throw error;
+    return {
+      caseId: data.id,
+      caseReference: data.client_reference || caseReference(data.id, data.created_at),
+      checkpointToken: newToken,
+      eventCount: incoming.length
+    };
+  }
+
+  const existing = await readCheckpoint(caseId, token);
+  if (!existing) throw new Error('Invalid intake checkpoint');
+  const priorFacts = existing.case_facts || {};
+  const priorEvents = Array.isArray(priorFacts._intake_events) ? priorFacts._intake_events : [];
+  const knownIds = new Set(priorEvents.map(event => event?.id).filter(Boolean));
+  const appended = incoming.filter(event => !knownIds.has(event.id));
+  const cleanFacts = cleanCheckpointFacts(facts);
+  const caseFacts = {
+    ...priorFacts,
+    ...cleanFacts,
+    _intake_checkpoint: true,
+    _intake_checkpoint_token_hash: priorFacts._intake_checkpoint_token_hash,
+    _intake_events: [...priorEvents, ...appended].slice(-500),
+    _intake_checkpoint_updated_at: now
+  };
+  const { error } = await supabase.from('cases').update({
+    client_name: cleanFacts.client_name || existing.client_name,
+    contact_info: cleanFacts.whatsapp_number || cleanFacts.contact_info || cleanFacts.client_email || existing.contact_info,
+    issue_summary: cleanFacts.initial_query || cleanFacts.incident_description || existing.issue_summary,
+    case_facts: caseFacts,
+    updated_at: now
+  }).eq('id', caseId);
+  if (error) throw error;
+  return {
+    caseId,
+    caseReference: existing.client_reference || caseReference(existing.id, existing.created_at),
+    checkpointToken: token,
+    eventCount: priorEvents.length + appended.length
+  };
 }
 
 async function getActiveLLM() {
@@ -310,6 +414,30 @@ exports.handler = async (event) => {
       };
     }
 
+
+    if (action === 'deadline_check') {
+      const status = deadlineStatus(body.facts || {}, body.now ? new Date(body.now) : new Date());
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, message: deadlineMessage(status) })
+      };
+    }
+
+    if (action === 'intake_checkpoint') {
+      const result = await saveIntakeCheckpoint({
+        caseId: body.caseId || null,
+        token: body.checkpointToken || null,
+        facts: body.facts || {},
+        events: body.events || []
+      });
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success:true, ...result })
+      };
+    }
+
     if (action === 'classify') {
       const result = await classifyText(body.text || '');
       return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(result) };
@@ -412,15 +540,49 @@ exports.handler = async (event) => {
       };
       const clientOutcome = clientOutcomeFor(caseFacts, scorecard);
 
-      const { data, error } = await supabase.from('cases').insert({
-        client_name: facts.client_name,
-        contact_info: facts.contact_info,
-        issue_summary: fullStory || 'Gathered via automated intake.',
-        case_facts: { ...caseFacts, client_outcome_message: clientOutcome },
-        status: 'new',
-        letter_status: scorecard.wp_eligible ? 'not_drafted' : 'not_applicable'
-      }).select().single();
-      if (error) throw error;
+      let data;
+      const checkpointId = originalFacts._checkpoint_case_id || null;
+      const checkpointToken = originalFacts._checkpoint_token || null;
+      const evaluatedFacts = {
+        ...caseFacts,
+        client_outcome_message: clientOutcome,
+        _intake_events: Array.isArray(originalFacts._intake_events) ? originalFacts._intake_events : undefined
+      };
+
+      if (checkpointId && checkpointToken) {
+        const checkpoint = await readCheckpoint(checkpointId, checkpointToken);
+        if (!checkpoint) throw new Error('Invalid intake checkpoint during evaluation');
+        const prior = checkpoint.case_facts || {};
+        const mergedFacts = {
+          ...prior,
+          ...cleanCheckpointFacts(evaluatedFacts),
+          _intake_checkpoint: false,
+          _intake_checkpoint_token_hash: prior._intake_checkpoint_token_hash,
+          _intake_events: prior._intake_events || []
+        };
+        const { data: updated, error } = await supabase.from('cases').update({
+          client_name: facts.client_name,
+          contact_info: facts.whatsapp_number || facts.contact_info || facts.client_email || checkpoint.contact_info,
+          issue_summary: fullStory || 'Gathered via automated intake.',
+          case_facts: mergedFacts,
+          status: 'new',
+          letter_status: scorecard.wp_eligible ? 'not_drafted' : 'not_applicable',
+          updated_at: new Date().toISOString()
+        }).eq('id', checkpointId).select().single();
+        if (error) throw error;
+        data = updated;
+      } else {
+        const { data: inserted, error } = await supabase.from('cases').insert({
+          client_name: facts.client_name,
+          contact_info: facts.whatsapp_number || facts.contact_info || facts.client_email || null,
+          issue_summary: fullStory || 'Gathered via automated intake.',
+          case_facts: cleanCheckpointFacts(evaluatedFacts),
+          status: 'new',
+          letter_status: scorecard.wp_eligible ? 'not_drafted' : 'not_applicable'
+        }).select().single();
+        if (error) throw error;
+        data = inserted;
+      }
 
       let whatsapp = { linked: false, reason: 'not_web_intake' };
       if (facts.source === 'web' || facts.whatsapp_number) {
