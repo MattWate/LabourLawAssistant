@@ -95,6 +95,7 @@ function buildDiagnostics(row, conversation) {
     },
     dates: {
       legal_date: legalDate,
+      candidate_legal_date: f._candidate_legal_date || null,
       metadata: dateMeta,
       ccma_deadline_status: f.ccma_deadline_status || null,
       determination_time_bar: f.admin_determination?.time_bar || null
@@ -120,6 +121,7 @@ function buildDiagnostics(row, conversation) {
       wants_letter: f.wants_letter ?? null
     },
     provenance: {
+      intake_events: Array.isArray(f._intake_events) ? f._intake_events : [],
       fact_metadata: meta,
       fact_trace: f.fact_trace || f.admin_determination?.fact_trace || [],
       llm_governance: f.llm_governance || null,
