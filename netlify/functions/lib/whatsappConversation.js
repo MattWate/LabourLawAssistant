@@ -779,8 +779,9 @@ async function processIncomingMessage(message) {
     delete facts._pending_confirmation;
 
     if (promptCount(facts) >= WHATSAPP_PROMPT_LIMIT) {
-      const missing = requiredLetterFieldsMissing(facts);
-      if (missing.length) return markHandoff(conversation, message, 'PROMPT_LIMIT_INCOMPLETE', facts);
+      facts._prompt_limit_reason = 'prompt_budget_reached';
+      facts = appendIntakeEvent(facts, 'prompt_cap_reached', { state: stepName, meta: { prompt_count: promptCount(facts), reason: facts._prompt_limit_reason } });
+      return completeEvaluation(conversation, message, facts);
     }
 
     facts = withPromptRecorded(facts, `step:${stepName}`);
@@ -816,14 +817,15 @@ async function processIncomingMessage(message) {
     }
 
     if (promptCount(facts) >= WHATSAPP_PROMPT_LIMIT) {
-      const missing = requiredLetterFieldsMissing(facts);
-      if (missing.length) return markHandoff(conversation, message, 'PROMPT_LIMIT_INCOMPLETE', facts);
+      facts._prompt_limit_reason = 'prompt_budget_reached';
+      facts = appendIntakeEvent(facts, 'prompt_cap_reached', { state: next, meta: { prompt_count: promptCount(facts), reason: facts._prompt_limit_reason } });
+      return completeEvaluation(conversation, message, facts);
     }
 
     facts = withPromptRecorded(facts, `step:${next}`);
     await updateConversation(conversation.id, { current_step: next, collected_facts: facts, classification,
       processed_message_ids: appendMessageId(conversation, message.whatsapp_message_id), last_inbound_at: new Date().toISOString() });
-    return [deadlineWarning, turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
+    return [turn.acknowledgement, turn.next_question || renderPrompt(next)].filter(Boolean).join('\n\n');
   }
   if (step.type === 'evaluate') return completeEvaluation(conversation, message, facts);
 
