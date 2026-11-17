@@ -1,5 +1,5 @@
 const { determineRecommendation } = require('./strategicMatrix');
-const { validateAndNormaliseDate } = require('./dateValidation');
+const { deadlineStatus } = require('./intakeSafety');
 
 const TRACK_LABELS = {
   'UD-MISCONDUCT': 'Unfair Dismissal — Misconduct',
@@ -64,29 +64,7 @@ function inferTrack(facts = {}) {
 }
 
 function ccmaStatus(facts = {}) {
-  const track = inferTrack(facts);
-  const statusText = clean(facts.disc_status || facts.employment_status || facts.category);
-  const dismissalWindowApplies = track.startsWith('UD-') || track === 'CD' || (track === 'AUD' && (statusText.includes('dismiss') || statusText.includes('fire')));
-
-  if (!dismissalWindowApplies) {
-    return { status: 'NOT_APPLICABLE', daysElapsed: null, daysRemaining: null, daysOverdue: null };
-  }
-
-  const dateValue = facts.incident_date || facts.dismissal_date || facts.resignation_date;
-  if (!dateValue) return { status: 'UNKNOWN', reason: 'missing_date', daysElapsed: null, daysRemaining: null, daysOverdue: null };
-
-  const parsed = validateAndNormaliseDate(dateValue, { allowFuture: false });
-  if (!parsed.ok) return { status: 'UNKNOWN', reason: parsed.reason, daysElapsed: null, daysRemaining: null, daysOverdue: null };
-
-  const now = new Date();
-  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const daysElapsed = Math.floor((todayUtc - parsed.date.getTime()) / 86400000);
-
-  if (daysElapsed <= 30) {
-    return { status: 'WITHIN_WINDOW', eventDate: parsed.iso, daysElapsed, daysRemaining: 30 - daysElapsed, daysOverdue: 0 };
-  }
-
-  return { status: 'LAPSED-CONDONATION', eventDate: parsed.iso, daysElapsed, daysRemaining: null, daysOverdue: daysElapsed - 30 };
+  return deadlineStatus(facts);
 }
 
 function hardDisqualifier(facts = {}, track) {
