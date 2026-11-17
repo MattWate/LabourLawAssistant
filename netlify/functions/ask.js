@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const OpenAI = require('openai');
-const { scoreCase } = require('./lib/scoringEngine');
+const { scoreCase, inferTrack } = require('./lib/scoringEngine');
 const { applyOverridePostProcessing } = require('./lib/overridePostProcessor');
 const { classifyAndHydrateMatter, mergeGovernanceFacts } = require('./lib/llmGovernance');
 const { caseReference } = require('./lib/caseReference');
@@ -416,7 +416,8 @@ exports.handler = async (event) => {
 
 
     if (action === 'deadline_check') {
-      const status = deadlineStatus(body.facts || {}, body.now ? new Date(body.now) : new Date());
+      const deadlineFacts = body.facts || {};
+      const status = deadlineStatus({ ...deadlineFacts, track: deadlineFacts.track || inferTrack(deadlineFacts) }, body.now ? new Date(body.now) : new Date());
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -589,7 +590,7 @@ exports.handler = async (event) => {
         try {
           whatsapp = await linkWebCaseToWhatsApp({ caseId: data.id, facts, caseFacts: { ...caseFacts, client_outcome_message: clientOutcome } });
           if (whatsapp.linked) {
-            const normalisedFacts = { ...caseFacts, client_outcome_message: clientOutcome, contact_info: whatsapp.number, whatsapp_number: whatsapp.number, source: 'web' };
+            const normalisedFacts = { ...(data.case_facts || caseFacts), client_outcome_message: clientOutcome, contact_info: whatsapp.number, whatsapp_number: whatsapp.number, source: 'web' };
             await supabase.from('cases').update({
               contact_info: whatsapp.number,
               case_facts: normalisedFacts,
