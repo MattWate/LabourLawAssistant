@@ -1,7 +1,9 @@
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { sendWhatsAppText, sendWhatsAppTemplate } = require('./lib/whatsapp');
 const { determineProductRoute } = require('./lib/productRouting');
 const { CONSENT_CONFIG } = require('./lib/consentConfig');
+const { sendEmail } = require('./lib/email');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -33,6 +35,62 @@ async function authenticate(event) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) throw new Error('Unauthorized');
   return data.user;
+}
+
+
+function sha256(value = '') {
+  return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
+}
+
+function siteBaseUrl(event) {
+  const host = event.headers?.host || event.headers?.['x-forwarded-host'];
+  const proto = event.headers?.['x-forwarded-proto'] || 'https';
+  if (host) return `${proto}://${host}`;
+  const configured = process.env.DEPLOY_PRIME_URL || process.env.URL;
+  if (configured) return configured.replace(/\/$/, '');
+  throw new Error('Could not determine site URL');
+}
+
+async function sendEmailConsentRequest({ event, caseId, caseData, facts, stage }) {
+  const clientEmail = facts.client_email || extractEmail(facts.contact_email || facts.contact_info || caseData.contact_info);
+  if (!clientEmail) return null;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = sha256(token);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date().toISOString();
+  const url = `${siteBaseUrl(event)}/client-consent.html?token=${encodeURIComponent(token)}`;
+  const stageLabel = stage === 'mandate' ? 'VRS mandate' : 'pre-payment instruction';
+  const updatedFacts = {
+    ...facts,
+    client_consent_token_hash: tokenHash,
+    client_consent_expires_at: expiresAt,
+    client_consent_stage: stage,
+    client_consent_issued_at: now,
+    client_consent_channel: 'email',
+    client_consent_email: clientEmail
+  };
+
+  await supabase.from('cases').update({
+    status: stage === 'mandate' ? 'awaiting_mandate_acceptance' : 'awaiting_payment_consent',
+    case_facts: updatedFacts,
+    updated_at: now
+  }).eq('id', caseId);
+
+  await sendEmail({
+    to: clientEmail,
+    subject: `Action required: confirm your ${stageLabel} — ${facts.case_reference || caseId}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#172033;line-height:1.6">
+      <p>Hello ${facts.client_name || caseData.client_name || 'there'},</p>
+      <p>VRS Labour Law Consultants needs your confirmation before the matter can move to payment.</p>
+      <p><a href="${url}" style="display:inline-block;background:#20368F;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Review and confirm</a></p>
+      <p>This private link expires in 24 hours.</p>
+      <p>Regards,<br>VRS Labour Law Consultants</p>
+    </div>`,
+    text: `VRS Labour Law Consultants needs your confirmation before the matter can move to payment.\n\nReview and confirm here: ${url}\n\nThis private link expires in 24 hours.`
+  });
+
+  return { clientEmail, expiresAt, updatedFacts };
 }
 
 function extractEmail(value = '') {
@@ -197,9 +255,20 @@ exports.handler = async (event) => {
       const mandateConversation = await ensureMandateConversation(caseId, caseData, facts);
 
       if (!mandateConversation?.from_number) {
-        return json(409, {
-          error: 'Client mandate acceptance is required before payment can be requested. No linked WhatsApp conversation is available to request it.',
-          mandate_required: true
+        const emailRequest = await sendEmailConsentRequest({ event, caseId, caseData, facts, stage: 'mandate' });
+        if (!emailRequest) {
+          return json(409, {
+            error: 'Client mandate acceptance is required before payment can be requested. No usable WhatsApp number or client email is available.',
+            mandate_required: true
+          });
+        }
+        return json(202, {
+          success: true,
+          mandate_required: true,
+          mandate_requested: true,
+          email_sent: true,
+          channel: 'email',
+          message: 'The VRS mandate and consent link has been emailed to the client. The client can complete the required confirmations without WhatsApp.'
         });
       }
 
@@ -238,9 +307,20 @@ exports.handler = async (event) => {
       const consentConversation = await ensureMandateConversation(caseId, caseData, facts);
 
       if (!consentConversation?.from_number) {
-        return json(409, {
-          error: 'Client pre-payment consent is required before a payment link can be created. No linked WhatsApp conversation is available to request it.',
-          consent_required: true
+        const emailRequest = await sendEmailConsentRequest({ event, caseId, caseData, facts, stage: 'payment' });
+        if (!emailRequest) {
+          return json(409, {
+            error: 'Client pre-payment consent is required before a payment link can be created. No usable WhatsApp number or client email is available.',
+            consent_required: true
+          });
+        }
+        return json(202, {
+          success: true,
+          consent_required: true,
+          consent_requested: true,
+          email_sent: true,
+          channel: 'email',
+          message: 'The pre-payment consent link has been emailed to the client. Once accepted, request payment again.'
         });
       }
 
