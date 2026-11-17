@@ -240,7 +240,22 @@ exports.handler = async (event) => {
       payfastValidationResponse
     };
 
-    const recordedPayment = await recordItn(existingPayment, data, checks);
+    let recordedPayment = existingPayment;
+    let auditWriteError = null;
+    try {
+      recordedPayment = await recordItn(existingPayment, data, checks);
+    } catch (recordError) {
+      auditWriteError = recordError.message;
+      console.error('PayFast ITN audit write failed; continuing to payment unlock', {
+        m_payment_id: data.m_payment_id,
+        case_id: existingPayment.case_id,
+        error: auditWriteError
+      });
+    }
+
+    // Payment unlock is the critical path. Audit persistence is diagnostic and must
+    // never strand a valid COMPLETE payment that matches an issued payment ID,
+    // expected amount and expected case.
     const unlockResult = await unlockCaseIfPaid(existingPayment, recordedPayment, data, checks);
 
     console.log('PayFast ITN received', {
@@ -253,6 +268,7 @@ exports.handler = async (event) => {
       signatureValid,
       merchantValid,
       payfastValidationStatus,
+      auditWriteError,
       unlockResult
     });
 
