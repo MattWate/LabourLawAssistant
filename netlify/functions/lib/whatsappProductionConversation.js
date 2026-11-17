@@ -187,11 +187,14 @@ async function processIncomingMessage(message) {
   }
 
   if (conversation?.current_step === 'CLIENT_EMAIL' && conversation.status === 'active') {
-    const email = clean(message.text_body).toLowerCase();
-    if (!validEmail(email)) {
-      return `That does not look like a valid email address. Please enter an address such as name@example.com.\n\n${CLIENT_EMAIL_PROMPT}`;
+    const hasPostContactRoute = Boolean(conversation.collected_facts?._post_contact_state);
+    if (!hasPostContactRoute) {
+      const email = clean(message.text_body).toLowerCase();
+      if (!validEmail(email)) {
+        return `That does not look like a valid email address. Please enter an address such as name@example.com.\n\n${CLIENT_EMAIL_PROMPT}`;
+      }
+      return completeAfterEmail(conversation, message, email);
     }
-    return completeAfterEmail(conversation, message, email);
   }
 
   const result = await baseConversation.processIncomingMessage(message);
@@ -207,8 +210,7 @@ async function processIncomingMessage(message) {
 module.exports = {
   processIncomingMessage,
   STEPS: {
-    ...baseConversation.STEPS,
-    CLIENT_EMAIL: { type: 'text', prompt: CLIENT_EMAIL_PROMPT, saveAs: 'client_email', next: 'HANDOFF' }
+    ...baseConversation.STEPS
   },
   CLIENT_EMAIL_PROMPT,
   COMPLETION_MESSAGE,
