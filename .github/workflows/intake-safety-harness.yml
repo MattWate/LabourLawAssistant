@@ -1,0 +1,25 @@
+name: Intake Safety Harness
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'netlify/functions/ask.js'
+      - 'netlify/functions/lib/intakeSafety.js'
+      - 'netlify/functions/lib/scoringEngine.js'
+      - 'netlify/functions/lib/llmGovernance.js'
+      - 'netlify/functions/lib/intakeConversation.js'
+      - 'netlify/functions/lib/whatsappConversation.js'
+      - 'netlify/functions/lib/whatsappProductionConversation.js'
+      - 'scripts/intake-safety-harness.js'
+      - '.github/workflows/intake-safety-harness.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/intake-safety-harness.js
