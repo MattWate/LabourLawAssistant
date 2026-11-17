@@ -617,7 +617,7 @@
       if (c.payment_status === 'paid') return '<span class="badge green">Payment received ' + esc(date(c.paid_at)) + '</span>';
       if (c.status === 'awaiting_mandate_acceptance') return '<button class="btn ghost" disabled>Awaiting Mandate</button>';
       if (c.status === 'awaiting_payment_consent') return '<button class="btn ghost" disabled>Awaiting Client Consent</button>';
-      if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button><button id="btn-manual-payment-' + c.id + '" class="btn warn" onclick="manualConfirmPayment(\\'' + c.id + '\\')">Confirm Payment Manually</button>';
+      if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button><button id="btn-manual-payment-' + c.id + '" class="btn warn" onclick="manualConfirmPayment(\'' + c.id + '\')">Confirm Payment Manually</button>';
       const route = f.product_route || {};
       if (!bool(ed.wp_eligible) || route.payment_allowed === false || (route.product_code && route.product_code !== 'WP_LETTER')) return '';
       return '<button id="btn-payment-' + c.id + '" class="btn success" onclick="approveCaseForPayment(\'' + c.id + '\')">Approve & Request Payment</button>';
