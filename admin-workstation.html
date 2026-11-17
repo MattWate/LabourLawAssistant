@@ -617,7 +617,7 @@
       if (c.payment_status === 'paid') return '<span class="badge green">Payment received ' + esc(date(c.paid_at)) + '</span>';
       if (c.status === 'awaiting_mandate_acceptance') return '<button class="btn ghost" disabled>Awaiting Mandate</button>';
       if (c.status === 'awaiting_payment_consent') return '<button class="btn ghost" disabled>Awaiting Client Consent</button>';
-      if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button>';
+      if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button><button id="btn-manual-payment-' + c.id + '" class="btn warn" onclick="manualConfirmPayment(\\'' + c.id + '\\')">Confirm Payment Manually</button>';
       const route = f.product_route || {};
       if (!bool(ed.wp_eligible) || route.payment_allowed === false || (route.product_code && route.product_code !== 'WP_LETTER')) return '';
       return '<button id="btn-payment-' + c.id + '" class="btn success" onclick="approveCaseForPayment(\'' + c.id + '\')">Approve & Request Payment</button>';
@@ -752,6 +752,29 @@
         toast(e.message || 'Could not record refund/credit action.');
       }
     }
+    async function manualConfirmPayment(id) {
+      const c = casesData.find(row => row.id === id);
+      if (!c || c.payment_status !== 'pending') { toast('This case no longer has a pending payment. Refresh the case.'); return; }
+      const reason = prompt('Confirm payment ONLY after checking the successful transaction in PayFast. Enter a reason:', 'PayFast ITN delayed; transaction checked in merchant dashboard');
+      if (reason === null) return;
+      if (reason.trim().length < 5) { toast('Please provide a reason of at least 5 characters.'); return; }
+      if (!confirm('I have independently checked that the correct payment was received for this case. Unlock drafting now?')) return;
+      const button = $('btn-manual-payment-' + id);
+      if (button) { button.disabled = true; button.textContent = 'Confirming...'; }
+      try {
+        const res = await authFetch('/.netlify/functions/manual_confirm_payment', {
+          method: 'POST', headers: headers(), body: JSON.stringify({caseId:id, reason:reason.trim(), confirmed:true})
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Payment confirmation failed');
+        await fetchCases();
+        toast(result.warning || result.message || 'Payment confirmation recorded.');
+      } catch(error) {
+        toast(error.message || 'Could not confirm payment');
+        if (button) { button.disabled = false; button.textContent = 'Confirm Payment Manually'; }
+      }
+    }
+
     async function approveCaseForPayment(id) {
       const c = casesData.find(x => x.id === id);
       if (!c) return toast('Case not found.');
