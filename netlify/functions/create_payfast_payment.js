@@ -109,7 +109,7 @@ exports.handler = async (event) => {
       notify_url: process.env.PAYFAST_NOTIFY_URL || `${site}/.netlify/functions/payfast_itn`,
       name_first: names.name_first,
       name_last: names.name_last,
-      email_address: emailFrom(facts.contact_info || caseData.contact_info),
+      email_address: emailFrom(facts.client_email || facts.contact_email || facts.contact_info || caseData.contact_info),
       m_payment_id: mPaymentId,
       amount,
       item_name: itemName,
