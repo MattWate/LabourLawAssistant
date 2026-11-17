@@ -6,6 +6,7 @@ const {
   promptBudgetDecision,
   candidateDateFromGovernance
 } = require('../netlify/functions/lib/intakeSafety');
+const { ccmaStatus } = require('../netlify/functions/lib/scoringEngine');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -25,7 +26,10 @@ for (const path of [
   'netlify/functions/lib/scoringEngine.js',
   'netlify/functions/lib/llmGovernance.js',
   'netlify/functions/lib/whatsappConversation.js',
-  'netlify/functions/lib/whatsappProductionConversation.js'
+  'netlify/functions/lib/whatsappProductionConversation.js',
+  'netlify/functions/approve_case_for_payment.js',
+  'netlify/functions/client_case_consent.js',
+  'netlify/functions/uat_log_review.js'
 ]) syntax(path);
 
 // Replay UAT card 04: dismissal on 13 Oct, reviewed 16 Nov => ordinary 30-day period lapsed.
@@ -39,6 +43,14 @@ assert(card04.daysElapsed === 34, 'Card 04 expected 34 elapsed days');
 assert(card04.daysOverdue === 4, 'Card 04 expected 4 days overdue');
 assert(/condonation/i.test(deadlineMessage(card04) || ''), 'Card 04 must surface condonation warning');
 console.log('PASS card 04 deadline replay', card04);
+
+const card04Inferred = ccmaStatus({
+  employment_status:'dismissed',
+  dismissal_reason_type:'Poor Performance',
+  incident_date:'2026-10-13'
+});
+assert(['LAPSED-CONDONATION','WITHIN_WINDOW'].includes(card04Inferred.status), 'Scoring deadline must infer dismissal track when track is absent');
+console.log('PASS deadline track inference without explicit track', card04Inferred);
 
 // Replay UAT card 07: source says only "19 October". AI date must remain candidate-only.
 const card07Candidate = candidateDateFromGovernance({
@@ -73,6 +85,10 @@ const ask = fs.readFileSync('netlify/functions/ask.js','utf8');
 const wa = fs.readFileSync('netlify/functions/lib/whatsappConversation.js','utf8');
 const waProd = fs.readFileSync('netlify/functions/lib/whatsappProductionConversation.js','utf8');
 const governance = fs.readFileSync('netlify/functions/lib/llmGovernance.js','utf8');
+const approve = fs.readFileSync('netlify/functions/approve_case_for_payment.js','utf8');
+const consent = fs.readFileSync('netlify/functions/client_case_consent.js','utf8');
+const review = fs.readFileSync('netlify/functions/uat_log_review.js','utf8');
+const scoring = fs.readFileSync('netlify/functions/lib/scoringEngine.js','utf8');
 
 checkIncludes(web, [
   'CONTACT_NAME:',
@@ -122,6 +138,35 @@ checkIncludes(waProd, [
   'hasPostContactRoute',
   'baseConversation.processIncomingMessage(message)'
 ], 'WhatsApp production wrapper');
+
+checkIncludes(scoring, [
+  'track: facts.track || inferTrack(facts)'
+], 'scoring deadline inference');
+
+checkIncludes(ask, [
+  '...(data.case_facts || caseFacts)',
+  '_intake_events: prior._intake_events || []'
+], 'audit preservation');
+
+checkIncludes(approve, [
+  'sendEmailConsentRequest',
+  "stage: 'mandate'",
+  "stage: 'payment'",
+  'client-consent.html?token=',
+  "channel: 'email'"
+], 'email consent fallback');
+
+checkIncludes(consent, [
+  "client_consent_stage === 'mandate'",
+  "mandateAcceptanceSnapshot('email')",
+  "paymentConsentSnapshot('email')",
+  'client_consent_completed_at'
+], 'client email consent endpoint');
+
+checkIncludes(review, [
+  'candidate_legal_date',
+  'intake_events'
+], 'UAT audit review');
 
 // Browser inline JS syntax check.
 const scripts = [...web.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m => m[1]).filter(s => s.trim());
