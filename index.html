@@ -474,6 +474,20 @@
             const existingMeta = metadata[item.field];
             if (hasKnownValue(collectedFacts[item.field]) && existingMeta?.confirmed === true) return;
 
+            if (["incident_date", "dismissal_date", "resignation_date"].includes(item.field)) {
+                collectedFacts._candidate_legal_date = {
+                    field: item.field,
+                    value: item.value,
+                    confidence: 1,
+                    source: "client_explicit_extraction",
+                    evidence: item.evidence || null,
+                    confirmed: false,
+                    captured_at: new Date().toISOString()
+                };
+                intakeEvent("ai_fact_proposed", { field: item.field, value: item.value, meta: { legal_date_candidate: true, evidence: item.evidence || null } });
+                return;
+            }
+
             collectedFacts[item.field] = item.value;
             metadata[item.field] = {
                 source: "client_explicit_extraction",
@@ -498,6 +512,18 @@
         const pending = [];
         turn.inferences.forEach(item => {
             if (!item?.field || hasKnownValue(collectedFacts[item.field])) return;
+            if (["incident_date", "dismissal_date", "resignation_date"].includes(item.field)) {
+                collectedFacts._candidate_legal_date = {
+                    field: item.field,
+                    value: item.value,
+                    confidence: Number(item.confidence || 0),
+                    source: "claude_inference",
+                    confirmed: false,
+                    captured_at: new Date().toISOString()
+                };
+                intakeEvent("ai_fact_proposed", { field: item.field, value: item.value, meta: { legal_date_candidate: true, confidence: Number(item.confidence || 0) } });
+                return;
+            }
             collectedFacts[item.field] = item.value;
             metadata[item.field] = {
                 source: "claude_inference",
@@ -611,16 +637,22 @@
         const confirmationQuestion = pendingConfirmationText();
         const pending = collectedFacts._pending_confirmation?.items || [];
         const metadata = { ...(collectedFacts._fact_metadata || {}) };
+        let confirmedLegalDate = false;
         pending.forEach(item => {
             if (confirmed) {
                 metadata[item.field] = { ...(metadata[item.field] || {}), source: "client_confirmed", confirmed: true, confidence: 1, captured_at: new Date().toISOString() };
+                intakeEvent("fact_confirmed", { field: item.field, value: collectedFacts[item.field] });
+                if (["incident_date", "dismissal_date", "resignation_date"].includes(item.field)) confirmedLegalDate = true;
             } else {
+                intakeEvent("fact_rejected", { field: item.field, value: collectedFacts[item.field] });
                 delete collectedFacts[item.field];
                 delete metadata[item.field];
             }
         });
         collectedFacts._fact_metadata = metadata;
         delete collectedFacts._pending_confirmation;
+        if (confirmedLegalDate) await checkDeadlineNow();
+        await flushIntakeCheckpoint();
         await processWebTurn({ msg: confirmationQuestion, saveAs: null }, confirmed ? "Yes" : "No", currentState);
         renderState();
     }
@@ -807,7 +839,7 @@
             if (wordCount < step.minWords) { appendMessage(val, "user"); appendMessage(`Please add a little more detail. This answer needs at least ${step.minWords} words.`, "bot"); inputEl.value = val; textContainer.style.display = 'flex'; inputEl.focus(); return; }
         }
         if (step.action === "classify") {
-            textContainer.style.display = 'none'; appendMessage(val, "user"); collectedFacts["initial_query"] = val;
+            textContainer.style.display = 'none'; appendMessage(val, "user"); collectedFacts["initial_query"] = val; intakeEvent("answer_received", { field: "initial_query", value: val });
             collectedFacts._fact_metadata = { ...(collectedFacts._fact_metadata || {}), initial_query: { source: "user_answer", confidence: 1, confirmed: true, captured_at: new Date().toISOString() } };
             showLoading();
             try {
