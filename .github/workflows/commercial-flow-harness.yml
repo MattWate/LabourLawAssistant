@@ -1,0 +1,28 @@
+name: Commercial Flow Harness
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'netlify/functions/approve_case_for_payment.js'
+      - 'netlify/functions/create_payfast_payment.js'
+      - 'netlify/functions/payfast_itn.js'
+      - 'netlify/functions/generate_letter.js'
+      - 'netlify/functions/generate_letter-background.js'
+      - 'netlify/functions/manage_letter_release.js'
+      - 'netlify/functions/client_letter_review.js'
+      - 'netlify/functions/client_case_consent.js'
+      - 'netlify/functions/lib/email.js'
+      - 'netlify/functions/lib/pdfDocument.js'
+      - 'scripts/commercial-flow-harness.js'
+      - '.github/workflows/commercial-flow-harness.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --ignore-scripts
+      - run: node scripts/commercial-flow-harness.js
