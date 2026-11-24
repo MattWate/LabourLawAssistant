@@ -73,10 +73,10 @@ assert(explicitCandidate.explicit_year_in_source === true, 'Explicit year should
 assert(explicitCandidate.confirmed === false && explicitCandidate.usable_as_legal_date === false, 'Even explicit AI date stays candidate-only');
 console.log('PASS explicit-year candidate remains unconfirmed');
 
-// Prompt budget: contacts and legal dates survive; optional drafting details are deferred.
+// Prompt budget: contacts, legal dates and required operational release data survive; normal substantive questions stop at the cap.
 assert(promptBudgetDecision({state:'CONTACT_EMAIL',count:15,limit:15}).allow === true, 'Contact capture must survive prompt cap');
 assert(promptBudgetDecision({state:'FIRED_DATE',count:15,limit:15}).allow === true, 'Legal date must survive prompt cap');
-assert(promptBudgetDecision({state:'ADDRESSEE_POSITION',count:12,limit:15}).allow === false, 'Optional addressee detail should be deferred near cap');
+assert(promptBudgetDecision({state:'ADDRESSEE_POSITION',count:15,limit:15}).allow === true, 'Required addressee detail must survive prompt cap');
 assert(promptBudgetDecision({state:'P5_TRAINING',count:15,limit:15}).allow === false, 'Normal substantive question must stop at cap');
 console.log('PASS priority-based prompt budget');
 
