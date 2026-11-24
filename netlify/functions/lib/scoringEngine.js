@@ -80,11 +80,24 @@ function hardDisqualifier(facts = {}, track) {
 }
 
 function meritBonus(facts = {}) {
-  const story = `${facts.initial_query || ''} ${facts.incident_description || ''} ${facts.protected_ground || ''}`;
-  if (hasAny(story, ['pregnant', 'pregnancy', 'maternity'])) return { name: 'Dismissal during or because of pregnancy', legalBasis: 'LRA s187(1)(e)' };
-  if (hasAny(story, ['whistleblow', 'protected disclosure', 'reported corruption'])) return { name: 'Protected disclosure / whistleblowing', legalBasis: 'Protected Disclosures Act 26 of 2000' };
-  if (hasAny(story, ['union activity', 'shop steward', 'trade union', 'union member'])) return { name: 'Union membership or activity', legalBasis: 'LRA s187(1)(a)' };
-  if (hasAny(story, ['hiv', 'lawful sick leave', 'sick leave'])) return { name: 'Dismissal linked to lawful sick leave or HIV status', legalBasis: 'LRA s187(1)(f); EEA s6' };
+  const story = `${facts.initial_query || ''} ${facts.incident_description || ''}`;
+  const protectedGround = clean(facts.protected_ground);
+  if (hasAny(`${story} ${protectedGround}`, ['pregnant', 'pregnancy', 'maternity'])) return { name: 'Dismissal during or because of pregnancy', legalBasis: 'LRA s187(1)(e)' };
+  if (hasAny(`${story} ${protectedGround}`, ['whistleblow', 'protected disclosure', 'reported corruption'])) return { name: 'Protected disclosure / whistleblowing', legalBasis: 'Protected Disclosures Act 26 of 2000' };
+
+  // A union reference is not enough on its own. The protected-activity bonus is
+  // reserved for a directly captured protected ground or narrative linking the
+  // adverse action to union membership/activity. This prevents ordinary hearing
+  // representation by a shop steward from becoming an s187 trigger.
+  const explicitUnionGround = hasAny(protectedGround, ['union activity', 'trade union', 'union membership', 'shop steward duties']);
+  const unionCausationInStory = hasAny(story, [
+    'because of my union', 'because i am a union', 'because i was a shop steward',
+    'for my union activity', 'for being a shop steward', 'due to union activity',
+    'retaliation for union', 'because of union membership', 'because of my shop steward duties'
+  ]);
+  if (explicitUnionGround || unionCausationInStory) return { name: 'Union membership or activity', legalBasis: 'LRA s187(1)(a)' };
+
+  if (hasAny(`${story} ${protectedGround}`, ['hiv', 'lawful sick leave', 'sick leave'])) return { name: 'Dismissal linked to lawful sick leave or HIV status', legalBasis: 'LRA s187(1)(f); EEA s6' };
   if (hasAny(story, ['not paid', 'non-payment', 'salary arrears', 'unpaid salary', 'two months salary'])) return { name: 'Sustained non-payment of salary', legalBasis: 'BCEA s34, s77' };
   if (facts.paid_suspension === false || clean(facts.paid_suspension).includes('without pay')) return { name: 'Suspension without pay without prior hearing', legalBasis: 'LRA s186(2)(b)' };
   return null;
@@ -114,7 +127,8 @@ function scoreMisconduct(facts, breakdown, story) {
   else if (admission.includes('dispute')) { substantive += 2; add(breakdown, 'substantive', 2, 'The alleged misconduct is disputed', 'LRA s188'); }
   const warnings = clean(facts.prior_warnings || facts.warnings);
   if (warnings.includes('none') && !gross) { substantive += 2; add(breakdown, 'substantive', 2, 'No prior warning for a non-gross offence', '2025 Code of Practice: Dismissal paras 7-9'); }
-  if (warnings.includes('multiple')) { substantive -= 1; add(breakdown, 'substantive', -1, 'Multiple prior warnings weaken proportionality', '2025 Code of Practice: Dismissal paras 7-9'); }
+  if (warnings.includes('final warning')) { substantive -= 2; add(breakdown, 'substantive', -2, 'A live final warning materially weakens proportionality arguments', '2025 Code of Practice: Dismissal paras 7-9'); }
+  else if (warnings.includes('multiple')) { substantive -= 1; add(breakdown, 'substantive', -1, 'Multiple prior warnings weaken proportionality', '2025 Code of Practice: Dismissal paras 7-9'); }
   substantive += tenurePoint(facts, breakdown);
   if (substantiveCap !== null) substantive = Math.min(substantive, substantiveCap);
   if (isNo(facts.hearing_held)) { procedural += 4; add(breakdown, 'procedural', 4, 'No formal disciplinary hearing before dismissal', '2025 Code of Practice: Dismissal para 11'); }
