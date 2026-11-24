@@ -65,7 +65,7 @@ check(explicitUnionRetaliation.merit_bonus_trigger?.name==='Union membership or 
 check(!/JUR_PUBLIC_SERVICE:[\s\S]{0,900}next:\s*"DEFLECT_PUBLIC_SERVICE"/.test(web),'F23','public-service answer does not hard-stop at question 3');
 check(ask.includes("serviceability_status: 'OUT_OF_SCOPE'") && ask.includes("merit_band: 'NOT_ASSESSED'"),'P30','out-of-scope matters are distinct from a legal NO MERIT finding');
 
-// F16/F2/F3/F22 — intake must prioritise required facts and suppress repeats.
+// F16/F2/F3/F22 — Batch B: intake must prioritise required facts, desired outcomes and suppress repeats.
 check(!/OPTIONAL_BUDGET_STATES[^;]*ADDRESSEE_NAME/.test(web) && /REQUIRED_OPERATIONAL_STATES[^;]*ADDRESSEE_NAME/.test(web),'F16','addressee is protected as required operational data near the prompt cap');
 check(/DESIRED_OUTCOME:[\s\S]{0,1800}saveAs:\s*"desired_outcome"/.test(web) && ask.includes('desired_outcome: facts.desired_outcome'),'F2','desired client outcome is explicitly captured and persisted');
 check(!/DESIRED_OUTCOME:[\s\S]{0,1800}next:\s*"DESIRED_OUTCOME",\s*val:\s*"(?:Financial settlement|Mutual separation|Reference or record outcome|Internal resolution|Advice only)"/.test(web),'F2-FLOW','desired outcome options do not loop back to themselves');
