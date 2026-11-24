@@ -277,6 +277,7 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     dismissal_reason_type: facts.dismissal_reason_type || null,
     advisory_topic: facts.advisory_topic || null,
     ancillary_topic: facts.ancillary_topic || null,
+    desired_outcome: facts.desired_outcome || facts.client_outcome_preference || facts.remedy_sought || null,
     hearing_held: facts.hearing_held ?? null,
     proc_notice: facts.proc_notice ?? null,
     proc_rep: facts.proc_rep ?? null,
