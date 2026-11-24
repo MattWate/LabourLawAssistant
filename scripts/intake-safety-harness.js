@@ -143,6 +143,13 @@ checkIncludes(scoring, [
   'track: facts.track || inferTrack(facts)'
 ], 'scoring deadline inference');
 
+const { promptBudgetDecision } = require('../netlify/functions/lib/intakeSafety');
+for (const state of ['DESIRED_OUTCOME','COMPANY_NAME','ADDRESSEE_NAME','ADDRESSEE_POSITION','COMPANY_CONTACT']) {
+  const decision = promptBudgetDecision({ state, count: 15, limit: 15 });
+  assert(decision.allow === true && decision.countAgainstBudget === false, `Required operational state ${state} must survive the prompt cap`);
+}
+console.log('PASS required operational fields survive prompt cap');
+
 checkIncludes(ask, [
   '...(data.case_facts || caseFacts)',
   '_intake_events: prior._intake_events || []'
