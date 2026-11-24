@@ -1,0 +1,443 @@
+{
+  "report": "Justine UAT Findings Report - 23 Nov 2026",
+  "counts": {
+    "intake": 23,
+    "platform": 30,
+    "letters": 19,
+    "total": 72
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "intake-prefill"
+    },
+    {
+      "id": "F2",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "intake-required-facts"
+    },
+    {
+      "id": "F3",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "intake-required-facts"
+    },
+    {
+      "id": "F4",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "intake-reason"
+    },
+    {
+      "id": "F5",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "service-precision"
+    },
+    {
+      "id": "F6",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "warning-detail"
+    },
+    {
+      "id": "F7",
+      "severity": "Low",
+      "status": "Fixed",
+      "coverage": "addressee-fields"
+    },
+    {
+      "id": "F8",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "merit-outcome"
+    },
+    {
+      "id": "F9",
+      "severity": "High",
+      "status": "Partly fixed",
+      "coverage": "deadline"
+    },
+    {
+      "id": "F10",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "reference-consistency"
+    },
+    {
+      "id": "F11",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "fee-display"
+    },
+    {
+      "id": "F12",
+      "severity": "Medium",
+      "status": "Fixed",
+      "coverage": "consent-gate"
+    },
+    {
+      "id": "F13",
+      "severity": "Low",
+      "status": "Open",
+      "coverage": "email-sanity"
+    },
+    {
+      "id": "F14",
+      "severity": "Low",
+      "status": "Open",
+      "coverage": "choice-echo"
+    },
+    {
+      "id": "F15",
+      "severity": "Medium",
+      "status": "Superseded",
+      "coverage": "prompt-budget"
+    },
+    {
+      "id": "F16",
+      "severity": "High",
+      "status": "Partly fixed",
+      "coverage": "prompt-budget"
+    },
+    {
+      "id": "F17",
+      "severity": "High",
+      "status": "Fixed",
+      "coverage": "deadline"
+    },
+    {
+      "id": "F18",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "resume-intake"
+    },
+    {
+      "id": "F19",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "poor-performance-facts"
+    },
+    {
+      "id": "F20",
+      "severity": "High",
+      "status": "Not retested",
+      "coverage": "candidate-date"
+    },
+    {
+      "id": "F21",
+      "severity": "Medium",
+      "status": "Partly fixed",
+      "coverage": "confirmation-ui"
+    },
+    {
+      "id": "F22",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "duplicate-question"
+    },
+    {
+      "id": "F23",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "public-service-routing"
+    },
+    {
+      "id": "P1",
+      "severity": "High",
+      "status": "Fixed",
+      "coverage": "claude-governance"
+    },
+    {
+      "id": "P2",
+      "severity": "High",
+      "status": "Partly fixed",
+      "coverage": "whatsapp-templates"
+    },
+    {
+      "id": "P3",
+      "severity": "High",
+      "status": "Not retested",
+      "coverage": "deadline-refresh"
+    },
+    {
+      "id": "P4",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "payfast-verification"
+    },
+    {
+      "id": "P5",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "protected-activity-gate"
+    },
+    {
+      "id": "P6",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "negative-merit-evidence"
+    },
+    {
+      "id": "P7",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "rescore-on-edit"
+    },
+    {
+      "id": "P8",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "verified-authorities"
+    },
+    {
+      "id": "P9",
+      "severity": "Low",
+      "status": "Not retested",
+      "coverage": "advisory-topic"
+    },
+    {
+      "id": "P10",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "actor-audit"
+    },
+    {
+      "id": "P11",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "activity-log"
+    },
+    {
+      "id": "P12",
+      "severity": "Medium",
+      "status": "Partly fixed",
+      "coverage": "payment-confirmation-detail"
+    },
+    {
+      "id": "P13",
+      "severity": "Medium",
+      "status": "Partly fixed",
+      "coverage": "review-link-state"
+    },
+    {
+      "id": "P14",
+      "severity": "High",
+      "status": "Fixed",
+      "coverage": "branding"
+    },
+    {
+      "id": "P15",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "factual-qa"
+    },
+    {
+      "id": "P16",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "document-preview"
+    },
+    {
+      "id": "P17",
+      "severity": "Medium",
+      "status": "Blocked by P21",
+      "coverage": "release-client-notice"
+    },
+    {
+      "id": "P18",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "date-field-semantics"
+    },
+    {
+      "id": "P19",
+      "severity": "Low",
+      "status": "Open",
+      "coverage": "provenance-rendering"
+    },
+    {
+      "id": "P20",
+      "severity": "Low",
+      "status": "Not retested",
+      "coverage": "case-refresh"
+    },
+    {
+      "id": "P21",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "deployed-pdf"
+    },
+    {
+      "id": "P22",
+      "severity": "High",
+      "status": "Fixed",
+      "coverage": "mandate-payment-gate"
+    },
+    {
+      "id": "P23",
+      "severity": "High",
+      "status": "Fixed",
+      "coverage": "contact-fields"
+    },
+    {
+      "id": "P24",
+      "severity": "Medium",
+      "status": "Not retested",
+      "coverage": "override-tracks"
+    },
+    {
+      "id": "P25",
+      "severity": "High",
+      "status": "Fixed",
+      "coverage": "assessment-after-cap"
+    },
+    {
+      "id": "P26",
+      "severity": "Low",
+      "status": "Open",
+      "coverage": "fact-normalisation"
+    },
+    {
+      "id": "P27",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "request-info-loop"
+    },
+    {
+      "id": "P28",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "document-preview"
+    },
+    {
+      "id": "P29",
+      "severity": "Low",
+      "status": "Open",
+      "coverage": "payfast-merchant-display"
+    },
+    {
+      "id": "P30",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "out-of-scope-record"
+    },
+    {
+      "id": "L1",
+      "severity": "High",
+      "status": "Fixed",
+      "coverage": "mandate-language"
+    },
+    {
+      "id": "L2",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "response-window"
+    },
+    {
+      "id": "L3",
+      "severity": "High",
+      "status": "Not retested",
+      "coverage": "substantive-position"
+    },
+    {
+      "id": "L4",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "factual-qa"
+    },
+    {
+      "id": "L5",
+      "severity": "Medium",
+      "status": "Not retested",
+      "coverage": "mitigation-use"
+    },
+    {
+      "id": "L6",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "letter-format"
+    },
+    {
+      "id": "L7",
+      "severity": "Medium",
+      "status": "VRS decision",
+      "coverage": "manual-vrs-policy"
+    },
+    {
+      "id": "L8",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "addressee-render"
+    },
+    {
+      "id": "L9",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "desired-outcome"
+    },
+    {
+      "id": "L10",
+      "severity": "Low",
+      "status": "Blocked by P21",
+      "coverage": "release-date"
+    },
+    {
+      "id": "L11",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "targeted-revision"
+    },
+    {
+      "id": "L12",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "revision-qa"
+    },
+    {
+      "id": "L13",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "verified-authorities"
+    },
+    {
+      "id": "L14",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "entitlement-credit"
+    },
+    {
+      "id": "L15",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "verified-authorities"
+    },
+    {
+      "id": "L16",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "timebar-letter-policy"
+    },
+    {
+      "id": "L17",
+      "severity": "High",
+      "status": "Open",
+      "coverage": "revision-fact-sync"
+    },
+    {
+      "id": "L18",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "track-clause-library"
+    },
+    {
+      "id": "L19",
+      "severity": "Medium",
+      "status": "Open",
+      "coverage": "legal-context-hygiene"
+    }
+  ]
+}
