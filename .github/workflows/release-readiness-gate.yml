@@ -1,0 +1,26 @@
+name: Release Readiness Gate
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'admin-workstation.html'
+      - 'netlify.toml'
+      - 'package.json'
+      - 'netlify/functions/**'
+      - 'scripts/uat-findings-matrix.json'
+      - 'scripts/release-readiness-harness.js'
+      - '.github/workflows/release-readiness-gate.yml'
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --ignore-scripts
+      - run: node scripts/intake-safety-harness.js
+      - run: node scripts/commercial-flow-harness.js
+      - run: node scripts/release-readiness-harness.js
