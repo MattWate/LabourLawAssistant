@@ -53,9 +53,17 @@ check(!card03.merit_bonus_trigger,'P5','shop steward mention does not trigger s1
 check(card03.merit_band!=='HIGH','P6','admitted assault + fair procedure + live final warning cannot score HIGH');
 check(card03.wp_eligible!==true,'F8','no/low-merit Card 03 is not automatically offered a WP letter');
 
+const explicitUnionRetaliation=scoreCase({
+ track:'AUD',
+ employment_status:'dismissed',
+ protected_ground:'union activity',
+ incident_description:'I was dismissed because of my union activity after organising members.'
+});
+check(explicitUnionRetaliation.merit_bonus_trigger?.name==='Union membership or activity','P5-POSITIVE','directly captured union retaliation still triggers protected-activity treatment');
+
 // F23/P30 — public service must be triaged, not hard-deflected before contact/deadline capture.
 check(!/JUR_PUBLIC_SERVICE:[\s\S]{0,900}next:\s*"DEFLECT_PUBLIC_SERVICE"/.test(web),'F23','public-service answer does not hard-stop at question 3');
-check(ask.includes('OUT_OF_SCOPE') || ask.includes('SERVICEABILITY'),'P30','out-of-scope matters are distinct from NO MERIT');
+check(ask.includes("serviceability_status: 'OUT_OF_SCOPE'") && ask.includes("merit_band: 'NOT_ASSESSED'"),'P30','out-of-scope matters are distinct from a legal NO MERIT finding');
 
 // F16/F2/F3/F22 — intake must prioritise required facts and suppress repeats.
 check(!/OPTIONAL_BUDGET_STATES[^;]*ADDRESSEE_NAME/.test(web),'F16','addressee is not sacrificed as optional near the prompt cap');
