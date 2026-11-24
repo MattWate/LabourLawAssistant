@@ -4,7 +4,10 @@ const CRITICAL_STATES = new Set([
   'FIRED_DATE','RESIGN_DATE','DISC_STATUS'
 ]);
 
-const OPTIONAL_STATES = new Set([
+const OPTIONAL_STATES = new Set([]);
+
+const REQUIRED_OPERATIONAL_STATES = new Set([
+  'DESIRED_OUTCOME','DESIRED_OUTCOME_OTHER','COMPANY_NAME',
   'ADDRESSEE_NAME','ADDRESSEE_POSITION','COMPANY_CONTACT'
 ]);
 
@@ -69,6 +72,7 @@ function deadlineMessage(status = {}) {
 
 function promptPriority(state) {
   if (CONTACT_STATES.has(state)) return 'contact';
+  if (REQUIRED_OPERATIONAL_STATES.has(state)) return 'operational';
   if (CRITICAL_STATES.has(state)) return 'critical';
   if (OPTIONAL_STATES.has(state)) return 'optional';
   return 'normal';
@@ -76,7 +80,7 @@ function promptPriority(state) {
 
 function promptBudgetDecision({ state, count = 0, limit = 15 }) {
   const priority = promptPriority(state);
-  if (priority === 'contact' || priority === 'critical') {
+  if (priority === 'contact' || priority === 'operational' || priority === 'critical') {
     return { allow:true, countAgainstBudget:false, priority };
   }
   if (priority === 'optional' && count >= Math.max(0, limit - 3)) {
@@ -108,5 +112,6 @@ module.exports = {
   candidateDateFromGovernance,
   CRITICAL_STATES,
   OPTIONAL_STATES,
+  REQUIRED_OPERATIONAL_STATES,
   CONTACT_STATES
 };
