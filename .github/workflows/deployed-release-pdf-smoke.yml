@@ -1,0 +1,40 @@
+name: Deployed Release PDF Smoke
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'netlify.toml'
+      - 'package.json'
+      - 'netlify/functions/lib/pdfDocument.js'
+      - 'netlify/functions/release_readiness_probe.js'
+      - 'netlify/functions/manage_letter_release.js'
+      - '.github/workflows/deployed-release-pdf-smoke.yml'
+jobs:
+  pdf-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify PDF generation inside deployed Netlify runtime
+        run: |
+          node - <<'NODE'
+          const url='https://labourlawassist.netlify.app/.netlify/functions/release_readiness_probe';
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          let last='';
+          for(let i=0;i<18;i++){
+            try{
+              const r=await fetch(url,{cache:'no-store'});
+              last=await r.text();
+              let d={}; try{d=JSON.parse(last)}catch{}
+              if(r.ok && d.ok && d.pdf_header==='%PDF-' && d.bytes>500){
+                console.log('PASS deployed PDF generation',d);
+                process.exit(0);
+              }
+              console.log('probe not ready/pass yet',r.status,last.slice(0,600));
+            }catch(e){last=e.message;console.log('probe error',e.message)}
+            await sleep(10000);
+          }
+          throw new Error('Deployed PDF generation failed: '+last.slice(0,1000));
+          NODE
