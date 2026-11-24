@@ -45,6 +45,7 @@ function renderReleasedLetterPdf({ caseId, facts = {}, draft = '', approvedAt })
       const boldFont = resolveQuicksand(700);
       const doc = new PDFDocument({
         size: 'A4',
+        font: regularFont,
         margins: { top: 50, bottom: 55, left: 58, right: 58 },
         info: {
           Title: `VRS Without Prejudice Letter - ${safe(facts.client_name, 'Client')}`,
