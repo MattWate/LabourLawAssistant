@@ -294,6 +294,8 @@ function buildCoreFacts(facts = {}, story = '', scorecard = {}, contextText = ''
     substantive_score: scorecard.substantive_score,
     procedural_score: scorecard.procedural_score,
     merit_band: scorecard.merit_band,
+    merit_assessed: scorecard.merit_assessed !== false,
+    serviceability_status: scorecard.serviceability_status || 'IN_SCOPE',
     recommended_next_step: scorecard.recommended_next_step,
     overall_viability: scorecard.recommended_next_step,
     wp_eligible: scorecard.wp_eligible,
@@ -337,7 +339,9 @@ function buildTriageFacts(facts = {}, outcome = 'UNKNOWN') {
     },
     wp_eligible: false,
     wp_type: null,
-    merit_band: 'NO MERIT',
+    merit_band: 'NOT_ASSESSED',
+    merit_assessed: false,
+    serviceability_status: 'OUT_OF_SCOPE',
     recommended_next_step: `Jurisdiction triage captured. Recommended forum: ${forum}.`,
     attorney_review_flag: true,
     wp_letter_status: 'NOT_APPLICABLE',
@@ -356,6 +360,11 @@ function clientOutcomeFor(facts = {}, scorecard = facts) {
     : deadline.status === 'WITHIN_WINDOW' && Number(deadline.daysRemaining) <= 7
       ? `Important: based on the date you gave us, there are only ${deadline.daysRemaining} days left in the ordinary 30-day CCMA referral period. Do not wait for settlement discussions before protecting the deadline. `
       : '';
+
+  if (scorecard.serviceability_status === 'OUT_OF_SCOPE' || facts.serviceability_status === 'OUT_OF_SCOPE') {
+    const forum = scorecard.recommended_forum || facts.recommended_forum || 'the relevant public-service bargaining council or specialist forum';
+    return deadlinePrefix + `Thank you for sharing your information. Because this appears to be a public-service matter, it falls outside the automated VRS service route and should be taken to ${forum}. This is a routing decision, not a finding that your case has no merit. Please protect any applicable referral deadline while arranging the correct forum.`;
+  }
 
   if (wpEligible) {
     const dismissalMatter = employmentStatus.includes('dismiss') ||
@@ -532,6 +541,21 @@ exports.handler = async (event) => {
       };
       const baseScorecard = scoreCase(scoringInput);
       const scorecard = applyOverridePostProcessing(scoringInput, scoringStory, baseScorecard);
+
+      const publicServiceAnswer = String(facts.public_service_or_excluded_agency || '').trim().toLowerCase();
+      if (['yes', 'true', 'public service', 'government'].includes(publicServiceAnswer)) {
+        scorecard.merit_band = 'NOT_ASSESSED';
+        scorecard.merit_assessed = false;
+        scorecard.serviceability_status = 'OUT_OF_SCOPE';
+        scorecard.wp_eligible = false;
+        scorecard.wp_type = null;
+        scorecard.recommended_forum = 'Relevant public-service bargaining council (for example PSCBC, GPSSBC, ELRC or SSSBC), depending on employer and sector';
+        scorecard.recommended_next_step = `This matter is outside the automated VRS service route because it appears to be a public-service matter. The legal merits have not been rejected. Protect any applicable referral deadline and route the dispute to the relevant public-service bargaining council or specialist forum.`;
+      } else {
+        scorecard.merit_assessed = true;
+        scorecard.serviceability_status = 'IN_SCOPE';
+      }
+
       const determination = await explainDeterministicDetermination({
         facts,
         scorecard,
