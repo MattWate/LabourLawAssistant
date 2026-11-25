@@ -430,7 +430,7 @@ function mergeGovernanceFacts(existingFacts = {}, governance = {}) {
     normalized_english_interpretation: governance.normalized_english_interpretation || null
   };
 
-  if (governance.input_language_detected && governance.input_language_detected !== 'unknown') {
+  if (governance.input_language_detected && !['unknown','Unknown'].includes(governance.input_language_detected)) {
     merged.input_language_detected = governance.input_language_detected;
     merged.input_language_confidence = Number(governance.input_language_confidence || 0);
   }
