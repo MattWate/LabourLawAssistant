@@ -1,0 +1,45 @@
+name: UAT 72-Point Closure Audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'admin-workstation.html'
+      - 'netlify.toml'
+      - 'package.json'
+      - 'netlify/functions/**'
+      - 'scripts/uat-findings-matrix.json'
+      - 'scripts/uat-72-closure-audit.json'
+      - 'scripts/uat-72-closure-harness.js'
+      - '.github/workflows/uat-72-closure-audit.yml'
+
+jobs:
+  closure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Run 72-point closure audit
+        run: node scripts/uat-72-closure-harness.js
+      - name: Publish closure report
+        if: always()
+        run: |
+          if [ -f artifacts/uat-closure/uat-72-closure-report.md ]; then
+            cat artifacts/uat-closure/uat-72-closure-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '# Justine 72-Point UAT Closure Audit' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Harness exited before producing a report. Review logs.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload closure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: justine-uat-72-closure-${{ github.sha }}
+          path: artifacts/uat-closure/
+          if-no-files-found: warn
+          retention-days: 90
