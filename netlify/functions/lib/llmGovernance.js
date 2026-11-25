@@ -98,6 +98,18 @@ function normaliseOverrideFlags(flags = []) {
   return [...new Set(flags.map(flag => OVERRIDE_ALIASES[String(flag || '').trim().toUpperCase()]).filter(Boolean))];
 }
 
+function normaliseLanguage(value = '') {
+  const text = String(value || '').trim();
+  const lower = text.toLowerCase();
+  if (!lower) return 'Unknown';
+  if (lower.includes('afrikaans')) return 'Afrikaans';
+  if (lower.includes('isizulu') || lower === 'zulu' || lower.includes(' zulu')) return 'isiZulu';
+  if (lower.includes('isixhosa') || lower === 'xhosa' || lower.includes(' xhosa')) return 'isiXhosa';
+  if (lower.includes('english')) return 'English';
+  if (lower === 'unknown' || lower === 'undetermined') return 'Unknown';
+  return 'Other';
+}
+
 function boolOrNull(value) {
   if (value === true || value === false || value === null) return value;
   const text = String(value || '').trim().toLowerCase();
@@ -174,7 +186,7 @@ function normaliseGovernance(raw = {}, source = 'claude') {
   }
   if (overrideFlags.length) hydratedFacts.override_flags = overrideFlags;
 
-  const language = cleanString(raw.input_language_detected || raw.language_detected || '') || 'unknown';
+  const language = normaliseLanguage(raw.input_language_detected || raw.language_detected || '');
   const languageConfidence = Number(raw.input_language_confidence || raw.language_confidence || 0);
   const englishInterpretation = cleanString(raw.normalized_english_interpretation || raw.english_interpretation || '') || null;
 
@@ -418,7 +430,7 @@ function mergeGovernanceFacts(existingFacts = {}, governance = {}) {
     normalized_english_interpretation: governance.normalized_english_interpretation || null
   };
 
-  if (governance.input_language_detected && governance.input_language_detected !== 'unknown') {
+  if (governance.input_language_detected && !['unknown','Unknown'].includes(governance.input_language_detected)) {
     merged.input_language_detected = governance.input_language_detected;
     merged.input_language_confidence = Number(governance.input_language_confidence || 0);
   }
@@ -435,5 +447,6 @@ module.exports = {
   classifyAndHydrateMatter,
   mergeGovernanceFacts,
   normaliseGovernance,
+  normaliseLanguage,
   toCompatibilityShape
 };
