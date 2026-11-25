@@ -37,6 +37,7 @@ const CATEGORY_GUIDANCE = Object.freeze({
   reference: 'Consider an agreed neutral or positive reference where this matches the client desired outcome.',
   clean_record_if_applicable: 'Seek expungement/clean-record treatment only where an adverse disciplinary finding or outcome may exist; otherwise make it conditional.',
   record_correction: 'Seek correction/removal of adverse employment records where supported.',
+  record_correction_if_applicable: 'Seek correction/removal of adverse disciplinary or employment records only where such records may exist.',
   confidentiality_non_disparagement: 'Use proportionate confidentiality and employee-side one-way non-disparagement unless mutuality is expressly authorised.',
   benefit_fund_confirmation_if_applicable: 'Consider pension/provident-fund confirmation or processing where applicable.',
   severance_if_due: 'For operational-requirements matters, address statutory/contractual severance where due.',
