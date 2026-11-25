@@ -60,7 +60,11 @@ const V={
   'deployed-pdf':()=>assert(has('netlify/functions/lib/pdfDocument.js','renderReleasedLetterPdf','Quicksand')&&has('netlify/functions/release_readiness_probe.js','pdf_header','font_probe'),'deployed PDF implementation/probe missing'),
   'mandate-payment-gate':()=>assert(has('netlify/functions/approve_case_for_payment.js','mandate_acceptance','payment_start_consent','approved_for_payment'),'mandate/payment gate missing'),
   'contact-fields':()=>assert(has('index.html','CONTACT_NAME','CONTACT_EMAIL','CONTACT_PHONE'),'contact fields missing'),
-  'override-tracks':()=>assert(has('netlify/functions/lib/llmGovernance.js','OVERRIDE_ALIASES','override_flags')&&has('netlify/functions/lib/scoringEngine.js','override_flags'),'override tracks missing'),
+  'override-tracks':()=>assert(
+    has('netlify/functions/lib/llmGovernance.js','OVERRIDE_ALIASES','normaliseOverrideFlags','hydratedFacts.override_flags = overrideFlags') &&
+    has('netlify/functions/ask.js','override_flags: scorecard.override_flags || []'),
+    'override flags are not normalised and propagated into case facts'
+  ),
   'assessment-after-cap':()=>assert(has('index.html','prompt_cap_reached','evaluation_started')&&has('netlify/functions/lib/whatsappConversation.js','prompt_cap_reached','completeEvaluation'),'assessment-after-cap missing'),
   'fact-normalisation':()=>assert(has('netlify/functions/lib/llmGovernance.js','normaliseTrack','cleanHydratedFacts')&&has('index.html','normaliseChoice'),'fact normalisation missing'),
   'request-info-loop':()=>assert(any('admin-workstation.html','Request More','Request more')&&any('admin-workstation.html','request_info','request info'),'request-more-info loop missing'),
@@ -74,7 +78,11 @@ const V={
   'manual-vrs-policy':()=>assert(true),
   'addressee-render':()=>assert(has('netlify/functions/lib/pdfDocument.js','recipientName','recipientPosition','employerName'),'addressee not rendered in PDF'),
   'desired-outcome':()=>assert(has('netlify/functions/ask.js','desired_outcome')&&has('netlify/functions/lib/claudeDrafting.js','desired_outcome'),'desired outcome not propagated to drafting'),
-  'release-date':()=>assert(has('netlify/functions/lib/pdfDocument.js','formatDate','approvedAt')&&has('netlify/functions/manage_letter_release.js','released_at'),'release date missing'),
+  'release-date':()=>assert(
+    has('netlify/functions/lib/pdfDocument.js','formatDate','approvedAt || new Date()') &&
+    has('netlify/functions/manage_letter_release.js','letter_sent_at: sentAt','updated_at: sentAt'),
+    'release/send date is not rendered and persisted'
+  ),
   'targeted-revision':()=>assert(fs.existsSync(path.join(ROOT,'netlify/functions/lib/revisionIntegrity.js'))&&has('netlify/functions/client_letter_review.js','client_revision_source_letter'),'targeted revision infrastructure missing'),
   'revision-qa':()=>{const source='Dismissed on 10 November 2026. Reference requested.';const r=validateRevisionIntegrity({caseBrief:{revision_round:1,revision_source_letter:source,revision_source_hash:sha256(source),client_requested_changes:'Change reference wording only.'},draft:{part_a_letter:{opening_paragraphs:['Completely different matter on 18 November 2026.'],settlement_terms:['Pay R75000']}}});assert(!r.ok,'bad revision accepted');},
   'entitlement-credit':()=>assert(any('netlify/functions/lib/claudeDrafting.js','entitlement','credit','leave pay','notice pay'),'entitlement/credit handling absent from drafting'),
