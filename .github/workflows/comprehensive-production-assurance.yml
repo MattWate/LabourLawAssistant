@@ -1,0 +1,49 @@
+name: Comprehensive Production Assurance
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'admin-workstation.html'
+      - 'netlify.toml'
+      - 'package.json'
+      - 'netlify/functions/**'
+      - 'scripts/**'
+      - '.github/workflows/comprehensive-production-assurance.yml'
+
+jobs:
+  assurance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Run comprehensive production assurance
+        run: node scripts/comprehensive-production-assurance.js
+
+      - name: Publish readable assurance summary
+        if: always()
+        run: |
+          if [ -f artifacts/production-assurance/production-assurance-report.md ]; then
+            cat artifacts/production-assurance/production-assurance-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Justine Comprehensive Production Assurance" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "The harness exited before the report could be generated. Review the job log." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload assurance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: justine-production-assurance-${{ github.sha }}
+          path: artifacts/production-assurance/
+          if-no-files-found: warn
+          retention-days: 30
