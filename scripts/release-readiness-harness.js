@@ -171,8 +171,9 @@ check(netlify.includes('pdfkit') && netlify.includes('included_files'),'P21-PACK
 check(release.includes('renderReleasedLetterPdf'),'P21-CODE','release uses PDF generation');
 check(admin.includes('letter_send_failed'),'P21-STATE','failed release has a visible status');
 check(
-  admin.includes("manageLetter('") &&
-  admin.includes("'preview'") &&
+  admin.includes('btn-preview-') &&
+  admin.includes('Preview Final PDF') &&
+  admin.includes("if (action === 'preview')") &&
   release.includes("action === 'preview'") &&
   release.includes('final_release_preview_hash') &&
   release.includes('Preview the final client-approved PDF before sending it to the employer.'),
