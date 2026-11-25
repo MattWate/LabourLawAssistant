@@ -170,7 +170,15 @@ check(!wrongDisciplinary.ok,'L18-GUARD','termination remedies are rejected for a
 check(netlify.includes('pdfkit') && netlify.includes('included_files'),'P21-PACKAGE','Netlify config explicitly handles PDFKit assets');
 check(release.includes('renderReleasedLetterPdf'),'P21-CODE','release uses PDF generation');
 check(admin.includes('letter_send_failed'),'P21-STATE','failed release has a visible status');
-check(admin.includes('preview') || admin.includes('PDF Preview'),'P28','final release document has a preview path before send');
+check(
+  admin.includes("manageLetter('") &&
+  admin.includes("'preview'") &&
+  release.includes("action === 'preview'") &&
+  release.includes('final_release_preview_hash') &&
+  release.includes('Preview the final client-approved PDF before sending it to the employer.'),
+  'P28',
+  'final client-approved PDF has an authenticated preview path and send is gated on that exact preview'
+);
 
 // P10/P11 — actor/audit visibility.
 check(!/letter_approved_by[^\n]{0,100}sasha@vrslabourlaw\.co\.za/.test(release),'P10','release actor is not hard-coded');
@@ -178,7 +186,14 @@ check(admin.includes('Activity') || admin.includes('audit'),'P11','case page exp
 
 // F11/P12 — commercial clarity.
 check(web.includes('R10') || web.includes('10.00') || ask.includes('R10'),'F11','fee is shown before payment consent');
-check(admin.includes('channel') && admin.includes('amount'),'P12','payment confirmation exposes channel and amount');
+check(
+  admin.includes('Payment amount') &&
+  admin.includes('Confirmation channel') &&
+  admin.includes('payment_confirmation_channel') &&
+  admin.includes('payment_amount'),
+  'P12',
+  'admin payment confirmation exposes authoritative channel and amount'
+);
 
 // Fixed-regression markers retained.
 check(web.includes('CONTACT_NAME') && web.includes('CONTACT_EMAIL') && web.includes('CONTACT_PHONE'),'F16-FIX','early contact capture remains');
