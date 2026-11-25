@@ -1,6 +1,7 @@
 const { getClaudeModel, anthropicHeaders, modelAuditMetadata } = require('./claudeConfig');
 const { validateLegalAuthorities, verifiedAuthoritySummary } = require('./legalAuthorityRegistry');
 const { validateRevisionIntegrity } = require('./revisionIntegrity');
+const { buildLetterPolicy, validateLetterPolicy } = require('./letterPolicy');
 const MAX_OUTPUT_TOKENS = Number(process.env.CLAUDE_DRAFT_MAX_TOKENS || 12000);
 
 
@@ -68,6 +69,7 @@ function buildCaseBrief({ facts = {}, senderVariant = 'VRS', clientSide = 'emplo
     legal_basis: facts.legal_basis || [],
     scoring_breakdown: facts.scoring_breakdown || [],
     recommended_next_step: facts.recommended_next_step || facts.overall_viability || null,
+    desired_outcome: facts.desired_outcome || null,
     ccma_deadline_status: facts.ccma_deadline_status || null,
     merit_bonus_trigger: facts.merit_bonus_trigger || null,
     strengths: facts.strengths || [],
@@ -123,6 +125,10 @@ ${currentLawSkillContext(skillContext)}
 === VERIFIED LEGAL AUTHORITY REGISTRY ===
 Only statutory and Code citations supported by this server-side registry may appear in outward-facing legal analysis. Do not invent section or paragraph numbers.
 ${JSON.stringify(verifiedAuthoritySummary(), null, 2)}
+
+=== DETERMINISTIC LETTER POLICY ===
+This server-side policy controls the employer response period, statutory deadline disclosure and track-appropriate settlement categories. Follow it exactly. Do not replace the business-day response period with a generic seven-calendar-day deadline.
+${JSON.stringify(buildLetterPolicy(caseBrief), null, 2)}
 
 === SERVER CASE BRIEF ===
 ${JSON.stringify(caseBrief, null, 2)}
@@ -184,7 +190,9 @@ Rules for this API output:
 - Internal scoring labels such as "HIGH merit", "MEDIUM merit", "LOW merit", merit-band names or numeric internal scores must never appear in outward-facing correspondence. Translate them into narrative legal reasoning.
 - Do not add continuity-of-service assertions unless continuous_service or equivalent is expressly confirmed in the case brief. A stated length of service does not by itself prove uninterrupted service.
 - Use conditional wording for anything that is not confirmed.
-- Give the recipient seven calendar days to respond.
+- Use the response period in the DETERMINISTIC LETTER POLICY. Express it in business days, not calendar days. The statutory referral deadline is separate from the employer response period and must never be presented as suspended by settlement discussions.
+- Apply the DETERMINISTIC LETTER POLICY time_bar instruction. Where disclosure is required, state the urgency clearly without overstating certainty.
+- Build settlement terms from the DETERMINISTIC LETTER POLICY categories for the case track and the client's desired outcome. Do not mechanically add termination remedies to pre-dismissal or unfair-labour-practice matters.
 - Draft the factual narrative as coherent prose in "opening_paragraphs". The renderer will place it under a visible "Background" heading and number each background paragraph. Do not type the heading or paragraph numbers into the field values.
 - Do not include specific rand figures in the body of the letter unless explicitly authorised as a settlement figure by VRS.
 - Apply the audience profile from VRS_HOUSE_STYLE consistently throughout Part A. Do not add contradictory tone instructions of your own.
@@ -616,6 +624,9 @@ function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
   const revisionValidation = validateRevisionIntegrity({ caseBrief, draft });
   defects.push(...revisionValidation.defects);
 
+  const letterPolicyValidation = validateLetterPolicy({ draft, caseBrief });
+  defects.push(...letterPolicyValidation.defects);
+
   return [...new Set(defects)];
 }
 
@@ -763,16 +774,23 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   assessment.score_change = Number((assessment.final_drafting_quality_score - assessment.initial_drafting_quality_score).toFixed(2));
   const legalAuthorityValidation = validateLegalAuthorities({ draft: parsed, caseBrief });
   const revisionIntegrity = validateRevisionIntegrity({ caseBrief, draft: parsed });
+  const letterPolicyValidation = validateLetterPolicy({ draft: parsed, caseBrief });
   assessment.legal_authority_validation = {
     ok: legalAuthorityValidation.ok,
     citations: legalAuthorityValidation.citations,
     defects: legalAuthorityValidation.defects
   };
   assessment.revision_integrity = revisionIntegrity.metrics;
+  assessment.letter_policy_validation = {
+    ok: letterPolicyValidation.ok,
+    defects: letterPolicyValidation.defects,
+    policy: letterPolicyValidation.policy
+  };
   assessment.quality_floor_met =
     assessment.quality_floor_met &&
     legalAuthorityValidation.ok &&
-    revisionIntegrity.ok;
+    revisionIntegrity.ok &&
+    letterPolicyValidation.ok;
 
   parsed.part_b_supervisory_assessment = assessment;
 
