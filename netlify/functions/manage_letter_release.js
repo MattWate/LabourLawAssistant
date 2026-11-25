@@ -301,7 +301,7 @@ exports.handler = async (event) => {
         draft,
         approvedAt: facts.letter_approved_at || now
       });
-      const previewSha = sha256(previewPdf.buffer);
+      const previewSha = crypto.createHash('sha256').update(previewPdf.buffer).digest('hex');
       const previewedAt = new Date().toISOString();
       const previewFacts = {
         ...facts,
