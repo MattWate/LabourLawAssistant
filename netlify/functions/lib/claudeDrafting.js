@@ -1,4 +1,6 @@
 const { getClaudeModel, anthropicHeaders, modelAuditMetadata } = require('./claudeConfig');
+const { validateLegalAuthorities, verifiedAuthoritySummary } = require('./legalAuthorityRegistry');
+const { validateRevisionIntegrity } = require('./revisionIntegrity');
 const MAX_OUTPUT_TOKENS = Number(process.env.CLAUDE_DRAFT_MAX_TOKENS || 12000);
 
 
@@ -73,6 +75,7 @@ function buildCaseBrief({ facts = {}, senderVariant = 'VRS', clientSide = 'emplo
     structured_case_facts: structuredDraftFacts(facts),
     client_requested_changes: facts.client_requested_changes || null,
     revision_source_letter: facts.client_revision_source_letter || null,
+    revision_source_hash: facts.client_revision_source_hash || null,
     revision_round: Number(facts.client_revision_round || 0)
   };
 }
@@ -116,6 +119,10 @@ This server-side current-law block overrides any conflicting or outdated citatio
 === END CURRENT LAW OVERRIDE ===
 
 ${currentLawSkillContext(skillContext)}
+
+=== VERIFIED LEGAL AUTHORITY REGISTRY ===
+Only statutory and Code citations supported by this server-side registry may appear in outward-facing legal analysis. Do not invent section or paragraph numbers.
+${JSON.stringify(verifiedAuthoritySummary(), null, 2)}
 
 === SERVER CASE BRIEF ===
 ${JSON.stringify(caseBrief, null, 2)}
@@ -603,6 +610,12 @@ function mandatoryDraftingDefects({ draft = {}, caseBrief = {} }) {
     }
   }
 
+  const authorityValidation = validateLegalAuthorities({ draft, caseBrief });
+  defects.push(...authorityValidation.defects);
+
+  const revisionValidation = validateRevisionIntegrity({ caseBrief, draft });
+  defects.push(...revisionValidation.defects);
+
   return [...new Set(defects)];
 }
 
@@ -748,6 +761,19 @@ async function callClaudeForWpDraft({ skillContext, caseBrief, skillSet }) {
   assessment.initial_drafting_quality_score = Number(initialAssessment.drafting_quality_score || 0);
   assessment.final_drafting_quality_score = Number(assessment.drafting_quality_score || 0);
   assessment.score_change = Number((assessment.final_drafting_quality_score - assessment.initial_drafting_quality_score).toFixed(2));
+  const legalAuthorityValidation = validateLegalAuthorities({ draft: parsed, caseBrief });
+  const revisionIntegrity = validateRevisionIntegrity({ caseBrief, draft: parsed });
+  assessment.legal_authority_validation = {
+    ok: legalAuthorityValidation.ok,
+    citations: legalAuthorityValidation.citations,
+    defects: legalAuthorityValidation.defects
+  };
+  assessment.revision_integrity = revisionIntegrity.metrics;
+  assessment.quality_floor_met =
+    assessment.quality_floor_met &&
+    legalAuthorityValidation.ok &&
+    revisionIntegrity.ok;
+
   parsed.part_b_supervisory_assessment = assessment;
 
   return {
