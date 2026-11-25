@@ -3,6 +3,7 @@ const {execFileSync}=require('child_process');
 const {scoreCase}=require('../netlify/functions/lib/scoringEngine');
 const {validateLegalAuthorities}=require('../netlify/functions/lib/legalAuthorityRegistry');
 const {validateRevisionIntegrity,sha256}=require('../netlify/functions/lib/revisionIntegrity');
+const {buildLetterPolicy,validateLetterPolicy}=require('../netlify/functions/lib/letterPolicy');
 
 const failures=[];
 const passes=[];
@@ -25,7 +26,8 @@ for(const p of [
  'netlify/functions/ask.js','netlify/functions/lib/scoringEngine.js','netlify/functions/lib/claudeDrafting.js',
  'netlify/functions/client_letter_review.js','netlify/functions/manage_letter_release.js',
  'netlify/functions/lib/pdfDocument.js','netlify/functions/release_readiness_probe.js',
- 'netlify/functions/lib/legalAuthorityRegistry.js','netlify/functions/lib/revisionIntegrity.js'
+ 'netlify/functions/lib/legalAuthorityRegistry.js','netlify/functions/lib/revisionIntegrity.js',
+ 'netlify/functions/lib/letterPolicy.js'
 ]) syntax(p);
 
 const web=read('index.html');
@@ -131,9 +133,38 @@ check(drafting.includes('verifiedAuthoritySummary') && drafting.includes('valida
 check(!drafting.includes('old Schedule 8 text'),'L19','legacy Schedule 8 context is not deliberately injected');
 
 // L2/L16/L18 — policy/track rules must be explicit rather than free-form.
-check(!drafting.includes('Give the recipient seven calendar days to respond.'),'L2','response period is not hard-coded to seven calendar days');
-check(exists('netlify/functions/lib/letterPolicy.js'),'L16','time-bar disclosure policy is explicit and testable');
-check(exists('netlify/functions/lib/letterPolicy.js'),'L18','settlement clauses are selected by track');
+check(!drafting.includes('Give the recipient seven calendar days to respond.') && drafting.includes('DETERMINISTIC LETTER POLICY'),'L2','response period comes from deterministic business-day policy rather than a fixed seven-calendar-day rule');
+check(exists('netlify/functions/lib/letterPolicy.js'),'L16','time-bar disclosure policy module exists');
+const nearExpiryPolicy=buildLetterPolicy({
+  track:'UD-MISCONDUCT',
+  ccma_deadline_status:{status:'WITHIN_WINDOW',daysRemaining:4}
+});
+check(nearExpiryPolicy.response.business_days===3 && nearExpiryPolicy.time_bar.disclose===true && nearExpiryPolicy.time_bar.level==='urgent_live','L16-LIVE','near-expiry referral produces an urgent independent deadline warning');
+const lapsedPolicy=buildLetterPolicy({
+  track:'UD-MISCONDUCT',
+  ccma_deadline_status:{status:'LAPSED-CONDONATION',daysOverdue:5}
+});
+check(lapsedPolicy.response.business_days===3 && /condonation/i.test(lapsedPolicy.time_bar.instruction),'L16-LAPSED','lapsed referral explicitly surfaces condonation');
+const urgentDraft=validateLetterPolicy({
+  caseBrief:{track:'UD-MISCONDUCT',ccma_deadline_status:{status:'WITHIN_WINDOW',daysRemaining:4}},
+  draft:{part_a_letter:{
+    opening_paragraphs:['The statutory referral deadline remains independent of these settlement discussions and is not suspended or extended by this correspondence.'],
+    legal_claims:[],
+    settlement_intro:'We invite a response within 3 business days.',
+    settlement_terms:['Compensation calibrated to the dismissal risk.'],
+    conclusion_paragraphs:[]
+  }}
+});
+check(urgentDraft.ok,'L16-GUARD','urgent draft with independent deadline wording passes deterministic policy validation');
+check(exists('netlify/functions/lib/letterPolicy.js'),'L18','track-based settlement policy module exists');
+const retrenchPolicy=buildLetterPolicy({track:'UD-RETRENCHMENT'});
+const disciplinaryPolicy=buildLetterPolicy({track:'DISCIPLINARY'});
+check(retrenchPolicy.settlement.categories.some(x=>x.id==='severance_if_due') && !disciplinaryPolicy.settlement.categories.some(x=>x.id==='severance_if_due'),'L18-TRACK','retrenchment and pre-dismissal disciplinary settlement categories are distinct');
+const wrongDisciplinary=validateLetterPolicy({
+  caseBrief:{track:'DISCIPLINARY'},
+  draft:{part_a_letter:{opening_paragraphs:[],legal_claims:[],settlement_intro:'',settlement_terms:['Pay statutory severance and issue a UI-19.'],conclusion_paragraphs:[]}}
+});
+check(!wrongDisciplinary.ok,'L18-GUARD','termination remedies are rejected for a pre-dismissal disciplinary track unless specifically supported');
 
 // P21/P28 — PDF release and preview/retry semantics.
 check(netlify.includes('pdfkit') && netlify.includes('included_files'),'P21-PACKAGE','Netlify config explicitly handles PDFKit assets');
