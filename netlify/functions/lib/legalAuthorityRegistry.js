@@ -2,17 +2,17 @@ const AUTHORITIES = Object.freeze({
   LRA: {
     title: 'Labour Relations Act 66 of 1995',
     source: 'https://www.gov.za/documents/labour-relations-act',
-    sections: new Set(['186(1)(e)','186(2)','186(2)(b)','186(2)(c)','187','187(1)(a)','187(1)(e)','187(1)(f)','188','188(1)','189','189A','200A','203(2A)'])
+    sections: new Set(['185','186','186(1)(e)','186(2)','186(2)(b)','186(2)(c)','187','187(1)(a)','187(1)(e)','187(1)(f)','188','188(1)','188A','189','189A','191','193','194','200A','203','203(2A)'])
   },
   BCEA: {
     title: 'Basic Conditions of Employment Act 75 of 1997',
     source: 'https://www.gov.za/documents/basic-conditions-employment-act',
-    sections: new Set(['34','37','38','41','77'])
+    sections: new Set(['20','21','22','34','37','38','40','41','77','77A'])
   },
   EEA: {
     title: 'Employment Equity Act 55 of 1998',
     source: 'https://www.gov.za/documents/employment-equity-act',
-    sections: new Set(['6','15'])
+    sections: new Set(['6','10','15','50'])
   },
   DISMISSAL_CODE_2025: {
     title: 'Code of Practice: Dismissal, 2025',
@@ -50,9 +50,28 @@ function extractStatutoryCitations(text = '') {
     while ((match = re.exec(raw)) !== null) citations.push({ authority: key, section: normaliseSection(match[1]), raw: match[0] });
   }
 
+  const reversePatterns = [
+    { key: 'LRA', re: /(?:section|s)\s*([0-9]{1,3}(?:A)?(?:\([0-9a-z]+\))?(?:\([0-9a-z]+\))?)\s+of\s+the\s+(?:LRA|Labour Relations Act)/gi },
+    { key: 'BCEA', re: /(?:section|s)\s*([0-9]{1,3}(?:\([0-9a-z]+\))?(?:\([0-9a-z]+\))?)\s+of\s+the\s+(?:BCEA|Basic Conditions of Employment Act)/gi },
+    { key: 'EEA', re: /(?:section|s)\s*([0-9]{1,3}(?:\([0-9a-z]+\))?(?:\([0-9a-z]+\))?)\s+of\s+the\s+(?:EEA|Employment Equity Act)/gi }
+  ];
+  for (const { key, re } of reversePatterns) {
+    let match;
+    while ((match = re.exec(raw)) !== null) citations.push({ authority: key, section: normaliseSection(match[1]), raw: match[0] });
+  }
+
   const codeRe = /(?:Code of Practice:\s*Dismissal,\s*2025|the Code)(?:\s*,?\s*(?:paragraphs?|paras?\.?))\s*([0-9]{1,2})(?:\s*[-–]\s*([0-9]{1,2}))?/gi;
   let codeMatch;
   while ((codeMatch = codeRe.exec(raw)) !== null) {
+    const start = Number(codeMatch[1]);
+    const end = codeMatch[2] ? Number(codeMatch[2]) : start;
+    for (let n = start; n <= end && n <= start + 30; n += 1) {
+      citations.push({ authority: 'DISMISSAL_CODE_2025', paragraph: String(n), raw: codeMatch[0] });
+    }
+  }
+
+  const reverseCodeRe = /(?:paragraphs?|paras?\.?)\s*([0-9]{1,2})(?:\s*[-–]\s*([0-9]{1,2}))?\s+of\s+(?:the\s+)?(?:Code of Practice:\s*Dismissal,\s*2025|Code)/gi;
+  while ((codeMatch = reverseCodeRe.exec(raw)) !== null) {
     const start = Number(codeMatch[1]);
     const end = codeMatch[2] ? Number(codeMatch[2]) : start;
     for (let n = start; n <= end && n <= start + 30; n += 1) {
