@@ -154,7 +154,7 @@ exports.handler = async (event) => {
     const caseId = request.caseId;
     const action = String(request.action || '').trim().toLowerCase();
     if (!caseId) return json(400, { error: 'Case ID required' });
-    if (!['save', 'approve', 'regenerate', 'send'].includes(action)) return json(400, { error: 'Action must be save, approve, regenerate or send' });
+    if (!['save', 'approve', 'regenerate', 'preview', 'send'].includes(action)) return json(400, { error: 'Action must be save, approve, regenerate, preview or send' });
 
     const { data: caseData, error: caseError } = await supabase.from('cases').select('*').eq('id', caseId).single();
     if (caseError || !caseData) return json(404, { error: 'Case not found' });
@@ -181,7 +181,12 @@ exports.handler = async (event) => {
         client_review_completed_at: null,
         client_review_outcome: null,
         client_letter_approved_at: null,
-        client_letter_approved_hash: null
+        client_letter_approved_hash: null,
+        final_release_previewed_at: null,
+        final_release_previewed_by: null,
+        final_release_preview_hash: null,
+        final_release_preview_pdf_sha256: null,
+        final_release_preview_filename: null
       };
       const { error } = await supabase.from('cases').update({
         draft_letter: draft,
@@ -217,7 +222,12 @@ exports.handler = async (event) => {
         client_review_outcome: null,
         client_letter_approved_at: null,
         client_letter_approved_hash: null,
-        client_requested_changes: null
+        client_requested_changes: null,
+        final_release_previewed_at: null,
+        final_release_previewed_by: null,
+        final_release_preview_hash: null,
+        final_release_preview_pdf_sha256: null,
+        final_release_preview_filename: null
       };
       const generated = await generateApprovedDocument({ caseData, facts: baseFacts, draft, user, approvedAt: now });
       const approvedFacts = {
@@ -277,6 +287,48 @@ exports.handler = async (event) => {
       return json(200, { success: true, action: 'regenerate', document_ready: true, document_filename: generated.document.filename });
     }
 
+    if (action === 'preview') {
+      if (caseData.letter_status !== 'client_approved') return json(409, { error: 'The client must approve this exact letter before the final PDF can be previewed' });
+      if (!draft) return json(400, { error: 'The approved letter is empty' });
+      if (draft !== String(caseData.draft_letter || '').trim()) return json(409, { error: 'The letter has changed since approval. Save and approve the revised version before previewing.' });
+      const draftHash = sha256(draft);
+      if (facts.approved_text_hash !== draftHash) return json(409, { error: 'The generated document does not match the approved letter. Regenerate it before previewing.' });
+      if (facts.client_letter_approved_hash !== draftHash) return json(409, { error: 'The current letter does not match the version approved by the client.' });
+
+      const previewPdf = await renderReleasedLetterPdf({
+        caseId,
+        facts,
+        draft,
+        approvedAt: facts.letter_approved_at || now
+      });
+      const previewSha = sha256(previewPdf.buffer);
+      const previewedAt = new Date().toISOString();
+      const previewFacts = {
+        ...facts,
+        final_release_previewed_at: previewedAt,
+        final_release_previewed_by: user.email || user.id,
+        final_release_preview_hash: draftHash,
+        final_release_preview_pdf_sha256: previewSha,
+        final_release_preview_filename: previewPdf.filename
+      };
+      const { error: previewUpdateError } = await supabase.from('cases').update({
+        case_facts: previewFacts,
+        updated_at: previewedAt
+      }).eq('id', caseId);
+      if (previewUpdateError) throw previewUpdateError;
+
+      return json(200, {
+        success: true,
+        action: 'preview',
+        preview_ready: true,
+        content_type: previewPdf.content_type || 'application/pdf',
+        filename: previewPdf.filename,
+        pdf_sha256: previewSha,
+        approved_text_hash: draftHash,
+        pdf_base64: previewPdf.buffer.toString('base64')
+      });
+    }
+
     const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
     let releaseAuth;
     try {
@@ -292,6 +344,9 @@ exports.handler = async (event) => {
     if (facts.approved_text_hash !== sha256(draft)) return json(409, { error: 'The generated document does not match the approved letter. Regenerate it before sending.' });
     if (facts.client_letter_approved_hash !== sha256(draft)) return json(409, { error: 'The current letter does not match the version approved by the client. Send it for client approval again.' });
     if (!facts.letter_document_path || !facts.letter_document_filename) return json(409, { error: 'Generate the final VRS document before sending.' });
+    if (facts.final_release_preview_hash !== sha256(draft) || !facts.final_release_previewed_at) {
+      return json(409, { error: 'Preview the final client-approved PDF before sending it to the employer.' });
+    }
 
     const to = employerEmail(caseData, facts);
     if (!to) return json(400, { error: 'A valid employer email address is required before release' });
