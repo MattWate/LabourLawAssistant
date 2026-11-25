@@ -1,0 +1,523 @@
+{
+  "generated_from": "scripts/uat-findings-matrix.json",
+  "closure_policy": {
+    "allowed_dispositions": [
+      "PASS",
+      "ACCEPTED_VRS_DECISION",
+      "SUPERSEDED"
+    ],
+    "forbidden_legacy_statuses": [
+      "Open",
+      "Partly fixed",
+      "Not retested",
+      "Blocked by P21"
+    ],
+    "note": "PASS requires executable evidence in scripts/uat-72-closure-harness.js. ACCEPTED_VRS_DECISION and SUPERSEDED require an explicit rationale."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "Medium",
+      "coverage": "intake-prefill",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the intake-prefill verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F2",
+      "severity": "High",
+      "coverage": "intake-required-facts",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the intake-required-facts verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F3",
+      "severity": "High",
+      "coverage": "intake-required-facts",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the intake-required-facts verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F4",
+      "severity": "Medium",
+      "coverage": "intake-reason",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the intake-reason verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F5",
+      "severity": "Medium",
+      "coverage": "service-precision",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the service-precision verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F6",
+      "severity": "Medium",
+      "coverage": "warning-detail",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the warning-detail verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F7",
+      "severity": "Low",
+      "coverage": "addressee-fields",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the addressee-fields verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F8",
+      "severity": "High",
+      "coverage": "merit-outcome",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the merit-outcome verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F9",
+      "severity": "High",
+      "coverage": "deadline",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the deadline verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F10",
+      "severity": "Medium",
+      "coverage": "reference-consistency",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the reference-consistency verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F11",
+      "severity": "High",
+      "coverage": "fee-display",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the fee-display verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F12",
+      "severity": "Medium",
+      "coverage": "consent-gate",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the consent-gate verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F13",
+      "severity": "Low",
+      "coverage": "email-sanity",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the email-sanity verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F14",
+      "severity": "Low",
+      "coverage": "choice-echo",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the choice-echo verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F15",
+      "severity": "Medium",
+      "coverage": "prompt-budget",
+      "disposition": "SUPERSEDED",
+      "rationale": "The old hard prompt-cap/handoff behaviour was replaced by priority-based prompt budgeting with critical/contact/operational fields allowed beyond the normal cap."
+    },
+    {
+      "id": "F16",
+      "severity": "High",
+      "coverage": "prompt-budget",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the prompt-budget verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F17",
+      "severity": "High",
+      "coverage": "deadline",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the deadline verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F18",
+      "severity": "Medium",
+      "coverage": "resume-intake",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the resume-intake verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F19",
+      "severity": "Medium",
+      "coverage": "poor-performance-facts",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the poor-performance-facts verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F20",
+      "severity": "High",
+      "coverage": "candidate-date",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the candidate-date verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F21",
+      "severity": "Medium",
+      "coverage": "confirmation-ui",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the confirmation-ui verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F22",
+      "severity": "Medium",
+      "coverage": "duplicate-question",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the duplicate-question verifier in the 72-point closure harness."
+    },
+    {
+      "id": "F23",
+      "severity": "High",
+      "coverage": "public-service-routing",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the public-service-routing verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P1",
+      "severity": "High",
+      "coverage": "claude-governance",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the claude-governance verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P2",
+      "severity": "High",
+      "coverage": "whatsapp-templates",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the whatsapp-templates verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P3",
+      "severity": "High",
+      "coverage": "deadline-refresh",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the deadline-refresh verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P4",
+      "severity": "High",
+      "coverage": "payfast-verification",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the payfast-verification verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P5",
+      "severity": "High",
+      "coverage": "protected-activity-gate",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the protected-activity-gate verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P6",
+      "severity": "High",
+      "coverage": "negative-merit-evidence",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the negative-merit-evidence verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P7",
+      "severity": "Medium",
+      "coverage": "rescore-on-edit",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the rescore-on-edit verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P8",
+      "severity": "Medium",
+      "coverage": "verified-authorities",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the verified-authorities verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P9",
+      "severity": "Low",
+      "coverage": "advisory-topic",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the advisory-topic verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P10",
+      "severity": "High",
+      "coverage": "actor-audit",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the actor-audit verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P11",
+      "severity": "Medium",
+      "coverage": "activity-log",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the activity-log verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P12",
+      "severity": "Medium",
+      "coverage": "payment-confirmation-detail",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the payment-confirmation-detail verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P13",
+      "severity": "Medium",
+      "coverage": "review-link-state",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the review-link-state verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P14",
+      "severity": "High",
+      "coverage": "branding",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the branding verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P15",
+      "severity": "High",
+      "coverage": "factual-qa",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the factual-qa verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P16",
+      "severity": "Medium",
+      "coverage": "document-preview",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the document-preview verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P17",
+      "severity": "Medium",
+      "coverage": "release-client-notice",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the release-client-notice verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P18",
+      "severity": "Medium",
+      "coverage": "date-field-semantics",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the date-field-semantics verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P19",
+      "severity": "Low",
+      "coverage": "provenance-rendering",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the provenance-rendering verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P20",
+      "severity": "Low",
+      "coverage": "case-refresh",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the case-refresh verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P21",
+      "severity": "High",
+      "coverage": "deployed-pdf",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the deployed-pdf verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P22",
+      "severity": "High",
+      "coverage": "mandate-payment-gate",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the mandate-payment-gate verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P23",
+      "severity": "High",
+      "coverage": "contact-fields",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the contact-fields verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P24",
+      "severity": "Medium",
+      "coverage": "override-tracks",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the override-tracks verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P25",
+      "severity": "High",
+      "coverage": "assessment-after-cap",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the assessment-after-cap verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P26",
+      "severity": "Low",
+      "coverage": "fact-normalisation",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the fact-normalisation verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P27",
+      "severity": "Medium",
+      "coverage": "request-info-loop",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the request-info-loop verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P28",
+      "severity": "Medium",
+      "coverage": "document-preview",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the document-preview verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P29",
+      "severity": "Low",
+      "coverage": "payfast-merchant-display",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the payfast-merchant-display verifier in the 72-point closure harness."
+    },
+    {
+      "id": "P30",
+      "severity": "Medium",
+      "coverage": "out-of-scope-record",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the out-of-scope-record verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L1",
+      "severity": "High",
+      "coverage": "mandate-language",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the mandate-language verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L2",
+      "severity": "High",
+      "coverage": "response-window",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the response-window verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L3",
+      "severity": "High",
+      "coverage": "substantive-position",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the substantive-position verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L4",
+      "severity": "High",
+      "coverage": "factual-qa",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the factual-qa verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L5",
+      "severity": "Medium",
+      "coverage": "mitigation-use",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the mitigation-use verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L6",
+      "severity": "Medium",
+      "coverage": "letter-format",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the letter-format verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L7",
+      "severity": "Medium",
+      "coverage": "manual-vrs-policy",
+      "disposition": "ACCEPTED_VRS_DECISION",
+      "rationale": "This item is an explicit VRS policy choice rather than a software defect. It remains a controlled manual policy decision and is not silently automated."
+    },
+    {
+      "id": "L8",
+      "severity": "Medium",
+      "coverage": "addressee-render",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the addressee-render verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L9",
+      "severity": "Medium",
+      "coverage": "desired-outcome",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the desired-outcome verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L10",
+      "severity": "Low",
+      "coverage": "release-date",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the release-date verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L11",
+      "severity": "High",
+      "coverage": "targeted-revision",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the targeted-revision verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L12",
+      "severity": "High",
+      "coverage": "revision-qa",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the revision-qa verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L13",
+      "severity": "Medium",
+      "coverage": "verified-authorities",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the verified-authorities verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L14",
+      "severity": "Medium",
+      "coverage": "entitlement-credit",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the entitlement-credit verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L15",
+      "severity": "High",
+      "coverage": "verified-authorities",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the verified-authorities verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L16",
+      "severity": "High",
+      "coverage": "timebar-letter-policy",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the timebar-letter-policy verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L17",
+      "severity": "High",
+      "coverage": "revision-fact-sync",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the revision-fact-sync verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L18",
+      "severity": "Medium",
+      "coverage": "track-clause-library",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the track-clause-library verifier in the 72-point closure harness."
+    },
+    {
+      "id": "L19",
+      "severity": "Medium",
+      "coverage": "legal-context-hygiene",
+      "disposition": "PASS",
+      "rationale": "Executable closure evidence is provided by the legal-context-hygiene verifier in the 72-point closure harness."
+    }
+  ]
+}
