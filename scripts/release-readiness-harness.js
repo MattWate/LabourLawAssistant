@@ -1,6 +1,8 @@
 const fs=require('fs');
 const {execFileSync}=require('child_process');
 const {scoreCase}=require('../netlify/functions/lib/scoringEngine');
+const {validateLegalAuthorities}=require('../netlify/functions/lib/legalAuthorityRegistry');
+const {validateRevisionIntegrity,sha256}=require('../netlify/functions/lib/revisionIntegrity');
 
 const failures=[];
 const passes=[];
@@ -22,7 +24,8 @@ check(uncoveredHigh.length===0,'MATRIX-HIGH-COVERAGE','every High finding has na
 for(const p of [
  'netlify/functions/ask.js','netlify/functions/lib/scoringEngine.js','netlify/functions/lib/claudeDrafting.js',
  'netlify/functions/client_letter_review.js','netlify/functions/manage_letter_release.js',
- 'netlify/functions/lib/pdfDocument.js','netlify/functions/release_readiness_probe.js'
+ 'netlify/functions/lib/pdfDocument.js','netlify/functions/release_readiness_probe.js',
+ 'netlify/functions/lib/legalAuthorityRegistry.js','netlify/functions/lib/revisionIntegrity.js'
 ]) syntax(p);
 
 const web=read('index.html');
@@ -72,19 +75,59 @@ check(!/DESIRED_OUTCOME:[\s\S]{0,1800}next:\s*"DESIRED_OUTCOME",\s*val:\s*"(?:Fi
 check(/incident_description/.test(web) && /describe what happened/i.test(web),'F3','client own-account narrative remains an explicit intake requirement');
 check(web.includes('_pending_confirmation'),'F22','confirmation state exists for deduplication checks');
 
-// L11/L12/L17 — targeted revision infrastructure must exist.
+// L11/L12/L17 — targeted revision infrastructure must exist and reject uncontrolled rewrites.
 check(exists('netlify/functions/lib/revisionIntegrity.js'),'L11','targeted revision integrity module exists');
-check(exists('netlify/functions/lib/revisionIntegrity.js'),'L12','revision QA invariants are implemented');
+const revisionSource='Background\nThe employee was dismissed on 10 November 2026 after a disciplinary process.\nLegal Claims\nThe dismissal is challenged under LRA section 188(1).';
+const targetedRevision={
+  part_a_letter:{
+    opening_paragraphs:['The employee was dismissed on 10 November 2026 after a disciplinary process.'],
+    legal_claims:[{title:'Fairness of dismissal',text:'The dismissal is challenged under LRA section 188(1) and the client asks that the reference wording also be corrected.'}],
+    settlement_intro:'The parties are invited to resolve the dispute.',
+    settlement_terms:['Provide an agreed neutral employment reference.'],
+    conclusion_paragraphs:['We invite a constructive response.']
+  }
+};
+const revisionOk=validateRevisionIntegrity({
+  caseBrief:{
+    revision_round:1,
+    revision_source_letter:revisionSource,
+    revision_source_hash:sha256(revisionSource),
+    client_requested_changes:'Please change the reference wording to a neutral reference.',
+    structured_case_facts:{incident_date:'2026-11-10'}
+  },
+  draft:targetedRevision
+});
+check(revisionOk.ok,'L12','targeted revision passes deterministic integrity invariants');
+const uncontrolled=validateRevisionIntegrity({
+  caseBrief:{
+    revision_round:1,
+    revision_source_letter:revisionSource,
+    revision_source_hash:sha256(revisionSource),
+    client_requested_changes:'Please change the reference wording only.',
+    structured_case_facts:{incident_date:'2026-11-10'}
+  },
+  draft:{part_a_letter:{opening_paragraphs:['A completely unrelated replacement narrative about another dispute and a new event on 14 December 2026.'],legal_claims:[],settlement_intro:'',settlement_terms:[],conclusion_paragraphs:[]}}
+});
+check(!uncontrolled.ok && uncontrolled.defects.length>0,'L12-GUARD','uncontrolled rewrite/new date is deterministically rejected');
 check(review.includes('client_revision_source_letter'),'L17','revision source version is persisted');
-check(drafting.includes('revision_source_letter'),'L11b','drafter receives the revision source');
+check(drafting.includes('revision_source_letter') && drafting.includes('revision_source_hash'),'L11b','drafter receives revision source and integrity hash');
 
 // P15/L4 — factual QA must have deterministic unsupported-fact protection.
 check(exists('netlify/functions/lib/draftingFactsGuard.js') || drafting.includes('mandatoryDraftingDefects'),'P15','deterministic factual QA guard exists');
 
 // P8/L13/L15/L19 — verified legal authority layer.
 check(exists('netlify/functions/lib/legalAuthorityRegistry.js'),'P8','verified legal authority registry exists');
-check(exists('netlify/functions/lib/legalAuthorityRegistry.js'),'L13','Code/statute citations are registry-backed');
-check(exists('netlify/functions/lib/legalAuthorityRegistry.js'),'L15','wrong statutory sections can be deterministically rejected');
+const validAuthorities=validateLegalAuthorities({
+  caseBrief:{track:'UD-MISCONDUCT'},
+  draft:{part_a_letter:{opening_paragraphs:[],legal_claims:[{title:'Fairness',text:'The dismissal is challenged under LRA section 188(1), read with paragraphs 7-11 of the Code of Practice: Dismissal, 2025.'}],settlement_intro:'',settlement_terms:['Payment in lieu of the applicable notice period under BCEA section 38, with that notice period determined under BCEA section 37.'],conclusion_paragraphs:[]}}
+});
+check(validAuthorities.ok,'L13','registered LRA/BCEA/2025 Code citations pass deterministic validation');
+const invalidAuthorities=validateLegalAuthorities({
+  caseBrief:{track:'UD-MISCONDUCT'},
+  draft:{part_a_letter:{opening_paragraphs:[],legal_claims:[{title:'Wrong law',text:'The dismissal is automatically governed by LRA section 999 and paragraph 25 of the Code of Practice: Dismissal, 2025.'}],settlement_intro:'',settlement_terms:[],conclusion_paragraphs:[]}}
+});
+check(!invalidAuthorities.ok && invalidAuthorities.defects.length>=2,'L15','unregistered statutory section and Code paragraph are deterministically rejected');
+check(drafting.includes('verifiedAuthoritySummary') && drafting.includes('validateLegalAuthorities'),'P8-INTEGRATION','drafting prompt and quality gate use the verified authority registry');
 check(!drafting.includes('old Schedule 8 text'),'L19','legacy Schedule 8 context is not deliberately injected');
 
 // L2/L16/L18 — policy/track rules must be explicit rather than free-form.
