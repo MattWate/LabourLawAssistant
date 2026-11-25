@@ -173,7 +173,10 @@ async function unlockCaseIfPaid(existingPayment, recordedPayment, data, checks) 
     payfast_merchant_valid: checks.merchantValid === true,
     payfast_server_validation_status: checks.payfastValidationStatus,
     payfast_amount_match: amountValid,
-    payfast_case_match: caseValid
+    payfast_case_match: caseValid,
+    payment_amount: Number(existingPayment.amount),
+    payment_confirmation_channel: 'PayFast ITN',
+    payment_confirmation_reference: recordedPayment?.pf_payment_id || data.pf_payment_id || existingPayment.m_payment_id
   };
 
   const { data: updatedRows, error: updateError } = await supabase.from('cases').update({

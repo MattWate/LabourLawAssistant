@@ -43,7 +43,11 @@ exports.handler = async (event) => {
     const evidence = {source:'admin_override',recorded_by:user.email,recorded_by_id:user.id,recorded_at:at,reason,
       m_payment_id:payment.m_payment_id,amount:payment.amount};
     const updatedFacts = {...facts,payment_status:'paid',paid_at:at,wp_generation_unlocked:true,
-      payment_verification_source:'admin_override',manual_payment_confirmation:evidence};
+      payment_verification_source:'admin_override',
+      payment_amount:Number(payment.amount),
+      payment_confirmation_channel:'Manual admin override',
+      payment_confirmation_reference:payment.m_payment_id,
+      manual_payment_confirmation:evidence};
 
     // Conditional update is the single unlock gate. A concurrent ITN or repeat
     // click can only win this gate once; losers must not restart case processing.

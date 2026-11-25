@@ -421,6 +421,22 @@
     function txt(v, fallback = '—') { return v === null || v === undefined || v === '' ? fallback : String(v); }
     function bool(v) { return v === true || String(v).toLowerCase() === 'true'; }
     function date(v) { return v ? new Date(v).toLocaleString('en-ZA') : 'Unknown'; }
+    function money(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? new Intl.NumberFormat('en-ZA', { style:'currency', currency:'ZAR' }).format(n) : '—';
+    }
+    function paymentDetailHtml(c) {
+      const f = facts(c);
+      const amount = f.payment_amount ?? f.manual_payment_confirmation?.amount ?? null;
+      const channel = f.payment_confirmation_channel || (f.payment_verification_source === 'admin_override' ? 'Manual admin override' : (c.payment_status === 'paid' ? 'PayFast' : f.payment_request_channel || '—'));
+      const reference = f.payment_confirmation_reference || f.payfast_payment_id || f.payfast_m_payment_id || f.payment_reference || f.manual_payment_confirmation?.m_payment_id || '—';
+      return '<div class="timeline" style="margin-top:12px">' +
+        '<div class="timeline-item"><strong>Payment amount</strong>' + esc(money(amount)) + '</div>' +
+        '<div class="timeline-item"><strong>Confirmation channel</strong>' + esc(channel) + '</div>' +
+        '<div class="timeline-item"><strong>Payment reference</strong>' + esc(reference) + '</div>' +
+        (c.paid_at || f.paid_at ? '<div class="timeline-item"><strong>Confirmed</strong>' + esc(date(c.paid_at || f.paid_at)) + '</div>' : '') +
+      '</div>';
+    }
 
     function effective(c) {
       const f = facts(c);
@@ -614,7 +630,7 @@
     function paymentAction(c) {
       const f = facts(c);
       const ed = effective(c);
-      if (c.payment_status === 'paid') return '<span class="badge green">' + (f.payment_verification_source === 'admin_override' ? 'Payment manually confirmed ' : 'Payment received ') + esc(date(c.paid_at)) + '</span>';
+      if (c.payment_status === 'paid') return '<span class="badge green">' + (f.payment_verification_source === 'admin_override' ? 'Payment manually confirmed ' : 'Payment received ') + esc(date(c.paid_at || f.paid_at)) + '</span>';
       if (c.status === 'awaiting_mandate_acceptance') return '<button class="btn ghost" disabled>Awaiting Mandate</button>';
       if (c.status === 'awaiting_payment_consent') return '<button class="btn ghost" disabled>Awaiting Client Consent</button>';
       if (c.payment_status === 'pending' || c.status === 'payment_pending') return '<button class="btn ghost" disabled>Payment Requested</button><button id="btn-manual-payment-' + c.id + '" class="btn warn" onclick="manualConfirmPayment(\'' + c.id + '\')">Confirm Payment Manually</button>';
@@ -687,7 +703,8 @@
         } else if (awaitingClient) {
           audit = '<div class="timeline" style="margin-top:12px"><div class="timeline-item"><strong>VRS approved</strong>' + esc(date(f.letter_approved_at)) + ' by ' + esc(txt(f.letter_approved_by)) + '</div><div class="timeline-item"><strong>Client review</strong>Waiting for client approval · link expires ' + esc(date(f.client_review_expires_at)) + '</div></div>';
         } else if (clientApproved) {
-          audit = '<div class="timeline" style="margin-top:12px"><div class="timeline-item"><strong>Client approved</strong>' + esc(date(f.client_letter_approved_at)) + '</div><div class="timeline-item"><strong>Release status</strong>Exact approved version is ready to send to the employer.</div></div>';
+          const previewCurrent = f.final_release_preview_hash && f.final_release_preview_hash === f.client_letter_approved_hash;
+          audit = '<div class="timeline" style="margin-top:12px"><div class="timeline-item"><strong>Client approved</strong>' + esc(date(f.client_letter_approved_at)) + '</div><div class="timeline-item"><strong>Final PDF preview</strong>' + (previewCurrent ? 'Previewed ' + esc(date(f.final_release_previewed_at)) + ' · ' + esc(txt(f.final_release_preview_filename)) : 'Required before release') + '</div><div class="timeline-item"><strong>Release status</strong>' + (previewCurrent ? 'Exact approved PDF has been previewed and is ready to send.' : 'Preview the exact approved PDF before release.') + '</div></div>';
         } else if (changesRequested) {
           audit = '<div class="timeline" style="margin-top:12px"><div class="timeline-item"><strong>Client requested changes</strong>' + esc(txt(f.client_requested_changes)) + '</div><div class="timeline-item"><strong>Revision</strong>The revised draft will return here for VRS review before the client is asked to approve it again.</div></div>';
         } else if (generating && f.client_requested_changes) {
@@ -698,7 +715,8 @@
         if (sent) {
           buttons = '<button class="btn ghost" disabled>Letter Released</button>';
         } else if (clientApproved) {
-          buttons = '<button id="btn-save-' + c.id + '" class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'save\')">Save Revised Draft</button><button id="btn-send-' + c.id + '" class="btn success" onclick="manageLetter(\'' + c.id + '\',\'send\')">Release & Send PDF</button>';
+          const previewCurrent = f.final_release_preview_hash && f.final_release_preview_hash === f.client_letter_approved_hash;
+          buttons = '<button id="btn-save-' + c.id + '" class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'save\')">Save Revised Draft</button><button id="btn-preview-' + c.id + '" class="btn warn" onclick="manageLetter(\'' + c.id + '\',\'preview\')">Preview Final PDF</button><button id="btn-send-' + c.id + '" class="btn success" ' + (previewCurrent ? '' : 'disabled') + ' onclick="manageLetter(\'' + c.id + '\',\'send\')">Release & Send PDF</button>';
         } else if (awaitingClient) {
           buttons = '<button id="btn-save-' + c.id + '" class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'save\')">Edit / Withdraw Review</button><button id="btn-approve-' + c.id + '" class="btn ghost" onclick="manageLetter(\'' + c.id + '\',\'approve\')">Issue New 12-hour Review Link</button><button class="btn success" disabled>Awaiting Client Approval</button>';
         } else if (changesRequested || generating) {
@@ -724,7 +742,7 @@
       const ed = effective(c);
       const questions = f.client_questions || [];
       const legal = ed.legal_basis || f.legal_basis || [];
-      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge ' + (c.payment_status === 'paid' ? 'green' : c.payment_status === 'pending' ? 'amber' : 'blue') + '">Payment: ' + esc(c.payment_status || 'not requested') + '</span><span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div></div>' + paymentResolutionCard(c) + '<div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
+      return '<div class="card"><h3>Delivery Status</h3><div class="badges" style="margin-top:12px">' + statusBadge(statusOf(c)) + '<span class="badge ' + (c.payment_status === 'paid' ? 'green' : c.payment_status === 'pending' ? 'amber' : 'blue') + '">Payment: ' + esc(c.payment_status || 'not requested') + '</span><span class="badge blue">' + esc(c.letter_status || 'no letter') + '</span>' + (ed.source ? '<span class="badge purple">' + esc(ed.source) + '</span>' : '') + '</div><div class="timeline"><div class="timeline-item"><strong>Created</strong>' + esc(date(c.created_at)) + '</div><div class="timeline-item"><strong>Updated</strong>' + esc(date(c.updated_at)) + '</div><div class="timeline-item"><strong>Recommended forum</strong>' + esc(txt(f.recommended_forum)) + '</div></div>' + (c.payment_status === 'paid' ? paymentDetailHtml(c) : '') + '</div>' + paymentResolutionCard(c) + '<div class="card"><h3>Client Questions</h3><div class="timeline">' + (questions.length ? questions.map(q => '<div class="timeline-item"><strong>' + esc(q.status || 'pending') + ' · ' + esc(q.channel || 'manual') + '</strong>' + esc(q.question || '') + (q.answer ? '<br><em>Answer: ' + esc(q.answer) + '</em>' : '') + '</div>').join('') : '<div class="timeline-item"><strong>No pending questions</strong>Use Request Info when facts are missing.</div>') + '</div></div><div class="card"><h3>Legal Basis</h3><div class="timeline">' + (legal.length ? legal.map(x => '<div class="timeline-item">' + esc(x) + '</div>').join('') : '<div class="timeline-item">No legal basis recorded.</div>') + '</div></div><div class="card"><h3>Raw case_facts</h3><pre class="raw">' + esc(JSON.stringify(f, null, 2)) + '</pre></div>';
     }
 
     function paymentResolutionCard(c) {
@@ -1003,23 +1021,25 @@
     }
 
     function setLetterActionBusy(id, busy, action = '') {
-      const ids = ['btn-save-' + id, 'btn-approve-' + id, 'btn-send-' + id];
+      const ids = ['btn-save-' + id, 'btn-approve-' + id, 'btn-preview-' + id, 'btn-send-' + id];
       ids.forEach(buttonId => {
         const button = $(buttonId);
         if (button) button.disabled = busy;
       });
-      const active = action === 'approve' ? $('btn-approve-' + id) : action === 'send' ? $('btn-send-' + id) : $('btn-save-' + id);
-      if (busy && active) active.textContent = action === 'send' ? 'Sending…' : action === 'approve' ? 'Approving…' : 'Saving…';
+      const active = action === 'approve' ? $('btn-approve-' + id) : action === 'preview' ? $('btn-preview-' + id) : action === 'send' ? $('btn-send-' + id) : $('btn-save-' + id);
+      if (busy && active) active.textContent = action === 'send' ? 'Sending…' : action === 'preview' ? 'Generating Preview…' : action === 'approve' ? 'Approving…' : 'Saving…';
     }
 
     function markApprovedLetterEdited(id) {
       const send = $('btn-send-' + id);
+      const preview = $('btn-preview-' + id);
       const save = $('btn-save-' + id);
       const note = $('letter-action-note-' + id);
       if (send) {
         send.disabled = true;
         send.textContent = 'Reapproval Required';
       }
+      if (preview) preview.disabled = true;
       if (save) save.textContent = 'Save Revised Draft';
       if (note) note.textContent = 'This approved letter has been edited. Save the revised draft, then approve the new version before release.';
     }
@@ -1038,6 +1058,18 @@
         if (!res.ok) throw new Error(result.error || 'Letter action failed.');
         if (action === 'save') toast('Revised draft saved. This version now requires approval before release.');
         if (action === 'approve') toast(result.client_review_sent ? 'Letter approved. Client review link sent.' : 'Letter approved for client review.');
+        if (action === 'preview') {
+          if (!result.pdf_base64) throw new Error('Preview PDF was not returned.');
+          const binary = atob(result.pdf_base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: result.content_type || 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          const previewWindow = window.open(url, '_blank', 'noopener');
+          if (!previewWindow) toast('Preview generated. Allow pop-ups to view the PDF.');
+          else toast('Final client-approved PDF preview opened.');
+          setTimeout(() => URL.revokeObjectURL(url), 120000);
+        }
         if (action === 'send') toast('Letter sent to ' + (result.sent_to || 'the employer') + '.');
         await fetchCases();
       } catch(e) {
